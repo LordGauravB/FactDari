@@ -1,35 +1,34 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, simpledialog, messagebox
 import ctypes
 from ctypes import wintypes
-import requests
-import webbrowser
-import pyttsx3
-from PIL import Image, ImageTk
 import pyodbc
 from datetime import datetime, timedelta
+import pyttsx3
+from PIL import Image, ImageTk
+import random
 
 # Constants
 CONN_STR = (
     r'DRIVER={SQL Server};'
     r'SERVER=GAURAVS_DESKTOP\SQLEXPRESS;'
-    r'DATABASE=FactsGenerator;'
+    r'DATABASE=FactDari;'
     r'Trusted_Connection=yes;'
 )
-MODES = ["API", "New Random", "Saved"]
 
 # Global variables
-fact_saved = False
 x_window, y_window = 0, 0
-current_fact_id = None
-current_saved_fact_id = None
+current_factcard_id = None
+show_answer = False
 
 def apply_rounded_corners(root, radius):
+    """Apply rounded corners to the window"""
     hWnd = wintypes.HWND(int(root.frame(), 16))
     hRgn = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, root.winfo_width(), root.winfo_height(), radius, radius)
     ctypes.windll.user32.SetWindowRgn(hWnd, hRgn, True)
 
 def execute_query(query, params=None, fetch=True):
+    """Execute a SQL query with optional parameters"""
     with pyodbc.connect(CONN_STR) as conn:
         with conn.cursor() as cursor:
             if params:
@@ -40,546 +39,695 @@ def execute_query(query, params=None, fetch=True):
                 return cursor.fetchall()
             conn.commit()
 
-def count_saved_facts():
-    return execute_query("SELECT COUNT(*) FROM SavedFacts")[0][0]
+def count_factcards():
+    """Count total fact cards in the database"""
+    return execute_query("SELECT COUNT(*) FROM FactCards")[0][0]
 
 def update_ui():
+    """Update UI elements periodically"""
     update_coordinates()
-    update_fact_count()
+    update_factcard_count()
     root.after(100, update_ui)
 
-def update_fact_count():
-    num_facts = count_saved_facts()
-    fact_count_label.config(text=f"Number of Saved Facts: {num_facts}")
-
-def open_github(event=None):
-    webbrowser.open('https://github.com/LordGauravB')
+def update_factcard_count():
+    """Update the fact card count display"""
+    num_factcards = count_factcards()
+    factcard_count_label.config(text=f"Total Fact Cards: {num_factcards}")
 
 def on_press(event):
+    """Handle mouse press on title bar for dragging"""
     global x_window, y_window
     x_window, y_window = event.x, event.y
 
 def update_coordinates():
+    """Update the coordinate display"""
     x, y = root.winfo_x(), root.winfo_y()
     coordinate_label.config(text=f"Coordinates: {x}, {y}")
 
 def on_drag(event):
+    """Handle window dragging"""
     x, y = event.x_root - x_window, event.y_root - y_window
     root.geometry(f"+{x}+{y}")
     coordinate_label.config(text=f"Coordinates: {x}, {y}")
 
 def set_static_position(event=None):
+    """Set window to a static position"""
     root.geometry("-1930+7")
     update_coordinates()
 
-def open_fact_file(event=None):
-    facts = execute_query("SELECT TOP 10 f.FactText FROM SavedFacts sf JOIN Facts f ON sf.FactID = f.FactID ORDER BY sf.DateSaved DESC")
-    if facts:
-        fact_window = tk.Toplevel(root)
-        fact_window.title("Recent Saved Facts")
-        fact_window.geometry("400x300")
-        for fact in facts:
-            tk.Label(fact_window, text=fact[0], wraplength=380).pack(pady=5)
-    else:
-        save_status_label.config(text="No saved facts found.", fg="#ff0000")
-
-def fetch_api_fact():
-    global current_api_fact, fact_saved
-    try:
-        response = requests.get("https://uselessfacts.jsph.pl/random.json?language=en", timeout=10)
-        if response.status_code == 200:
-            fact_text = response.json()['text']
-            current_api_fact = fact_text  # Store the API fact
-            fact_saved = False  # Reset saved status
-            return fact_text
-        else:
-            return "Failed to fetch a random fact from API"
-    except requests.RequestException as e:
-        return f"Error: {str(e)}"
-
-def fetch_db_fact(category="Random"):
-    global current_fact_id
-    if category == "Random":
-        query = "SELECT FactID, FactText FROM Facts ORDER BY NEWID()"
-    else:
-        query = """
-        SELECT f.FactID, f.FactText 
-        FROM Facts f
-        JOIN Categories c ON f.CategoryID = c.CategoryID
-        WHERE c.CategoryName = ?
-        ORDER BY NEWID()
-        """
-    facts = execute_query(query, (category,) if category != "Random" else None)
-    if facts:
-        fact = facts[0]
-        current_fact_id = fact[0]
-        execute_query("UPDATE Facts SET ViewCount = ViewCount + 1 WHERE FactID = ?", (fact[0],), fetch=False)
-        return fact[1]
-    return "No fact found for the selected category."
-
-def is_fact_saved(fact_id, fact_text=None):
-    if fact_id:
-        query = "SELECT COUNT(*) FROM SavedFacts WHERE FactID = ?"
-        result = execute_query(query, (fact_id,))
-        return result[0][0] > 0
-    elif fact_text:
-        query = """
-        SELECT COUNT(*) 
-        FROM SavedFacts sf
-        JOIN Facts f ON sf.FactID = f.FactID
-        WHERE f.FactText = ?
-        """
-        result = execute_query(query, (fact_text,))
-        return result[0][0] > 0
-    return False
-
-def update_star_icon():
-    global fact_saved
-    current_mode = mode_var.get()
-    current_fact = fact_label.cget("text")
+def speak_text():
+    """Speak the current fact card text"""
+    text = factcard_label.cget("text")
+    # Remove "Question: " or "Answer: " prefix if present
+    if text.startswith("Question: "):
+        text = text[10:]
+    elif text.startswith("Answer: "):
+        text = text[8:]
     
-    if (current_mode == "Saved" or
-        current_fact == "Welcome to Fact Generator!" or
-        current_fact.startswith("No fact found")):
-        star_button.config(image=black_star_icon)
-    elif current_mode == "API":
-        fact_saved = is_fact_saved(None, current_fact)
-        if fact_saved:
-            star_button.config(image=gold_star_icon)
-        else:
-            star_button.config(image=white_star_icon)
-    elif current_fact_id:
-        fact_saved = is_fact_saved(current_fact_id)
-        if fact_saved:
-            star_button.config(image=gold_star_icon)
-        else:
-            star_button.config(image=white_star_icon)
-    else:
-        star_button.config(image=white_star_icon)
+    engine = pyttsx3.init()
+    engine.say(text)
+    engine.runAndWait()
 
-def toggle_save_fact():
-    global fact_saved, current_fact_id, current_api_fact
-    current_mode = mode_var.get()
-    current_fact = fact_label.cget("text")
-    
-    if (current_mode == "Saved" or
-        current_fact == "Welcome to Fact Generator!" or
-        current_fact.startswith("No fact found")):
-        return  # Do nothing in these cases
-    
-    if not fact_saved:
-        if current_mode == "API" and current_api_fact:
-            # For new API facts that aren't in the database yet
-            api_category_id = execute_query("SELECT CategoryID FROM Categories WHERE CategoryName = 'API'")[0][0]
-            current_fact_id = execute_query(
-                "INSERT INTO Facts (FactText, CategoryID, IsVerified) OUTPUT INSERTED.FactID VALUES (?, ?, 0)",
-                (current_api_fact, api_category_id)
-            )[0][0]
-        elif not current_fact_id:
-            # For other modes, if somehow the fact isn't in the database (shouldn't happen, but just in case)
-            return
-        
-        # Insert into SavedFacts
-        execute_query("INSERT INTO SavedFacts (FactID, NextReviewDate, CurrentInterval) VALUES (?, GETDATE(), 1)", 
-                     (current_fact_id,), fetch=False)
-        
-        # Call the stored procedure to populate tags
-        execute_query("EXEC AutoPopulateSpecificFactTags @FactID=?", (current_fact_id,), fetch=False)
-        
-        save_status_label.config(text="Fact Saved!", fg="#b66d20")
-        fact_saved = True
-    else:
-        if current_mode == "API":
-            # Use a single query to delete from all related tables for API mode
-            delete_query = """
-            BEGIN TRANSACTION;
-            
-            DECLARE @fact_id INT;
-            SELECT @fact_id = FactID FROM Facts WHERE FactText = ?;
-            
-            IF @fact_id IS NOT NULL
-            BEGIN
-                DELETE FROM FactTags WHERE FactID = @fact_id;
-                DELETE FROM SavedFacts WHERE FactID = @fact_id;
-                DELETE FROM Facts WHERE FactID = @fact_id;
-            END
-            
-            COMMIT TRANSACTION;
-            """
-            execute_query(delete_query, (current_fact,), fetch=False)
-            current_fact_id = None  # Reset current_fact_id after deletion
-        else:
-            # For other modes, only delete from SavedFacts
-            execute_query("DELETE FROM SavedFacts WHERE FactID = ?", (current_fact_id,), fetch=False)
-        
-        save_status_label.config(text="Fact Unsaved!", fg="#b66d20")
-        fact_saved = False
-    
-    update_star_icon()
-    update_fact_count()
-
-def get_next_review_info():
-    """
-    Get information about the next review date and count of facts due on that date.
-    This version first retrieves the minimum (earliest) NextReviewDate that is greater than the current date,
-    then counts only the facts that have that exact NextReviewDate.
-    """
+def get_due_factcard_count():
+    """Get count of fact cards due for review today"""
     current_date = datetime.now().strftime('%Y-%m-%d')
     category = category_var.get()
     
-    if category == "Random":
-        query_min = """
+    if category == "All Categories":
+        query = "SELECT COUNT(*) FROM FactCards WHERE NextReviewDate <= ?"
+        result = execute_query(query, (current_date,))
+    else:
+        query = """
+        SELECT COUNT(*) 
+        FROM FactCards f
+        JOIN Categories c ON f.CategoryID = c.CategoryID
+        WHERE f.NextReviewDate <= ? AND c.CategoryName = ?
+        """
+        result = execute_query(query, (current_date, category))
+    
+    return result[0][0] if result else 0
+
+def get_next_review_info():
+    """Get information about the next review date after today"""
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    category = category_var.get()
+    
+    if category == "All Categories":
+        query = """
             SELECT MIN(NextReviewDate)
-            FROM SavedFacts 
+            FROM FactCards 
             WHERE NextReviewDate > ?
         """
-        result = execute_query(query_min, (current_date,))
+        result = execute_query(query, (current_date,))
     else:
-        query_min = """
-            SELECT MIN(sf.NextReviewDate)
-            FROM SavedFacts sf
-            JOIN Facts f ON sf.FactID = f.FactID
+        query = """
+            SELECT MIN(f.NextReviewDate)
+            FROM FactCards f
             JOIN Categories c ON f.CategoryID = c.CategoryID
-            WHERE sf.NextReviewDate > ? AND c.CategoryName = ?
+            WHERE f.NextReviewDate > ? AND c.CategoryName = ?
         """
-        result = execute_query(query_min, (current_date, category))
+        result = execute_query(query, (current_date, category))
     
     if result and result[0][0]:
         next_date = result[0][0]
-        # Count only the facts due exactly on the minimum next_date
-        if category == "Random":
-            query_count = """
+        # Count fact cards due on the next date
+        if category == "All Categories":
+            query = """
                 SELECT COUNT(*)
-                FROM SavedFacts 
+                FROM FactCards 
                 WHERE NextReviewDate = ?
             """
-            count_result = execute_query(query_count, (next_date,))
+            count_result = execute_query(query, (next_date,))
         else:
-            query_count = """
+            query = """
                 SELECT COUNT(*)
-                FROM SavedFacts sf
-                JOIN Facts f ON sf.FactID = f.FactID
+                FROM FactCards f
                 JOIN Categories c ON f.CategoryID = c.CategoryID
-                WHERE sf.NextReviewDate = ? AND c.CategoryName = ?
+                WHERE f.NextReviewDate = ? AND c.CategoryName = ?
             """
-            count_result = execute_query(query_count, (next_date, category))
+            count_result = execute_query(query, (next_date, category))
         count = count_result[0][0] if count_result else 0
         return next_date, count
     return None, 0
 
-def hide_review_buttons():
-    """Disable only the spaced repetition buttons (do not disable the 'Generate/Next Fact' button)"""
-    hard_button.config(state="disabled")
-    medium_button.config(state="disabled")
-    easy_button.config(state="disabled")
+def toggle_question_answer():
+    """Toggle between showing question and answer"""
+    global show_answer
+    
+    if current_factcard_id is None:
+        return
+    
+    # Toggle between question and answer
+    show_answer = not show_answer
+    
+    if show_answer:
+        # Fetch the answer from the database
+        query = "SELECT Answer FROM FactCards WHERE FactCardID = ?"
+        answer = execute_query(query, (current_factcard_id,))[0][0]
+        factcard_label.config(text=f"Answer: {answer}", font=("Trebuchet MS", adjust_font_size(answer)))
+        show_answer_button.config(text="Show Question")
+    else:
+        # Show the question again
+        query = "SELECT Question FROM FactCards WHERE FactCardID = ?"
+        question = execute_query(query, (current_factcard_id,))[0][0]
+        factcard_label.config(text=f"Question: {question}", font=("Trebuchet MS", adjust_font_size(question)))
+        show_answer_button.config(text="Show Answer")
 
-def show_review_buttons():
-    """Enable only the spaced repetition buttons (do not affect the 'Generate/Next Fact' button)"""
-    hard_button.config(state="normal")
-    medium_button.config(state="normal")
-    easy_button.config(state="normal")
-
-def fetch_saved_fact():
-    """Fetch a fact due for review, or display next review date if none due"""
-    global current_saved_fact_id
+def fetch_due_factcard():
+    """Fetch a fact card due for review"""
+    global current_factcard_id, show_answer
     category = category_var.get()
     current_date = datetime.now().strftime('%Y-%m-%d')
     
-    # Query for facts due today or overdue
-    if category == "Random":
-        query = """
-            SELECT TOP 1 sf.SavedFactID, f.FactText, sf.NextReviewDate, sf.CurrentInterval
-            FROM SavedFacts sf 
-            JOIN Facts f ON sf.FactID = f.FactID 
-            WHERE sf.NextReviewDate <= ?
-            ORDER BY sf.NextReviewDate, NEWID()
-        """
-        fact = execute_query(query, (current_date,))
-    else:
-        query = """
-            SELECT TOP 1 sf.SavedFactID, f.FactText, sf.NextReviewDate, sf.CurrentInterval
-            FROM SavedFacts sf 
-            JOIN Facts f ON sf.FactID = f.FactID 
-            JOIN Categories c ON f.CategoryID = c.CategoryID
-            WHERE c.CategoryName = ? AND sf.NextReviewDate <= ?
-            ORDER BY sf.NextReviewDate, NEWID()
-        """
-        fact = execute_query(query, (category, current_date))
+    # Reset the show_answer state for new fact card
+    show_answer = False
     
-    if fact:
-        # We have a fact due for review
-        current_saved_fact_id, fact_text, next_review, interval = fact[0]
-        update_review_info(next_review, interval)
-        show_review_buttons()
-        return fact_text
+    # Get fact cards due for review today or earlier
+    if category == "All Categories":
+        query = """
+            SELECT TOP 1 FactCardID, Question, Answer, NextReviewDate, CurrentInterval
+            FROM FactCards
+            WHERE NextReviewDate <= ?
+            ORDER BY NextReviewDate, NEWID()
+        """
+        factcard = execute_query(query, (current_date,))
     else:
-        # No facts due for review
-        current_saved_fact_id = None
+        query = """
+            SELECT TOP 1 f.FactCardID, f.Question, f.Answer, f.NextReviewDate, f.CurrentInterval
+            FROM FactCards f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE c.CategoryName = ? AND f.NextReviewDate <= ?
+            ORDER BY f.NextReviewDate, NEWID()
+        """
+        factcard = execute_query(query, (category, current_date))
+    
+    if factcard:
+        # We have a fact card due for review
+        factcard_id, question, answer, next_review, interval = factcard[0]
+        current_factcard_id = factcard_id
+        
+        # Show the question
+        show_review_buttons(True)
+        show_answer_button.config(state="normal")
+        return f"Question: {question}"
+    else:
+        # No fact cards due for review
+        current_factcard_id = None
         next_date, count = get_next_review_info()
-        hide_review_buttons()
+        show_review_buttons(False)
+        show_answer_button.config(state="disabled")
         
         if next_date:
             next_date_str = next_date.strftime('%Y-%m-%d') if isinstance(next_date, datetime) else next_date
-            review_info_label.config(text=f"No facts due today. Next review: {next_date_str} ({count} facts)")
-            return f"No facts due for review today.\n\nNext review date: {next_date_str}\nFacts due on that day: {count}"
+            return f"No fact cards due for review today.\n\nNext review date: {next_date_str}\nFact cards due on that day: {count}"
         else:
-            review_info_label.config(text="No facts saved for review.")
-            return "No facts saved for review. Add some facts first!"
+            return "No fact cards found. Add some fact cards first!"
 
-def generate_new_fact():
-    global fact_saved, current_fact_id, current_api_fact
-    current_mode = mode_var.get()
-    current_category = category_var.get()
-    
-    # Clear existing fact
-    fact_label.config(text="")
-    save_status_label.config(text="")
-    
-    if current_mode == "API":
-        new_fact_text = fetch_api_fact()
-        current_fact_id = None
-        fact_saved = False
-        hide_spaced_repetition_frame()
-    elif current_mode == "New Random":
-        new_fact_text = fetch_db_fact(current_category)
-        fact_saved = is_fact_saved(current_fact_id)
-        hide_spaced_repetition_frame()
-    else:  # Saved mode
-        new_fact_text = fetch_saved_fact()
-        fact_saved = True
-        show_spaced_repetition_frame()
-        
-        # For Saved mode, check if we have a current fact_id to determine if buttons should be shown
-        if current_saved_fact_id is None:
-            hide_review_buttons()
-        else:
-            show_review_buttons()
-
-    if new_fact_text:
-        fact_label.config(text=new_fact_text, font=("Trebuchet MS", adjust_font_size(new_fact_text)))
+def load_next_factcard():
+    """Load the next due fact card"""
+    factcard_text = fetch_due_factcard()
+    if factcard_text:
+        factcard_label.config(text=factcard_text, font=("Trebuchet MS", adjust_font_size(factcard_text)))
     else:
-        fact_label.config(text="No fact found. Try a different category or mode.", font=("Trebuchet MS", 12))
-    
-    update_star_icon()
-    root.update_idletasks()
+        factcard_label.config(text="No fact cards found.", font=("Trebuchet MS", 12))
+    update_due_count()
 
-def load_categories(mode):
-    global CATEGORIES
-    if mode == "New Random":
-        query = "SELECT DISTINCT CategoryName FROM Categories WHERE IsActive = 1"
-    elif mode == "Saved":
-        query = """
-        SELECT DISTINCT c.CategoryName
-        FROM SavedFacts sf
-        JOIN Facts f ON sf.FactID = f.FactID
-        JOIN Categories c ON f.CategoryID = c.CategoryID
-        WHERE c.IsActive = 1
-        """
-    else:  # API mode
-        CATEGORIES = ["API"]
+def update_due_count():
+    """Update the count of fact cards due today"""
+    due_count = get_due_factcard_count()
+    due_count_label.config(text=f"Due today: {due_count}")
+
+def show_review_buttons(show):
+    """Show or hide the spaced repetition buttons"""
+    state = "normal" if show else "disabled"
+    hard_button.config(state=state)
+    medium_button.config(state=state)
+    easy_button.config(state=state)
+    
+    # Instead of disabling, completely hide or show the edit and delete buttons
+    if show:
+        # Show buttons if there's a fact card to review
+        edit_icon_button.pack(side="left", padx=10)
+        delete_icon_button.pack(side="left", padx=10)
+    else:
+        # Hide buttons if there's no fact card
+        edit_icon_button.pack_forget()
+        delete_icon_button.pack_forget()
+
+def calculate_next_interval(current_interval, difficulty):
+    """Calculate the next interval based on difficulty rating"""
+    if difficulty == "Hard":
+        return 1  # Reset to 1 day for hard cards
+    elif difficulty == "Medium":
+        return int(current_interval * 1.5)  # Increase by 50%
+    else:  # Easy
+        return int(current_interval * 2.5)  # Increase by 150%
+
+def update_factcard_schedule(difficulty):
+    """Update the fact card's review schedule based on difficulty rating"""
+    global current_factcard_id
+    if current_factcard_id:
+        # Get current interval
+        query = "SELECT CurrentInterval FROM FactCards WHERE FactCardID = ?"
+        current_interval = execute_query(query, (current_factcard_id,))[0][0]
+        
+        # Calculate new interval
+        if difficulty == "Hard":
+            new_interval = 1  # Reset to 1 for Hard
+        elif difficulty == "Medium":
+            new_interval = int(current_interval * 1.5)  # 50% increase for Medium
+        else:  # Easy
+            new_interval = int(current_interval * 2.5)  # 150% increase for Easy
+        
+        # Update the database
+        next_review_date = (datetime.now() + timedelta(days=new_interval)).strftime('%Y-%m-%d')
+        execute_query(
+            """
+            UPDATE FactCards 
+            SET NextReviewDate = ?, CurrentInterval = ?, ViewCount = ViewCount + 1
+            WHERE FactCardID = ?
+            """, 
+            (next_review_date, new_interval, current_factcard_id), 
+            fetch=False
+        )
+        
+        # Show feedback
+        if difficulty == "Hard":
+            feedback_text = f"Rated as {difficulty}. Next review today."
+        else:
+            feedback_text = f"Rated as {difficulty}. Next review in {new_interval} days."
+        
+        status_label.config(text=feedback_text, fg="#b66d20")
+        
+        # Load the next fact card
+        root.after(1000, load_next_factcard)
+
+def on_hard_click():
+    update_factcard_schedule("Hard")
+
+def on_medium_click():
+    update_factcard_schedule("Medium")
+
+def on_easy_click():
+    update_factcard_schedule("Easy")
+
+def add_new_factcard():
+    """Add a new fact card to the database"""
+    # Create a popup window
+    add_window = tk.Toplevel(root)
+    add_window.title("Add New Fact Card")
+    add_window.geometry("500x350")
+    add_window.configure(bg='#1e1e1e')
+    
+    # Get categories for dropdown
+    categories = execute_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
+    category_names = [cat[0] for cat in categories]
+    
+    # Create and place widgets
+    tk.Label(add_window, text="Add New Fact Card", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 14, 'bold')).pack(pady=10)
+    
+    # Category selection
+    cat_frame = tk.Frame(add_window, bg="#1e1e1e")
+    cat_frame.pack(fill="x", padx=20, pady=5)
+    
+    tk.Label(cat_frame, text="Category:", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 10)).pack(side="left", padx=5)
+    
+    cat_var = tk.StringVar(add_window)
+    cat_var.set(category_names[0] if category_names else "No Categories")
+    
+    cat_dropdown = ttk.Combobox(cat_frame, textvariable=cat_var, values=category_names, state="readonly", width=20)
+    cat_dropdown.pack(side="left", padx=5, fill="x", expand=True)
+    
+    # Question
+    q_frame = tk.Frame(add_window, bg="#1e1e1e")
+    q_frame.pack(fill="x", padx=20, pady=5)
+    
+    tk.Label(q_frame, text="Question:", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 10)).pack(side="top", anchor="w", padx=5)
+    
+    question_text = tk.Text(q_frame, height=4, width=40, font=("Trebuchet MS", 10))
+    question_text.pack(fill="x", padx=5, pady=5)
+    
+    # Answer
+    a_frame = tk.Frame(add_window, bg="#1e1e1e")
+    a_frame.pack(fill="x", padx=20, pady=5)
+    
+    tk.Label(a_frame, text="Answer:", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 10)).pack(side="top", anchor="w", padx=5)
+    
+    answer_text = tk.Text(a_frame, height=4, width=40, font=("Trebuchet MS", 10))
+    answer_text.pack(fill="x", padx=5, pady=5)
+    
+    def save_factcard():
+        category = cat_var.get()
+        question = question_text.get("1.0", "end-1c").strip()
+        answer = answer_text.get("1.0", "end-1c").strip()
+        
+        if not question or not answer:
+            status_label.config(text="Question and answer are required!", fg="#ff0000")
+            return
+        
+        # Get category ID
+        category_id = execute_query("SELECT CategoryID FROM Categories WHERE CategoryName = ?", (category,))[0][0]
+        
+        # Insert the new fact card
+        execute_query(
+            """
+            INSERT INTO FactCards (CategoryID, Question, Answer, NextReviewDate, CurrentInterval) 
+            VALUES (?, ?, ?, GETDATE(), 1)
+            """, 
+            (category_id, question, answer), 
+            fetch=False
+        )
+        
+        add_window.destroy()
+        status_label.config(text="New fact card added successfully!", fg="#4CAF50")
+        update_factcard_count()
+        update_due_count()
+        # If no current card is shown, load the newly added card
+        if current_factcard_id is None:
+            load_next_factcard()
+    
+    # Save button
+    save_button = tk.Button(add_window, text="Save Fact Card", bg='#4CAF50', fg="white", 
+                           command=save_factcard, cursor="hand2", borderwidth=0, 
+                           highlightthickness=0, padx=10, pady=5,
+                           font=("Trebuchet MS", 10, 'bold'))
+    save_button.pack(pady=20)
+
+def edit_current_factcard():
+    """Edit the current fact card"""
+    if not current_factcard_id:
         return
     
+    # Get current fact card data
+    query = """
+    SELECT f.Question, f.Answer, c.CategoryName
+    FROM FactCards f 
+    JOIN Categories c ON f.CategoryID = c.CategoryID
+    WHERE f.FactCardID = ?
+    """
+    data = execute_query(query, (current_factcard_id,))[0]
+    current_question, current_answer, current_category = data
+    
+    # Create a popup window
+    edit_window = tk.Toplevel(root)
+    edit_window.title("Edit Fact Card")
+    edit_window.geometry("500x350")
+    edit_window.configure(bg='#1e1e1e')
+    
+    # Get categories for dropdown
+    categories = execute_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
+    category_names = [cat[0] for cat in categories]
+    
+    # Create and place widgets
+    tk.Label(edit_window, text="Edit Fact Card", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 14, 'bold')).pack(pady=10)
+    
+    # Category selection
+    cat_frame = tk.Frame(edit_window, bg="#1e1e1e")
+    cat_frame.pack(fill="x", padx=20, pady=5)
+    
+    tk.Label(cat_frame, text="Category:", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 10)).pack(side="left", padx=5)
+    
+    cat_var = tk.StringVar(edit_window)
+    cat_var.set(current_category)
+    
+    cat_dropdown = ttk.Combobox(cat_frame, textvariable=cat_var, values=category_names, state="readonly", width=20)
+    cat_dropdown.pack(side="left", padx=5, fill="x", expand=True)
+    
+    # Question
+    q_frame = tk.Frame(edit_window, bg="#1e1e1e")
+    q_frame.pack(fill="x", padx=20, pady=5)
+    
+    tk.Label(q_frame, text="Question:", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 10)).pack(side="top", anchor="w", padx=5)
+    
+    question_text = tk.Text(q_frame, height=4, width=40, font=("Trebuchet MS", 10))
+    question_text.insert("1.0", current_question)
+    question_text.pack(fill="x", padx=5, pady=5)
+    
+    # Answer
+    a_frame = tk.Frame(edit_window, bg="#1e1e1e")
+    a_frame.pack(fill="x", padx=20, pady=5)
+    
+    tk.Label(a_frame, text="Answer:", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 10)).pack(side="top", anchor="w", padx=5)
+    
+    answer_text = tk.Text(a_frame, height=4, width=40, font=("Trebuchet MS", 10))
+    answer_text.insert("1.0", current_answer)
+    answer_text.pack(fill="x", padx=5, pady=5)
+    
+    def update_factcard():
+        category = cat_var.get()
+        question = question_text.get("1.0", "end-1c").strip()
+        answer = answer_text.get("1.0", "end-1c").strip()
+        
+        if not question or not answer:
+            status_label.config(text="Question and answer are required!", fg="#ff0000")
+            return
+        
+        # Get category ID
+        category_id = execute_query("SELECT CategoryID FROM Categories WHERE CategoryName = ?", (category,))[0][0]
+        
+        # Update the fact card
+        execute_query(
+            """
+            UPDATE FactCards 
+            SET CategoryID = ?, Question = ?, Answer = ? 
+            WHERE FactCardID = ?
+            """, 
+            (category_id, question, answer, current_factcard_id), 
+            fetch=False
+        )
+        
+        edit_window.destroy()
+        status_label.config(text="Fact card updated successfully!", fg="#4CAF50")
+        
+        # Refresh the current card display
+        global show_answer
+        if show_answer:
+            factcard_label.config(text=f"Answer: {answer}", font=("Trebuchet MS", adjust_font_size(answer)))
+        else:
+            factcard_label.config(text=f"Question: {question}", font=("Trebuchet MS", adjust_font_size(question)))
+    
+    # Update button
+    update_button = tk.Button(edit_window, text="Update Fact Card", bg='#2196F3', fg="white", 
+                             command=update_factcard, cursor="hand2", borderwidth=0, 
+                             highlightthickness=0, padx=10, pady=5,
+                             font=("Trebuchet MS", 10, 'bold'))
+    update_button.pack(pady=20)
+
+def delete_current_factcard():
+    """Delete the current fact card"""
+    if not current_factcard_id:
+        return
+    
+    # Ask for confirmation
+    if tk.messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this fact card?"):
+        # Delete the fact card
+        execute_query("DELETE FROM FactCards WHERE FactCardID = ?", (current_factcard_id,), fetch=False)
+        status_label.config(text="Fact card deleted!", fg="#F44336")
+        update_factcard_count()
+        update_due_count()
+        # Load the next fact card
+        load_next_factcard()
+
+def manage_categories():
+    """Open a window to manage categories"""
+    # Create a popup window
+    cat_window = tk.Toplevel(root)
+    cat_window.title("Manage Categories")
+    cat_window.geometry("400x500")
+    cat_window.configure(bg='#1e1e1e')
+    
+    # Create and place widgets
+    tk.Label(cat_window, text="Manage Categories", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 14, 'bold')).pack(pady=10)
+    
+    # Add new category frame
+    add_frame = tk.Frame(cat_window, bg="#1e1e1e")
+    add_frame.pack(fill="x", padx=20, pady=10)
+    
+    tk.Label(add_frame, text="New Category:", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 10)).pack(side="left", padx=5)
+    
+    new_cat_entry = tk.Entry(add_frame, width=20, font=("Trebuchet MS", 10))
+    new_cat_entry.pack(side="left", padx=5, fill="x", expand=True)
+    
+    def add_category():
+        new_cat = new_cat_entry.get().strip()
+        if not new_cat:
+            return
+        
+        # Check if category already exists
+        existing = execute_query("SELECT COUNT(*) FROM Categories WHERE CategoryName = ?", (new_cat,))[0][0]
+        if existing > 0:
+            tk.messagebox.showinfo("Error", f"Category '{new_cat}' already exists!")
+            return
+        
+        # Add the new category
+        execute_query(
+            "INSERT INTO Categories (CategoryName, Description) VALUES (?, '')", 
+            (new_cat,), 
+            fetch=False
+        )
+        
+        new_cat_entry.delete(0, tk.END)
+        refresh_category_list()
+        update_category_dropdown()
+    
+    add_button = tk.Button(add_frame, text="Add", bg='#4CAF50', fg="white", 
+                         command=add_category, cursor="hand2", borderwidth=0, 
+                         highlightthickness=0, padx=10)
+    add_button.pack(side="left", padx=5)
+    
+    # Category list frame
+    list_frame = tk.Frame(cat_window, bg="#1e1e1e")
+    list_frame.pack(fill="both", expand=True, padx=20, pady=10)
+    
+    tk.Label(list_frame, text="Existing Categories:", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 10, 'bold')).pack(anchor="w", pady=5)
+    
+    # Scrollable list frame
+    scroll_frame = tk.Frame(list_frame, bg="#1e1e1e")
+    scroll_frame.pack(fill="both", expand=True)
+    
+    scrollbar = tk.Scrollbar(scroll_frame)
+    scrollbar.pack(side="right", fill="y")
+    
+    cat_listbox = tk.Listbox(scroll_frame, height=15, width=30, font=("Trebuchet MS", 10),
+                           yscrollcommand=scrollbar.set, bg="#2a2a2a", fg="white",
+                           selectbackground="#4CAF50", selectforeground="white")
+    cat_listbox.pack(side="left", fill="both", expand=True)
+    
+    scrollbar.config(command=cat_listbox.yview)
+    
+    def refresh_category_list():
+        cat_listbox.delete(0, tk.END)
+        categories = execute_query("SELECT CategoryName, CategoryID FROM Categories ORDER BY CategoryName")
+        for cat in categories:
+            cat_listbox.insert(tk.END, f"{cat[0]} (ID: {cat[1]})")
+    
+    refresh_category_list()
+    
+    # Action buttons frame
+    action_frame = tk.Frame(cat_window, bg="#1e1e1e")
+    action_frame.pack(fill="x", padx=20, pady=10)
+    
+    def rename_selected_category():
+        selection = cat_listbox.curselection()
+        if not selection:
+            return
+        
+        # Extract category ID from selection text
+        cat_text = cat_listbox.get(selection[0])
+        cat_id = int(cat_text.split("ID: ")[1].strip(")"))
+        
+        # Get current name
+        cat_name = execute_query("SELECT CategoryName FROM Categories WHERE CategoryID = ?", (cat_id,))[0][0]
+        
+        # Ask for new name
+        new_name = simpledialog.askstring("Rename Category", f"New name for '{cat_name}':", initialvalue=cat_name)
+        if not new_name or new_name == cat_name:
+            return
+        
+        # Check if the new name already exists
+        existing = execute_query("SELECT COUNT(*) FROM Categories WHERE CategoryName = ? AND CategoryID != ?", 
+                              (new_name, cat_id))[0][0]
+        if existing > 0:
+            tk.messagebox.showinfo("Error", f"Category '{new_name}' already exists!")
+            return
+        
+        # Update the category
+        execute_query("UPDATE Categories SET CategoryName = ? WHERE CategoryID = ?", (new_name, cat_id), fetch=False)
+        refresh_category_list()
+        update_category_dropdown()
+    
+    def delete_selected_category():
+        selection = cat_listbox.curselection()
+        if not selection:
+            return
+        
+        # Extract category ID from selection text
+        cat_text = cat_listbox.get(selection[0])
+        cat_id = int(cat_text.split("ID: ")[1].strip(")"))
+        cat_name = cat_text.split(" (ID:")[0]
+        
+        # Check if category has fact cards
+        card_count = execute_query("SELECT COUNT(*) FROM FactCards WHERE CategoryID = ?", (cat_id,))[0][0]
+        
+        if card_count > 0:
+            if not tk.messagebox.askyesno("Warning", 
+                                       f"Category '{cat_name}' has {card_count} fact cards. " +
+                                       "Deleting it will also delete all associated fact cards. Continue?"):
+                return
+        
+        # Delete the category and its fact cards
+        execute_query("""
+            BEGIN TRANSACTION;
+            
+            DELETE FROM FactCardTags WHERE FactCardID IN (SELECT FactCardID FROM FactCards WHERE CategoryID = ?);
+            DELETE FROM FactCards WHERE CategoryID = ?;
+            DELETE FROM Categories WHERE CategoryID = ?;
+            
+            COMMIT TRANSACTION;
+        """, (cat_id, cat_id, cat_id), fetch=False)
+        
+        refresh_category_list()
+        update_category_dropdown()
+        update_factcard_count()
+        update_due_count()
+    
+    rename_button = tk.Button(action_frame, text="Rename", bg='#2196F3', fg="white", 
+                            command=rename_selected_category, cursor="hand2", borderwidth=0, 
+                            highlightthickness=0, padx=10, pady=5)
+    rename_button.pack(side="left", padx=5)
+    
+    delete_button_cat = tk.Button(action_frame, text="Delete", bg='#F44336', fg="white", 
+                                command=delete_selected_category, cursor="hand2", borderwidth=0, 
+                                highlightthickness=0, padx=10, pady=5)
+    delete_button_cat.pack(side="left", padx=5)
+    
+    # Close button
+    close_button = tk.Button(cat_window, text="Close", bg='#607D8B', fg="white", 
+                           command=cat_window.destroy, cursor="hand2", borderwidth=0, 
+                           highlightthickness=0, padx=20, pady=5,
+                           font=("Trebuchet MS", 10, 'bold'))
+    close_button.pack(pady=15)
+
+def load_categories():
+    """Load categories for the dropdown"""
+    query = "SELECT DISTINCT CategoryName FROM Categories WHERE IsActive = 1 ORDER BY CategoryName"
     categories = execute_query(query)
-    CATEGORIES = [category[0] for category in categories] if categories else ["No Categories Available"]
-    CATEGORIES.insert(0, "Random")  # Add "Random" as the first option
+    category_names = [category[0] for category in categories] if categories else []
+    category_names.insert(0, "All Categories")  # Add All Categories option
+    return category_names
+
+def update_category_dropdown():
+    """Update the category dropdown with current categories"""
+    categories = load_categories()
+    category_dropdown['values'] = categories
+    # Keep current selection if it exists in new list, otherwise reset
+    current_category = category_var.get()
+    if current_category in categories:
+        category_var.set(current_category)
+    else:
+        category_var.set("All Categories")
 
 def adjust_font_size(text):
-    return max(8, min(13, int(13 - (len(text.split()) - 15) * 0.2)))
-
-def speak_fact():
-    engine = pyttsx3.init()
-    engine.say(fact_label.cget("text"))
-    engine.runAndWait()
-
-def create_button(parent, text, command, bg='#007bff', side='left'):
-    button = tk.Button(parent, text=text, bg=bg, fg="white", command=command, 
-                     cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
-    button.pack(side=side, padx=10, pady=0.5)
-    return button
-
-global generate_button
-
+    """Dynamically adjust font size based on text length"""
+    return max(8, min(12, int(12 - (len(text) / 200))))
 
 def create_label(parent, text, fg="white", cursor=None, font=("Trebuchet MS", 7), side='left'):
+    """Create a styled label"""
     label = tk.Label(parent, text=text, fg=fg, bg="#1e1e1e", font=font)
     if cursor:
         label.configure(cursor=cursor)
     label.pack(side=side)
     return label
 
-def update_category_dropdown(event=None):
-    current_mode = mode_var.get()
-    load_categories(current_mode)
-    
-    if current_mode == "API":
-        category_var.set("API")
-        category_dropdown.config(state="disabled")
-    else:
-        category_dropdown['values'] = CATEGORIES
-        category_var.set("Random")
-        category_dropdown.config(state="readonly")
-
-def toggle_mode(event=None):
-    global generate_button
-    current_index = MODES.index(mode_var.get())
-    next_mode = MODES[(current_index + 1) % len(MODES)]
-    
-    # Immediately hide all elements
-    fact_label.pack_forget()
-    spaced_repetition_frame.pack_forget()
-    
-    mode_var.set(next_mode)
-    mode_button.config(text=f"Mode: {next_mode}")
-    
-    # Generate new fact
-    generate_new_fact()
-    # Force update
-    root.update_idletasks()
-    
-    # Update category dropdown
-    update_category_dropdown()
-    
-    # Show elements based on new mode
-    fact_label.pack(side="top", fill="both", expand=True)
-    if next_mode == "Saved":
-        show_spaced_repetition_frame()
-        # Hide the Generate/Next Fact button in Saved mode
-        generate_button.pack_forget()
-    else:
-        # Show the Generate/Next Fact button in other modes
-        generate_button.pack(side='left', padx=10, pady=0.5)
-        root.geometry("400x270")
-    
-    root.after(10, lambda: apply_rounded_corners(root, 15))
-
-def show_spaced_repetition_frame():
-    """Show the spaced repetition frame but don't automatically show buttons"""
-    spaced_repetition_frame.pack(side="bottom", fill="x", padx=10, pady=5)
-    root.geometry("400x350")
-    
-    # Only enable buttons if there's a current fact to review
-    if current_saved_fact_id is not None:
-        show_review_buttons()
-    else:
-        hide_review_buttons()
-
-def hide_spaced_repetition_frame():
-    """Hide the entire spaced repetition frame"""
-    spaced_repetition_frame.pack_forget()
-    root.geometry("400x270")
-    root.update_idletasks()
-    apply_rounded_corners(root, 15)
+def on_category_change(event=None):
+    """Handle category dropdown change"""
+    load_next_factcard()
 
 def reset_to_welcome():
-    fact_label.config(text="Welcome to Fact Generator!", 
-                      font=("Trebuchet MS", adjust_font_size("Welcome to Fact Generator!")))
-    save_status_label.config(text="")
-    update_star_icon()
-    mode_var.set("New Random")  # Reset to default mode
-    category_var.set("Random")  # Reset to default category
-    update_category_dropdown()
-    hide_spaced_repetition_frame()  # Hide spaced repetition frame on welcome screen
-
-def update_review_info(next_review_date, interval):
-    """Updates the next review date information"""
-    if isinstance(next_review_date, str):
-        try:
-            next_review_date = datetime.strptime(next_review_date, '%Y-%m-%d %H:%M:%S.%f')
-        except ValueError:
-            try:
-                next_review_date = datetime.strptime(next_review_date, '%Y-%m-%d')
-            except ValueError:
-                next_review_date = datetime.now()
-    
-    current_date = datetime.now()
-    days_until_review = (next_review_date - current_date).days if next_review_date > current_date else 0
-    
-    if days_until_review <= 0:
-        review_status = "Due today"
-    else:
-        review_status = f"Next review in {days_until_review} days"
-    
-    review_info_label.config(text=f"Status: {review_status} (Interval: {interval} days)")
-
-def calculate_next_interval(current_interval, difficulty):
-    """Calculate the next interval based on difficulty rating"""
-    if difficulty == "Hard":
-        return max(1, current_interval)  # Reset to 1 or keep current interval
-    elif difficulty == "Medium":
-        return current_interval * 1.5  # Increase by 50%
-    else:  # Easy
-        return current_interval * 2.5  # Increase by 150%
-
-def update_fact_schedule(difficulty):
-    """Updates the fact's review schedule based on difficulty rating"""
-    global current_saved_fact_id
-    if current_saved_fact_id:
-        # Get current interval
-        current_interval = execute_query(
-            "SELECT CurrentInterval FROM SavedFacts WHERE SavedFactID = ?", 
-            (current_saved_fact_id,)
-        )[0][0]
-        
-        # Calculate new interval
-        new_interval = int(calculate_next_interval(current_interval, difficulty))
-        
-        # Calculate next review date
-        if difficulty == "Hard":
-            # For Hard difficulty, keep the due date as today
-            next_review_date = datetime.now().strftime('%Y-%m-%d')
-            feedback_text = f"Rated as {difficulty}. Next review today."
-        else:
-            # For Medium and Easy, use the calculated interval
-            next_review_date = (datetime.now() + timedelta(days=new_interval)).strftime('%Y-%m-%d')
-            feedback_text = f"Rated as {difficulty}. Next review in {new_interval} days."
-        
-        # Update the database
-        execute_query(
-            """
-            UPDATE SavedFacts 
-            SET NextReviewDate = ?, CurrentInterval = ? 
-            WHERE SavedFactID = ?
-            """, 
-            (next_review_date, new_interval, current_saved_fact_id), 
-            fetch=False
-        )
-        
-        # Show feedback
-        save_status_label.config(
-            text=feedback_text, 
-            fg="#b66d20"
-        )
-        
-        # Generate the next fact
-        generate_new_fact()
-
-def on_hard_click():
-    update_fact_schedule("Hard")
-    # Explicitly move to next fact
-    root.after(100, generate_new_fact)
-
-def on_medium_click():
-    update_fact_schedule("Medium")
-    # Explicitly move to next fact
-    root.after(100, generate_new_fact)
-
-def on_easy_click():
-    update_fact_schedule("Easy")
-    # Explicitly move to next fact
-    root.after(100, generate_new_fact)
+    """Reset to welcome screen"""
+    factcard_label.config(text="Welcome to FactDari!", 
+                          font=("Trebuchet MS", adjust_font_size("Welcome to FactDari!")))
+    status_label.config(text="")
+    show_review_buttons(False)
+    show_answer_button.config(state="disabled")
+    update_due_count()
 
 # Main window setup
 root = tk.Tk()
-root.geometry("400x270")
+root.geometry("500x350")
 root.overrideredirect(True)
 root.configure(bg='#1e1e1e')
-
-# Load icons
-white_star_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/White-Star.png").resize((20, 20), Image.Resampling.LANCZOS))
-gold_star_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/Gold-Star.png").resize((20, 20), Image.Resampling.LANCZOS))
-black_star_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/Black-Star.png").resize((20, 20), Image.Resampling.LANCZOS))
-home_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/home.png").resize((20, 20), Image.Resampling.LANCZOS))
-speaker_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/speaker_icon.png").resize((20, 20), Image.Resampling.LANCZOS))
 
 # Title bar
 title_bar = tk.Frame(root, bg='#000000', height=30, relief='raised')
@@ -587,108 +735,146 @@ title_bar.pack(side="top", fill="x")
 title_bar.bind("<Button-1>", on_press)
 title_bar.bind("<B1-Motion>", on_drag)
 
-tk.Label(title_bar, text="Facts", fg="white", bg='#000000', font=("Trebuchet MS", 12, 'bold')).pack(side="left", padx=5, pady=5)
+tk.Label(title_bar, text="FactDari", fg="white", bg='#000000', 
+         font=("Trebuchet MS", 12, 'bold')).pack(side="left", padx=5, pady=5)
 
-# Mode button and category dropdown
-mode_var = tk.StringVar(root, value=MODES[1])
-mode_button = tk.Button(title_bar, text=f"Mode: {mode_var.get()}", bg='#2196F3', fg="white", command=toggle_mode, 
-                        cursor="hand2", borderwidth=0, highlightthickness=0, padx=5, pady=2,
-                        font=("Trebuchet MS", 8, 'bold'))
-mode_button.pack(side="right", padx=5, pady=3)
-
-category_frame = tk.Frame(title_bar, bg='#2196F3')
+# Category selection
+category_frame = tk.Frame(title_bar, bg='#000000')
 category_frame.pack(side="right", padx=5, pady=3)
 
-category_var = tk.StringVar(root, value="Random")
+tk.Label(category_frame, text="Category:", fg="white", bg='#000000', 
+         font=("Trebuchet MS", 8)).pack(side="left", padx=5)
+
+category_var = tk.StringVar(root, value="All Categories")
 category_dropdown = ttk.Combobox(category_frame, textvariable=category_var, state="readonly", width=15)
-category_dropdown.bind("<<ComboboxSelected>>", lambda event: generate_new_fact())
-category_dropdown.pack()
+category_dropdown['values'] = load_categories()
+category_dropdown.pack(side="left")
+category_dropdown.bind("<<ComboboxSelected>>", on_category_change)
 
-# Fact display
-fact_frame = tk.Frame(root, bg="#1e1e1e")
-fact_frame.pack(side="top", fill="both", expand=True)
+# Main content area
+content_frame = tk.Frame(root, bg="#1e1e1e")
+content_frame.pack(side="top", fill="both", expand=True, padx=10, pady=5)
 
-fact_label = tk.Label(fact_frame, text="Welcome to Fact Generator!", fg="white", bg="#1e1e1e", 
-                      font=("Trebuchet MS", adjust_font_size("Welcome to Fact Generator!")), wraplength=350)
-fact_label.pack(side="top", fill="both", expand=True)
+# Fact card display
+factcard_frame = tk.Frame(content_frame, bg="#1e1e1e")
+factcard_frame.pack(side="top", fill="both", expand=True, pady=5)
 
-# Star button
-star_button = tk.Button(fact_frame, image=white_star_icon, bg='#1e1e1e', command=toggle_save_fact, 
-                        cursor="hand2", borderwidth=0, highlightthickness=0)
-star_button.place(relx=1.0, rely=0, anchor="ne", x=-30, y=5)
+factcard_label = tk.Label(factcard_frame, text="Welcome to FactDari!", fg="white", bg="#1e1e1e", 
+                          font=("Trebuchet MS", 12), wraplength=450, justify="center")
+factcard_label.pack(side="top", fill="both", expand=True, padx=10, pady=10)
 
-# Speaker button
-speaker_button = tk.Button(fact_frame, image=speaker_icon, bg='#1e1e1e', command=speak_fact, 
-                           cursor="hand2", borderwidth=0, highlightthickness=0)
-speaker_button.image = speaker_icon
-speaker_button.place(relx=1.0, rely=0, anchor="ne", x=-5, y=5)
+# Show Answer button
+center_buttons = tk.Frame(content_frame, bg="#1e1e1e")
+center_buttons.pack(side="top", fill="x", pady=5)
 
-# Home button (repositioned)
-home_button = tk.Button(fact_frame, image=home_icon, bg='#1e1e1e', bd=0, highlightthickness=0, 
-                        cursor="hand2", activebackground='#1e1e1e', command=reset_to_welcome)
-home_button.place(relx=0, rely=0, anchor="nw", x=5, y=5)
+show_answer_button = tk.Button(center_buttons, text="Show Answer", command=toggle_question_answer, 
+                              bg='#2196F3', fg="white", cursor="hand2", borderwidth=0, 
+                              highlightthickness=0, padx=10, pady=5, state="disabled")
+show_answer_button.pack(fill="x", padx=100, pady=5)
 
-# Bottom frame
-bottom_frame = tk.Frame(root, bg="#1e1e1e")
-bottom_frame.pack(side="bottom", fill="x", padx=10, pady=0)
+# Spaced repetition buttons
+sr_frame = tk.Frame(content_frame, bg="#1e1e1e")
+sr_frame.pack(side="top", fill="x", pady=5)
 
-create_label(bottom_frame, "Created by - Gaurav Bhandari", cursor="hand2", side='right').bind("<Button-1>", open_github)
-coordinate_label = create_label(bottom_frame, "Coordinates: ", side='right')
-coordinate_label.pack_configure(padx=20)
+sr_label = create_label(sr_frame, "Rate your recall:", 
+                      font=("Trebuchet MS", 9, 'bold'), side='top')
+sr_label.pack_configure(anchor="center", pady=5)
 
-fact_count_label = create_label(bottom_frame, "Number of Saved Facts: 0", cursor="hand2", side='left')
-fact_count_label.bind("<Button-1>", open_fact_file)
+sr_buttons = tk.Frame(sr_frame, bg="#1e1e1e")
+sr_buttons.pack(side="top", fill="x")
 
-# Control frame
-control_frame = tk.Frame(root, bg="#1e1e1e")
-control_frame.pack(side="bottom", fill="x")
-
-button_frame = tk.Frame(control_frame, bg="#1e1e1e")
-button_frame.pack(expand=True)
-
-generate_button = create_button(button_frame, "Generate/Next Fact", generate_new_fact, bg='#b66d20')
-
-save_status_label = create_label(control_frame, "", fg="#b66d20", font=("Trebuchet MS", 10), side='bottom')
-
-# Spaced Repetition frame (replacing mastery frame)
-spaced_repetition_frame = tk.Frame(root, bg="#1e1e1e")
-
-# Create a sub-frame for the buttons
-sr_button_frame = tk.Frame(spaced_repetition_frame, bg="#1e1e1e")
-sr_button_frame.pack(side="top", fill="x", expand=True)
-
-# Update the buttons for spaced repetition
-hard_button = tk.Button(sr_button_frame, text="Hard", command=on_hard_click, bg='#F44336', fg="white", 
+hard_button = tk.Button(sr_buttons, text="Hard", command=on_hard_click, bg='#F44336', fg="white", 
                       cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
 hard_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
 
-medium_button = tk.Button(sr_button_frame, text="Medium", command=on_medium_click, bg='#FFC107', fg="white", 
+medium_button = tk.Button(sr_buttons, text="Medium", command=on_medium_click, bg='#FFC107', fg="white", 
                         cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
 medium_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
 
-easy_button = tk.Button(sr_button_frame, text="Easy", command=on_easy_click, bg='#4CAF50', fg="white", 
+easy_button = tk.Button(sr_buttons, text="Easy", command=on_easy_click, bg='#4CAF50', fg="white", 
                        cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
 easy_button.pack(side="left", expand=True, fill="x")
 
-# Review information label
-review_info_label = tk.Label(spaced_repetition_frame, text="Status: Due today (Interval: 1 day)", 
-                            fg="white", bg="#1e1e1e", font=("Trebuchet MS", 10))
-review_info_label.pack(side="top", pady=(5, 0))
+# Load icons
+home_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/home.png").resize((20, 20), Image.Resampling.LANCZOS))
+speaker_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/speaker_icon.png").resize((20, 20), Image.Resampling.LANCZOS))
+# Load action icons
+add_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/add.png").resize((24, 24), Image.Resampling.LANCZOS))
+edit_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/edit.png").resize((24, 24), Image.Resampling.LANCZOS))
+delete_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/delete.png").resize((24, 24), Image.Resampling.LANCZOS))
+
+# Icon buttons frame - below the spaced repetition buttons
+icon_buttons_frame = tk.Frame(content_frame, bg="#1e1e1e")
+icon_buttons_frame.pack(side="top", fill="x", pady=5)
+
+# Add button is always visible
+add_icon_button = tk.Button(icon_buttons_frame, image=add_icon, bg='#1e1e1e', command=add_new_factcard,
+                         cursor="hand2", borderwidth=0, highlightthickness=0)
+add_icon_button.pack(side="left", padx=10)
+add_icon_button.image = add_icon  # Keep a reference
+
+# Create edit button but don't pack it initially
+edit_icon_button = tk.Button(icon_buttons_frame, image=edit_icon, bg='#1e1e1e', command=edit_current_factcard,
+                          cursor="hand2", borderwidth=0, highlightthickness=0)
+edit_icon_button.image = edit_icon  # Keep a reference
+
+# Create delete button but don't pack it initially
+delete_icon_button = tk.Button(icon_buttons_frame, image=delete_icon, bg='#1e1e1e', command=delete_current_factcard,
+                            cursor="hand2", borderwidth=0, highlightthickness=0)
+delete_icon_button.image = delete_icon  # Keep a reference
+
+# Status label - always visible
+status_label = create_label(icon_buttons_frame, "", fg="#b66d20", 
+                         font=("Trebuchet MS", 10), side='right')
+status_label.pack_configure(pady=5, padx=10)
+
+# Add home and speaker buttons
+home_button = tk.Button(factcard_frame, image=home_icon, bg='#1e1e1e', bd=0, highlightthickness=0, 
+                       cursor="hand2", activebackground='#1e1e1e', command=reset_to_welcome)
+home_button.place(relx=0, rely=0, anchor="nw", x=5, y=5)
+
+speaker_button = tk.Button(factcard_frame, image=speaker_icon, bg='#1e1e1e', command=speak_text, 
+                          cursor="hand2", borderwidth=0, highlightthickness=0)
+speaker_button.image = speaker_icon  # Keep a reference
+speaker_button.place(relx=1.0, rely=0, anchor="ne", x=-5, y=5)
+
+# Bottom stats frame
+stats_frame = tk.Frame(root, bg="#1e1e1e")
+stats_frame.pack(side="bottom", fill="x", padx=10, pady=3)
+
+# Stats labels - all with the same font size
+factcard_count_label = create_label(stats_frame, "Total Fact Cards: 0", 
+                                  font=("Trebuchet MS", 9), side='left')
+factcard_count_label.pack_configure(padx=10)
+
+due_count_label = create_label(stats_frame, "Due today: 0", 
+                             font=("Trebuchet MS", 9), side='left')
+due_count_label.pack_configure(padx=10)
+
+coordinate_label = create_label(stats_frame, "Coordinates: ", 
+                              font=("Trebuchet MS", 9), side='right')
+coordinate_label.pack_configure(padx=10)
+
+# Initially disable the review buttons
+show_review_buttons(False)
 
 # Set initial transparency
-root.attributes('-alpha', 0.65)
+root.attributes('-alpha', 0.9)
 
 # Bind focus events to the root window
 root.bind("<FocusIn>", lambda event: root.attributes('-alpha', 1.0))
-root.bind("<FocusOut>", lambda event: root.attributes('-alpha', 0.65))
+root.bind("<FocusOut>", lambda event: root.attributes('-alpha', 0.7))
 
 # Final setup
 root.update_idletasks()
 apply_rounded_corners(root, 15)
 set_static_position()
 root.bind("<s>", set_static_position)
-update_star_icon()
-update_category_dropdown()
-hide_spaced_repetition_frame()  # Initially hide the spaced repetition frame
+update_factcard_count()
+update_due_count()
 root.after(100, update_ui)
+
+# Load the first fact card
+load_next_factcard()
+
 root.mainloop()
