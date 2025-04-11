@@ -7,6 +7,7 @@ import webbrowser
 import pyttsx3
 from PIL import Image, ImageTk
 import pyodbc
+from datetime import datetime, timedelta
 
 # Constants
 CONN_STR = (
@@ -43,9 +44,9 @@ def count_saved_facts():
     return execute_query("SELECT COUNT(*) FROM SavedFacts")[0][0]
 
 def update_ui():
-        update_coordinates()
-        update_fact_count()
-        root.after(100, update_ui)
+    update_coordinates()
+    update_fact_count()
+    root.after(100, update_ui)
 
 def update_fact_count():
     num_facts = count_saved_facts()
@@ -179,7 +180,8 @@ def toggle_save_fact():
             return
         
         # Insert into SavedFacts
-        execute_query("INSERT INTO SavedFacts (FactID) VALUES (?)", (current_fact_id,), fetch=False)
+        execute_query("INSERT INTO SavedFacts (FactID, NextReviewDate, CurrentInterval) VALUES (?, GETDATE(), 1)", 
+                     (current_fact_id,), fetch=False)
         
         # Call the stored procedure to populate tags
         execute_query("EXEC AutoPopulateSpecificFactTags @FactID=?", (current_fact_id,), fetch=False)
@@ -216,33 +218,113 @@ def toggle_save_fact():
     update_star_icon()
     update_fact_count()
 
+def get_next_review_info():
+    """
+    Get information about the next review date and count of facts due on that date.
+    This version first retrieves the minimum (earliest) NextReviewDate that is greater than the current date,
+    then counts only the facts that have that exact NextReviewDate.
+    """
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    category = category_var.get()
+    
+    if category == "Random":
+        query_min = """
+            SELECT MIN(NextReviewDate)
+            FROM SavedFacts 
+            WHERE NextReviewDate > ?
+        """
+        result = execute_query(query_min, (current_date,))
+    else:
+        query_min = """
+            SELECT MIN(sf.NextReviewDate)
+            FROM SavedFacts sf
+            JOIN Facts f ON sf.FactID = f.FactID
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE sf.NextReviewDate > ? AND c.CategoryName = ?
+        """
+        result = execute_query(query_min, (current_date, category))
+    
+    if result and result[0][0]:
+        next_date = result[0][0]
+        # Count only the facts due exactly on the minimum next_date
+        if category == "Random":
+            query_count = """
+                SELECT COUNT(*)
+                FROM SavedFacts 
+                WHERE NextReviewDate = ?
+            """
+            count_result = execute_query(query_count, (next_date,))
+        else:
+            query_count = """
+                SELECT COUNT(*)
+                FROM SavedFacts sf
+                JOIN Facts f ON sf.FactID = f.FactID
+                JOIN Categories c ON f.CategoryID = c.CategoryID
+                WHERE sf.NextReviewDate = ? AND c.CategoryName = ?
+            """
+            count_result = execute_query(query_count, (next_date, category))
+        count = count_result[0][0] if count_result else 0
+        return next_date, count
+    return None, 0
+
+def hide_review_buttons():
+    """Disable only the spaced repetition buttons (do not disable the 'Generate/Next Fact' button)"""
+    hard_button.config(state="disabled")
+    medium_button.config(state="disabled")
+    easy_button.config(state="disabled")
+
+def show_review_buttons():
+    """Enable only the spaced repetition buttons (do not affect the 'Generate/Next Fact' button)"""
+    hard_button.config(state="normal")
+    medium_button.config(state="normal")
+    easy_button.config(state="normal")
+
 def fetch_saved_fact():
+    """Fetch a fact due for review, or display next review date if none due"""
     global current_saved_fact_id
     category = category_var.get()
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    
+    # Query for facts due today or overdue
     if category == "Random":
         query = """
-            SELECT TOP 1 sf.SavedFactID, f.FactText, sf.MasteryLevel
+            SELECT TOP 1 sf.SavedFactID, f.FactText, sf.NextReviewDate, sf.CurrentInterval
             FROM SavedFacts sf 
             JOIN Facts f ON sf.FactID = f.FactID 
-            ORDER BY NEWID()
+            WHERE sf.NextReviewDate <= ?
+            ORDER BY sf.NextReviewDate, NEWID()
         """
-        fact = execute_query(query)
+        fact = execute_query(query, (current_date,))
     else:
         query = """
-            SELECT TOP 1 sf.SavedFactID, f.FactText, sf.MasteryLevel
+            SELECT TOP 1 sf.SavedFactID, f.FactText, sf.NextReviewDate, sf.CurrentInterval
             FROM SavedFacts sf 
             JOIN Facts f ON sf.FactID = f.FactID 
             JOIN Categories c ON f.CategoryID = c.CategoryID
-            WHERE c.CategoryName = ?
-            ORDER BY NEWID()
+            WHERE c.CategoryName = ? AND sf.NextReviewDate <= ?
+            ORDER BY sf.NextReviewDate, NEWID()
         """
-        fact = execute_query(query, (category,))
+        fact = execute_query(query, (category, current_date))
     
     if fact:
-        current_saved_fact_id, fact_text, mastery_level = fact[0]
-        update_mastery_progress(mastery_level)
+        # We have a fact due for review
+        current_saved_fact_id, fact_text, next_review, interval = fact[0]
+        update_review_info(next_review, interval)
+        show_review_buttons()
         return fact_text
-    return "No saved facts found for the selected category."
+    else:
+        # No facts due for review
+        current_saved_fact_id = None
+        next_date, count = get_next_review_info()
+        hide_review_buttons()
+        
+        if next_date:
+            next_date_str = next_date.strftime('%Y-%m-%d') if isinstance(next_date, datetime) else next_date
+            review_info_label.config(text=f"No facts due today. Next review: {next_date_str} ({count} facts)")
+            return f"No facts due for review today.\n\nNext review date: {next_date_str}\nFacts due on that day: {count}"
+        else:
+            review_info_label.config(text="No facts saved for review.")
+            return "No facts saved for review. Add some facts first!"
 
 def generate_new_fact():
     global fact_saved, current_fact_id, current_api_fact
@@ -257,12 +339,21 @@ def generate_new_fact():
         new_fact_text = fetch_api_fact()
         current_fact_id = None
         fact_saved = False
+        hide_spaced_repetition_frame()
     elif current_mode == "New Random":
         new_fact_text = fetch_db_fact(current_category)
         fact_saved = is_fact_saved(current_fact_id)
+        hide_spaced_repetition_frame()
     else:  # Saved mode
         new_fact_text = fetch_saved_fact()
         fact_saved = True
+        show_spaced_repetition_frame()
+        
+        # For Saved mode, check if we have a current fact_id to determine if buttons should be shown
+        if current_saved_fact_id is None:
+            hide_review_buttons()
+        else:
+            show_review_buttons()
 
     if new_fact_text:
         fact_label.config(text=new_fact_text, font=("Trebuchet MS", adjust_font_size(new_fact_text)))
@@ -301,8 +392,13 @@ def speak_fact():
     engine.runAndWait()
 
 def create_button(parent, text, command, bg='#007bff', side='left'):
-    return tk.Button(parent, text=text, bg=bg, fg="white", command=command, 
-                     cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5).pack(side=side, padx=10, pady=0.5)
+    button = tk.Button(parent, text=text, bg=bg, fg="white", command=command, 
+                     cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
+    button.pack(side=side, padx=10, pady=0.5)
+    return button
+
+global generate_button
+
 
 def create_label(parent, text, fg="white", cursor=None, font=("Trebuchet MS", 7), side='left'):
     label = tk.Label(parent, text=text, fg=fg, bg="#1e1e1e", font=font)
@@ -324,12 +420,13 @@ def update_category_dropdown(event=None):
         category_dropdown.config(state="readonly")
 
 def toggle_mode(event=None):
+    global generate_button
     current_index = MODES.index(mode_var.get())
     next_mode = MODES[(current_index + 1) % len(MODES)]
     
     # Immediately hide all elements
     fact_label.pack_forget()
-    mastery_frame.pack_forget()
+    spaced_repetition_frame.pack_forget()
     
     mode_var.set(next_mode)
     mode_button.config(text=f"Mode: {next_mode}")
@@ -345,19 +442,30 @@ def toggle_mode(event=None):
     # Show elements based on new mode
     fact_label.pack(side="top", fill="both", expand=True)
     if next_mode == "Saved":
-        show_mastery_frame()
+        show_spaced_repetition_frame()
+        # Hide the Generate/Next Fact button in Saved mode
+        generate_button.pack_forget()
     else:
+        # Show the Generate/Next Fact button in other modes
+        generate_button.pack(side='left', padx=10, pady=0.5)
         root.geometry("400x270")
     
-
     root.after(10, lambda: apply_rounded_corners(root, 15))
 
-def show_mastery_frame():
-    mastery_frame.pack(side="bottom", fill="x", padx=10, pady=5)
+def show_spaced_repetition_frame():
+    """Show the spaced repetition frame but don't automatically show buttons"""
+    spaced_repetition_frame.pack(side="bottom", fill="x", padx=10, pady=5)
     root.geometry("400x350")
+    
+    # Only enable buttons if there's a current fact to review
+    if current_saved_fact_id is not None:
+        show_review_buttons()
+    else:
+        hide_review_buttons()
 
-def hide_mastery_frame():
-    mastery_frame.pack_forget()
+def hide_spaced_repetition_frame():
+    """Hide the entire spaced repetition frame"""
+    spaced_repetition_frame.pack_forget()
     root.geometry("400x270")
     root.update_idletasks()
     apply_rounded_corners(root, 15)
@@ -370,26 +478,95 @@ def reset_to_welcome():
     mode_var.set("New Random")  # Reset to default mode
     category_var.set("Random")  # Reset to default category
     update_category_dropdown()
-    hide_mastery_frame()  # Hide mastery frame on welcome screen
+    hide_spaced_repetition_frame()  # Hide spaced repetition frame on welcome screen
 
-def update_mastery_level(increment):
+def update_review_info(next_review_date, interval):
+    """Updates the next review date information"""
+    if isinstance(next_review_date, str):
+        try:
+            next_review_date = datetime.strptime(next_review_date, '%Y-%m-%d %H:%M:%S.%f')
+        except ValueError:
+            try:
+                next_review_date = datetime.strptime(next_review_date, '%Y-%m-%d')
+            except ValueError:
+                next_review_date = datetime.now()
+    
+    current_date = datetime.now()
+    days_until_review = (next_review_date - current_date).days if next_review_date > current_date else 0
+    
+    if days_until_review <= 0:
+        review_status = "Due today"
+    else:
+        review_status = f"Next review in {days_until_review} days"
+    
+    review_info_label.config(text=f"Status: {review_status} (Interval: {interval} days)")
+
+def calculate_next_interval(current_interval, difficulty):
+    """Calculate the next interval based on difficulty rating"""
+    if difficulty == "Hard":
+        return max(1, current_interval)  # Reset to 1 or keep current interval
+    elif difficulty == "Medium":
+        return current_interval * 1.5  # Increase by 50%
+    else:  # Easy
+        return current_interval * 2.5  # Increase by 150%
+
+def update_fact_schedule(difficulty):
+    """Updates the fact's review schedule based on difficulty rating"""
     global current_saved_fact_id
     if current_saved_fact_id:
-        execute_query("EXEC UpdateMasteryLevel @SavedFactID=?, @Increment=?", 
-                      (current_saved_fact_id, increment), fetch=False)
-        new_mastery_level = execute_query("SELECT MasteryLevel FROM SavedFacts WHERE SavedFactID=?", 
-                                          (current_saved_fact_id,))[0][0]
-        update_mastery_progress(new_mastery_level)
+        # Get current interval
+        current_interval = execute_query(
+            "SELECT CurrentInterval FROM SavedFacts WHERE SavedFactID = ?", 
+            (current_saved_fact_id,)
+        )[0][0]
+        
+        # Calculate new interval
+        new_interval = int(calculate_next_interval(current_interval, difficulty))
+        
+        # Calculate next review date
+        if difficulty == "Hard":
+            # For Hard difficulty, keep the due date as today
+            next_review_date = datetime.now().strftime('%Y-%m-%d')
+            feedback_text = f"Rated as {difficulty}. Next review today."
+        else:
+            # For Medium and Easy, use the calculated interval
+            next_review_date = (datetime.now() + timedelta(days=new_interval)).strftime('%Y-%m-%d')
+            feedback_text = f"Rated as {difficulty}. Next review in {new_interval} days."
+        
+        # Update the database
+        execute_query(
+            """
+            UPDATE SavedFacts 
+            SET NextReviewDate = ?, CurrentInterval = ? 
+            WHERE SavedFactID = ?
+            """, 
+            (next_review_date, new_interval, current_saved_fact_id), 
+            fetch=False
+        )
+        
+        # Show feedback
+        save_status_label.config(
+            text=feedback_text, 
+            fg="#b66d20"
+        )
+        
+        # Generate the next fact
+        generate_new_fact()
 
-def update_mastery_progress(mastery_level):
-    mastery_progress['value'] = mastery_level
-    mastery_label.config(text=f"Mastery: {mastery_level}%")
+def on_hard_click():
+    update_fact_schedule("Hard")
+    # Explicitly move to next fact
+    root.after(100, generate_new_fact)
 
-def on_know_click():
-    update_mastery_level(1)
+def on_medium_click():
+    update_fact_schedule("Medium")
+    # Explicitly move to next fact
+    root.after(100, generate_new_fact)
 
-def on_forgot_click():
-    update_mastery_level(-5)
+def on_easy_click():
+    update_fact_schedule("Easy")
+    # Explicitly move to next fact
+    root.after(100, generate_new_fact)
 
 # Main window setup
 root = tk.Tk()
@@ -469,33 +646,34 @@ control_frame.pack(side="bottom", fill="x")
 button_frame = tk.Frame(control_frame, bg="#1e1e1e")
 button_frame.pack(expand=True)
 
-create_button(button_frame, "Generate/Next Fact", generate_new_fact, bg='#b66d20')
+generate_button = create_button(button_frame, "Generate/Next Fact", generate_new_fact, bg='#b66d20')
 
 save_status_label = create_label(control_frame, "", fg="#b66d20", font=("Trebuchet MS", 10), side='bottom')
 
-# Mastery frame
-mastery_frame = tk.Frame(root, bg="#1e1e1e")  # Change parent to root instead of control_frame
+# Spaced Repetition frame (replacing mastery frame)
+spaced_repetition_frame = tk.Frame(root, bg="#1e1e1e")
 
 # Create a sub-frame for the buttons
-button_frame = tk.Frame(mastery_frame, bg="#1e1e1e")
-button_frame.pack(side="top", fill="x", expand=True)
+sr_button_frame = tk.Frame(spaced_repetition_frame, bg="#1e1e1e")
+sr_button_frame.pack(side="top", fill="x", expand=True)
 
-# Update the buttons
-know_button = tk.Button(button_frame, text="I Know", command=on_know_click, bg='#4CAF50', fg="white", 
+# Update the buttons for spaced repetition
+hard_button = tk.Button(sr_button_frame, text="Hard", command=on_hard_click, bg='#F44336', fg="white", 
+                      cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
+hard_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
+
+medium_button = tk.Button(sr_button_frame, text="Medium", command=on_medium_click, bg='#FFC107', fg="white", 
                         cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
-know_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
+medium_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
 
-forgot_button = tk.Button(button_frame, text="I Forgot", command=on_forgot_click, bg='#F44336', fg="white", 
-                          cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
-forgot_button.pack(side="left", expand=True, fill="x")
+easy_button = tk.Button(sr_button_frame, text="Easy", command=on_easy_click, bg='#4CAF50', fg="white", 
+                       cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
+easy_button.pack(side="left", expand=True, fill="x")
 
-# Update the progress bar to be below the buttons
-mastery_progress = ttk.Progressbar(mastery_frame, orient="horizontal", length=200, mode="determinate")
-mastery_progress.pack(side="top", fill="x", expand=True, pady=(5, 0))
-
-# Update the mastery label to be below the progress bar
-mastery_label = tk.Label(mastery_frame, text="Mastery: 0%", fg="white", bg="#1e1e1e", font=("Trebuchet MS", 10))
-mastery_label.pack(side="top", pady=(5, 0))
+# Review information label
+review_info_label = tk.Label(spaced_repetition_frame, text="Status: Due today (Interval: 1 day)", 
+                            fg="white", bg="#1e1e1e", font=("Trebuchet MS", 10))
+review_info_label.pack(side="top", pady=(5, 0))
 
 # Set initial transparency
 root.attributes('-alpha', 0.65)
@@ -511,6 +689,6 @@ set_static_position()
 root.bind("<s>", set_static_position)
 update_star_icon()
 update_category_dropdown()
-hide_mastery_frame()  # Initially hide the mastery frame
+hide_spaced_repetition_frame()  # Initially hide the spaced repetition frame
 root.after(100, update_ui)
 root.mainloop()

@@ -51,16 +51,14 @@ CREATE TABLE FactTags (
 )
 GO
 
+-- Create SavedFacts table with spaced repetition columns
 CREATE TABLE SavedFacts (
     SavedFactID INT PRIMARY KEY IDENTITY(1,1),
     FactID INT FOREIGN KEY REFERENCES Facts(FactID),
-    DateSaved DATETIME NOT NULL DEFAULT GETDATE()
+    DateSaved DATETIME NOT NULL DEFAULT GETDATE(),
+    NextReviewDate DATE NOT NULL DEFAULT GETDATE(),
+    CurrentInterval INT NOT NULL DEFAULT 1
 )
-GO
-
--- Add MasteryLevel column to SavedFacts table
-ALTER TABLE SavedFacts
-ADD MasteryLevel INT NOT NULL DEFAULT 0;
 GO
 
 -- Create Stored Procedures
@@ -153,20 +151,71 @@ BEGIN
 END
 GO
 
--- Create a stored procedure to update mastery level
-CREATE PROCEDURE UpdateMasteryLevel
+-- Create a stored procedure for updating review schedule (Anki-style spaced repetition)
+CREATE PROCEDURE UpdateReviewSchedule
     @SavedFactID INT,
-    @Increment INT
+    @Difficulty NVARCHAR(10)
 AS
 BEGIN
-    UPDATE SavedFacts
-    SET MasteryLevel = CASE
-        WHEN MasteryLevel + @Increment < 0 THEN 0
-        WHEN MasteryLevel + @Increment > 100 THEN 100
-        ELSE MasteryLevel + @Increment
-    END
+    DECLARE @NewInterval INT;
+    DECLARE @CurrentInterval INT;
+    
+    -- Get current interval
+    SELECT @CurrentInterval = CurrentInterval 
+    FROM SavedFacts 
     WHERE SavedFactID = @SavedFactID;
+    
+    -- Calculate new interval based on difficulty
+    IF @Difficulty = 'Hard'
+    BEGIN
+        -- For hard cards, reset or maintain the interval
+        SET @NewInterval = IIF(@CurrentInterval <= 1, 1, @CurrentInterval);
+    END
+    ELSE IF @Difficulty = 'Medium'
+    BEGIN
+        -- For medium cards, increase by 50%
+        SET @NewInterval = CEILING(@CurrentInterval * 1.5);
+    END
+    ELSE -- Easy
+    BEGIN
+        -- For easy cards, increase by 150%
+        SET @NewInterval = CEILING(@CurrentInterval * 2.5);
+    END
+    
+    -- Update the interval and next review date
+    UPDATE SavedFacts
+    SET CurrentInterval = @NewInterval,
+        NextReviewDate = DATEADD(day, @NewInterval, GETDATE())
+    WHERE SavedFactID = @SavedFactID;
+    
+    -- Return the updated values
+    SELECT @NewInterval AS NewInterval, 
+           CONVERT(VARCHAR(10), DATEADD(day, @NewInterval, GETDATE()), 120) AS NextReviewDate;
 END
 GO
-    
+
+-- Insert initial data
+
+-- Add the API category
+INSERT INTO Categories (CategoryName, Description)
+VALUES ('API', 'Facts from external APIs');
+
+-- Add some sample categories
+INSERT INTO Categories (CategoryName, Description)
+VALUES 
+('Science', 'Scientific facts and discoveries'),
+('History', 'Historical events and figures'),
+('Geography', 'Places, landmarks, and geography'),
+('Technology', 'Tech facts and innovations');
+
+-- Add some sample tags
+INSERT INTO Tags (TagName)
+VALUES 
+('Science'), ('History'), ('Geography'), ('Technology'),
+('Space'), ('Animals'), ('Human Body'), ('Plants'),
+('Ancient'), ('Modern'), ('War'), ('Inventions'),
+('Countries'), ('Oceans'), ('Mountains'), ('Cities'),
+('Computers'), ('Internet'), ('Gadgets'), ('Programming');
+
 PRINT 'FactsGenerator database has been recreated with all tables and stored procedures.'
+GO
