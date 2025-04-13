@@ -172,6 +172,34 @@ def toggle_question_answer():
         question = execute_query(query, (current_factcard_id,))[0][0]
         factcard_label.config(text=f"Question: {question}", font=("Trebuchet MS", adjust_font_size(question)))
         show_answer_button.config(text="Show Answer")
+    
+    # Keep mastery display updated
+    update_mastery_display()
+
+def update_mastery_display():
+    """Update the visual display of the mastery level for the current card"""
+    if current_factcard_id:
+        query = "SELECT Mastery FROM FactCards WHERE FactCardID = ?"
+        mastery = execute_query(query, (current_factcard_id,))[0][0]
+        
+        # Update the mastery progress in the UI
+        mastery_percentage = int(mastery * 100)
+        mastery_level_label.config(text=f"Mastery: {mastery_percentage}%")
+        
+        # Update progress bar
+        mastery_progress["value"] = mastery_percentage
+        
+        # Change color based on mastery level
+        if mastery < 0.3:
+            mastery_level_label.config(fg="#F44336")  # Red for low mastery
+        elif mastery < 0.7:
+            mastery_level_label.config(fg="#FFC107")  # Yellow for medium mastery
+        else:
+            mastery_level_label.config(fg="#4CAF50")  # Green for high mastery
+    else:
+        # No card selected
+        mastery_level_label.config(text="Mastery: N/A")
+        mastery_progress["value"] = 0
 
 def fetch_due_factcard():
     """Fetch a fact card due for review"""
@@ -185,7 +213,7 @@ def fetch_due_factcard():
     # Get fact cards due for review today or earlier
     if category == "All Categories":
         query = """
-            SELECT TOP 1 FactCardID, Question, Answer, NextReviewDate, CurrentInterval
+            SELECT TOP 1 FactCardID, Question, Answer, NextReviewDate, CurrentInterval, Mastery
             FROM FactCards
             WHERE NextReviewDate <= ?
             ORDER BY NextReviewDate, NEWID()
@@ -193,7 +221,7 @@ def fetch_due_factcard():
         factcard = execute_query(query, (current_date,))
     else:
         query = """
-            SELECT TOP 1 f.FactCardID, f.Question, f.Answer, f.NextReviewDate, f.CurrentInterval
+            SELECT TOP 1 f.FactCardID, f.Question, f.Answer, f.NextReviewDate, f.CurrentInterval, f.Mastery
             FROM FactCards f
             JOIN Categories c ON f.CategoryID = c.CategoryID
             WHERE c.CategoryName = ? AND f.NextReviewDate <= ?
@@ -203,7 +231,8 @@ def fetch_due_factcard():
     
     if factcard:
         # We have a fact card due for review
-        factcard_id, question, answer, next_review, interval = factcard[0]
+        factcard_id = factcard[0][0]
+        question = factcard[0][1]
         current_factcard_id = factcard_id
         
         # Show the question
@@ -228,8 +257,11 @@ def load_next_factcard():
     factcard_text = fetch_due_factcard()
     if factcard_text:
         factcard_label.config(text=factcard_text, font=("Trebuchet MS", adjust_font_size(factcard_text)))
+        update_mastery_display()  # Update the mastery display
     else:
         factcard_label.config(text="No fact cards found.", font=("Trebuchet MS", 12))
+        mastery_level_label.config(text="Mastery: N/A")
+        mastery_progress["value"] = 0
     update_due_count()
 
 def update_due_count():
@@ -254,48 +286,58 @@ def show_review_buttons(show):
         edit_icon_button.pack_forget()
         delete_icon_button.pack_forget()
 
-def calculate_next_interval(current_interval, difficulty):
-    """Calculate the next interval based on difficulty rating"""
-    if difficulty == "Hard":
-        return 1  # Reset to 1 day for hard cards
-    elif difficulty == "Medium":
-        return int(current_interval * 1.5)  # Increase by 50%
-    else:  # Easy
-        return int(current_interval * 2.5)  # Increase by 150%
-
 def update_factcard_schedule(difficulty):
-    """Update the fact card's review schedule based on difficulty rating"""
+    """Update the fact card's review schedule based on difficulty rating and adjust mastery level"""
     global current_factcard_id
     if current_factcard_id:
-        # Get current interval
-        query = "SELECT CurrentInterval FROM FactCards WHERE FactCardID = ?"
-        current_interval = execute_query(query, (current_factcard_id,))[0][0]
+        # Get current interval and mastery level
+        query = "SELECT CurrentInterval, Mastery FROM FactCards WHERE FactCardID = ?"
+        result = execute_query(query, (current_factcard_id,))[0]
+        current_interval, current_mastery = result[0], result[1]
         
-        # Calculate new interval
+        # Update mastery level based on difficulty
         if difficulty == "Hard":
-            new_interval = 1  # Reset to 1 for Hard
+            # Decrease mastery when struggling (min 0.0)
+            new_mastery = max(0.0, current_mastery - 0.1)
+            new_interval = 1  # Reset interval
         elif difficulty == "Medium":
-            new_interval = int(current_interval * 1.5)  # 50% increase for Medium
+            # Small increase in mastery
+            new_mastery = min(1.0, current_mastery + 0.05)
+            # Adjust multiplier based on mastery level
+            multiplier = 1.3 + (current_mastery * 0.4)  # ranges from 1.3 to 1.7
+            new_interval = int(current_interval * multiplier)
         else:  # Easy
-            new_interval = int(current_interval * 2.5)  # 150% increase for Easy
+            # Larger increase in mastery
+            new_mastery = min(1.0, current_mastery + 0.15)
+            # Adjust multiplier based on mastery level
+            multiplier = 2.0 + (current_mastery * 1.0)  # ranges from 2.0 to 3.0
+            new_interval = int(current_interval * multiplier)
         
-        # Update the database
-        next_review_date = (datetime.now() + timedelta(days=new_interval)).strftime('%Y-%m-%d')
+        # Calculate next review date
+        if difficulty == "Hard":
+            # For Hard, set the next review date to TODAY
+            next_review_date = datetime.now().strftime('%Y-%m-%d')
+        else:
+            # For Medium and Easy, add the interval days
+            next_review_date = (datetime.now() + timedelta(days=new_interval)).strftime('%Y-%m-%d')
+            
+        # Update the database with new values including mastery
         execute_query(
             """
             UPDATE FactCards 
-            SET NextReviewDate = ?, CurrentInterval = ?, ViewCount = ViewCount + 1
+            SET NextReviewDate = ?, CurrentInterval = ?, Mastery = ?, ViewCount = ViewCount + 1
             WHERE FactCardID = ?
             """, 
-            (next_review_date, new_interval, current_factcard_id), 
+            (next_review_date, new_interval, new_mastery, current_factcard_id), 
             fetch=False
         )
         
-        # Show feedback
+        # Show feedback including mastery level
+        mastery_percentage = int(new_mastery * 100)
         if difficulty == "Hard":
-            feedback_text = f"Rated as {difficulty}. Next review today."
+            feedback_text = f"Rated as {difficulty}. Next review today. Mastery: {mastery_percentage}%"
         else:
-            feedback_text = f"Rated as {difficulty}. Next review in {new_interval} days."
+            feedback_text = f"Rated as {difficulty}. Next review in {new_interval} days. Mastery: {mastery_percentage}%"
         
         status_label.config(text=feedback_text, fg="#b66d20")
         
@@ -372,11 +414,11 @@ def add_new_factcard():
         # Get category ID
         category_id = execute_query("SELECT CategoryID FROM Categories WHERE CategoryName = ?", (category,))[0][0]
         
-        # Insert the new fact card
+        # Insert the new fact card - now including default Mastery of 0.0
         execute_query(
             """
-            INSERT INTO FactCards (CategoryID, Question, Answer, NextReviewDate, CurrentInterval) 
-            VALUES (?, ?, ?, GETDATE(), 1)
+            INSERT INTO FactCards (CategoryID, Question, Answer, NextReviewDate, CurrentInterval, Mastery) 
+            VALUES (?, ?, ?, GETDATE(), 1, 0.0)
             """, 
             (category_id, question, answer), 
             fetch=False
@@ -404,18 +446,18 @@ def edit_current_factcard():
     
     # Get current fact card data
     query = """
-    SELECT f.Question, f.Answer, c.CategoryName
+    SELECT f.Question, f.Answer, c.CategoryName, f.Mastery
     FROM FactCards f 
     JOIN Categories c ON f.CategoryID = c.CategoryID
     WHERE f.FactCardID = ?
     """
     data = execute_query(query, (current_factcard_id,))[0]
-    current_question, current_answer, current_category = data
+    current_question, current_answer, current_category, current_mastery = data
     
     # Create a popup window
     edit_window = tk.Toplevel(root)
     edit_window.title("Edit Fact Card")
-    edit_window.geometry("500x350")
+    edit_window.geometry("500x400")  # Made slightly taller for mastery slider
     edit_window.configure(bg='#1e1e1e')
     
     # Get categories for dropdown
@@ -461,10 +503,28 @@ def edit_current_factcard():
     answer_text.insert("1.0", current_answer)
     answer_text.pack(fill="x", padx=5, pady=5)
     
+    # Mastery level slider
+    m_frame = tk.Frame(edit_window, bg="#1e1e1e")
+    m_frame.pack(fill="x", padx=20, pady=5)
+    
+    tk.Label(m_frame, text=f"Mastery Level: {int(current_mastery * 100)}%", fg="white", bg="#1e1e1e", 
+             font=("Trebuchet MS", 10)).pack(side="top", anchor="w", padx=5)
+    
+    mastery_var = tk.DoubleVar(edit_window, value=current_mastery)
+    
+    def update_mastery_label(val):
+        mastery_val = int(float(val) * 100)
+        m_frame.winfo_children()[0].config(text=f"Mastery Level: {mastery_val}%")
+    
+    mastery_slider = ttk.Scale(m_frame, from_=0.0, to=1.0, orient="horizontal",
+                             variable=mastery_var, command=update_mastery_label)
+    mastery_slider.pack(fill="x", padx=5, pady=5)
+    
     def update_factcard():
         category = cat_var.get()
         question = question_text.get("1.0", "end-1c").strip()
         answer = answer_text.get("1.0", "end-1c").strip()
+        mastery = mastery_var.get()
         
         if not question or not answer:
             status_label.config(text="Question and answer are required!", fg="#ff0000")
@@ -473,14 +533,14 @@ def edit_current_factcard():
         # Get category ID
         category_id = execute_query("SELECT CategoryID FROM Categories WHERE CategoryName = ?", (category,))[0][0]
         
-        # Update the fact card
+        # Update the fact card including mastery
         execute_query(
             """
             UPDATE FactCards 
-            SET CategoryID = ?, Question = ?, Answer = ? 
+            SET CategoryID = ?, Question = ?, Answer = ?, Mastery = ? 
             WHERE FactCardID = ?
             """, 
-            (category_id, question, answer, current_factcard_id), 
+            (category_id, question, answer, mastery, current_factcard_id), 
             fetch=False
         )
         
@@ -493,6 +553,9 @@ def edit_current_factcard():
             factcard_label.config(text=f"Answer: {answer}", font=("Trebuchet MS", adjust_font_size(answer)))
         else:
             factcard_label.config(text=f"Question: {question}", font=("Trebuchet MS", adjust_font_size(question)))
+        
+        # Update mastery display
+        update_mastery_display()
     
     # Update button
     update_button = tk.Button(edit_window, text="Update Fact Card", bg='#2196F3', fg="white", 
@@ -721,11 +784,13 @@ def reset_to_welcome():
     status_label.config(text="")
     show_review_buttons(False)
     show_answer_button.config(state="disabled")
+    mastery_level_label.config(text="Mastery: N/A")
+    mastery_progress["value"] = 0
     update_due_count()
 
 # Main window setup
 root = tk.Tk()
-root.geometry("500x350")
+root.geometry("500x380")  # Made slightly taller to accommodate mastery display
 root.overrideredirect(True)
 root.configure(bg='#1e1e1e')
 
@@ -759,26 +824,41 @@ content_frame.pack(side="top", fill="both", expand=True, padx=10, pady=5)
 factcard_frame = tk.Frame(content_frame, bg="#1e1e1e")
 factcard_frame.pack(side="top", fill="both", expand=True, pady=5)
 
+# Add top padding to push content down
+padding_frame = tk.Frame(factcard_frame, bg="#1e1e1e", height=30)  # Adjust height as needed
+padding_frame.pack(side="top", fill="x")
+
 factcard_label = tk.Label(factcard_frame, text="Welcome to FactDari!", fg="white", bg="#1e1e1e", 
                           font=("Trebuchet MS", 12), wraplength=450, justify="center")
 factcard_label.pack(side="top", fill="both", expand=True, padx=10, pady=10)
 
-# Show Answer button
-center_buttons = tk.Frame(content_frame, bg="#1e1e1e")
-center_buttons.pack(side="top", fill="x", pady=5)
+# Create a new frame for Show Answer and Mastery info that will keep them together
+answer_mastery_frame = tk.Frame(content_frame, bg="#1e1e1e")
+answer_mastery_frame.pack(side="top", fill="x", pady=0)
 
-show_answer_button = tk.Button(center_buttons, text="Show Answer", command=toggle_question_answer, 
+# Show Answer button in the combined frame
+show_answer_button = tk.Button(answer_mastery_frame, text="Show Answer", command=toggle_question_answer, 
                               bg='#2196F3', fg="white", cursor="hand2", borderwidth=0, 
                               highlightthickness=0, padx=10, pady=5, state="disabled")
-show_answer_button.pack(fill="x", padx=100, pady=5)
+show_answer_button.pack(fill="x", padx=100, pady=2)
+
+# Mastery level display in the combined frame
+mastery_level_label = tk.Label(answer_mastery_frame, text="Mastery: N/A", fg="white", bg="#1e1e1e", 
+                             font=("Trebuchet MS", 10, 'bold'))
+mastery_level_label.pack(side="top", pady=2)
+
+# Add a progress bar to visualize mastery in the combined frame
+mastery_progress = ttk.Progressbar(answer_mastery_frame, orient="horizontal", length=280, mode="determinate")
+mastery_progress.pack(side="top", pady=2)
+
+# Style the progress bar
+style = ttk.Style()
+style.theme_use('default')
+style.configure("TProgressbar", thickness=8, troughcolor='#333333', background='#4CAF50')
 
 # Spaced repetition buttons
 sr_frame = tk.Frame(content_frame, bg="#1e1e1e")
 sr_frame.pack(side="top", fill="x", pady=5)
-
-sr_label = create_label(sr_frame, "Rate your recall:", 
-                      font=("Trebuchet MS", 9, 'bold'), side='top')
-sr_label.pack_configure(anchor="center", pady=5)
 
 sr_buttons = tk.Frame(sr_frame, bg="#1e1e1e")
 sr_buttons.pack(side="top", fill="x")
@@ -799,9 +879,9 @@ easy_button.pack(side="left", expand=True, fill="x")
 home_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/home.png").resize((20, 20), Image.Resampling.LANCZOS))
 speaker_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/speaker_icon.png").resize((20, 20), Image.Resampling.LANCZOS))
 # Load action icons
-add_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/add.png").resize((24, 24), Image.Resampling.LANCZOS))
-edit_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/edit.png").resize((24, 24), Image.Resampling.LANCZOS))
-delete_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/delete.png").resize((24, 24), Image.Resampling.LANCZOS))
+add_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/add.png").resize((20, 20), Image.Resampling.LANCZOS))
+edit_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/edit.png").resize((20, 20), Image.Resampling.LANCZOS))
+delete_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/delete.png").resize((20, 20), Image.Resampling.LANCZOS))
 
 # Icon buttons frame - below the spaced repetition buttons
 icon_buttons_frame = tk.Frame(content_frame, bg="#1e1e1e")
