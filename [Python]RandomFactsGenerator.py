@@ -20,6 +20,7 @@ CONN_STR = (
 x_window, y_window = 0, 0
 current_factcard_id = None
 show_answer = False
+is_home_page = True  # New flag to track if we're on the home page
 
 def apply_rounded_corners(root, radius):
     """Apply rounded corners to the window"""
@@ -46,7 +47,8 @@ def count_factcards():
 def update_ui():
     """Update UI elements periodically"""
     update_coordinates()
-    update_factcard_count()
+    if not is_home_page:
+        update_factcard_count()
     root.after(100, update_ui)
 
 def update_factcard_count():
@@ -788,6 +790,57 @@ def reset_to_welcome():
     mastery_progress["value"] = 0
     update_due_count()
 
+def show_home_page():
+    """Show the home page with welcome message and start button"""
+    global is_home_page
+    is_home_page = True
+    
+    # Hide all fact card-related UI elements
+    stats_frame.pack_forget()
+    icon_buttons_frame.pack_forget()
+    sr_frame.pack_forget()
+    answer_mastery_frame.pack_forget()
+    category_frame.pack_forget()
+    
+    # Update the welcome message
+    factcard_label.config(text="Welcome to FactDari!\n\nYour Personal Knowledge Companion", 
+                         font=("Trebuchet MS", 16, 'bold'),
+                         wraplength=450, justify="center")
+    
+    # Show the slogan
+    slogan_label.config(text="Strengthen your knowledge one fact at a time")
+    slogan_label.pack(side="top", pady=5)
+    
+    # Show the start learning button
+    start_button.pack(pady=20)
+    
+    # Apply rounded corners again after UI changes
+    root.update_idletasks()
+    apply_rounded_corners(root, 15)
+
+def start_learning():
+    """Switch from home page to learning interface"""
+    global is_home_page
+    is_home_page = False
+    
+    # Hide home page elements
+    slogan_label.pack_forget()
+    start_button.pack_forget()
+    
+    # Show all fact card-related UI elements
+    category_frame.pack(side="right", padx=5, pady=3)
+    answer_mastery_frame.pack(side="top", fill="x", pady=0)
+    sr_frame.pack(side="top", fill="x", pady=5)
+    icon_buttons_frame.pack(side="top", fill="x", pady=5)
+    stats_frame.pack(side="bottom", fill="x", padx=10, pady=3)
+    
+    # Load the first fact card
+    load_next_factcard()
+    
+    # Apply rounded corners again after UI changes
+    root.update_idletasks()
+    apply_rounded_corners(root, 15)
+
 # Main window setup
 root = tk.Tk()
 root.geometry("500x380")  # Made slightly taller to accommodate mastery display
@@ -803,10 +856,8 @@ title_bar.bind("<B1-Motion>", on_drag)
 tk.Label(title_bar, text="FactDari", fg="white", bg='#000000', 
          font=("Trebuchet MS", 12, 'bold')).pack(side="left", padx=5, pady=5)
 
-# Category selection
+# Category selection - create but don't pack yet
 category_frame = tk.Frame(title_bar, bg='#000000')
-category_frame.pack(side="right", padx=5, pady=3)
-
 tk.Label(category_frame, text="Category:", fg="white", bg='#000000', 
          font=("Trebuchet MS", 8)).pack(side="left", padx=5)
 
@@ -829,12 +880,21 @@ padding_frame = tk.Frame(factcard_frame, bg="#1e1e1e", height=30)  # Adjust heig
 padding_frame.pack(side="top", fill="x")
 
 factcard_label = tk.Label(factcard_frame, text="Welcome to FactDari!", fg="white", bg="#1e1e1e", 
-                          font=("Trebuchet MS", 12), wraplength=450, justify="center")
+                          font=("Trebuchet MS", 16, 'bold'), wraplength=450, justify="center")
 factcard_label.pack(side="top", fill="both", expand=True, padx=10, pady=10)
 
-# Create a new frame for Show Answer and Mastery info that will keep them together
+# Create slogan label (will be packed in show_home_page)
+slogan_label = tk.Label(content_frame, text="Strengthen your knowledge one fact at a time", 
+                      fg="#4CAF50", bg="#1e1e1e", font=("Trebuchet MS", 12, 'italic'))
+
+# Create start learning button (will be packed in show_home_page)
+start_button = tk.Button(content_frame, text="Start Learning", command=start_learning, 
+                      bg='#4CAF50', fg="white", cursor="hand2", borderwidth=0, 
+                      highlightthickness=0, padx=20, pady=10,
+                      font=("Trebuchet MS", 14, 'bold'))
+
+# Create a new frame for Show Answer and Mastery info that will keep them together - don't pack yet
 answer_mastery_frame = tk.Frame(content_frame, bg="#1e1e1e")
-answer_mastery_frame.pack(side="top", fill="x", pady=0)
 
 # Show Answer button in the combined frame
 show_answer_button = tk.Button(answer_mastery_frame, text="Show Answer", command=toggle_question_answer, 
@@ -856,9 +916,8 @@ style = ttk.Style()
 style.theme_use('default')
 style.configure("TProgressbar", thickness=8, troughcolor='#333333', background='#4CAF50')
 
-# Spaced repetition buttons
+# Spaced repetition buttons - create but don't pack yet
 sr_frame = tk.Frame(content_frame, bg="#1e1e1e")
-sr_frame.pack(side="top", fill="x", pady=5)
 
 sr_buttons = tk.Frame(sr_frame, bg="#1e1e1e")
 sr_buttons.pack(side="top", fill="x")
@@ -883,11 +942,10 @@ add_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/Git
 edit_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/edit.png").resize((20, 20), Image.Resampling.LANCZOS))
 delete_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/delete.png").resize((20, 20), Image.Resampling.LANCZOS))
 
-# Icon buttons frame - below the spaced repetition buttons
+# Icon buttons frame - create but don't pack yet
 icon_buttons_frame = tk.Frame(content_frame, bg="#1e1e1e")
-icon_buttons_frame.pack(side="top", fill="x", pady=5)
 
-# Add button is always visible
+# Add button
 add_icon_button = tk.Button(icon_buttons_frame, image=add_icon, bg='#1e1e1e', command=add_new_factcard,
                          cursor="hand2", borderwidth=0, highlightthickness=0)
 add_icon_button.pack(side="left", padx=10)
@@ -910,7 +968,7 @@ status_label.pack_configure(pady=5, padx=10)
 
 # Add home and speaker buttons
 home_button = tk.Button(factcard_frame, image=home_icon, bg='#1e1e1e', bd=0, highlightthickness=0, 
-                       cursor="hand2", activebackground='#1e1e1e', command=reset_to_welcome)
+                       cursor="hand2", activebackground='#1e1e1e', command=show_home_page)
 home_button.place(relx=0, rely=0, anchor="nw", x=5, y=5)
 
 speaker_button = tk.Button(factcard_frame, image=speaker_icon, bg='#1e1e1e', command=speak_text, 
@@ -918,9 +976,8 @@ speaker_button = tk.Button(factcard_frame, image=speaker_icon, bg='#1e1e1e', com
 speaker_button.image = speaker_icon  # Keep a reference
 speaker_button.place(relx=1.0, rely=0, anchor="ne", x=-5, y=5)
 
-# Bottom stats frame
+# Bottom stats frame - create but don't pack yet
 stats_frame = tk.Frame(root, bg="#1e1e1e")
-stats_frame.pack(side="bottom", fill="x", padx=10, pady=3)
 
 # Stats labels - all with the same font size
 factcard_count_label = create_label(stats_frame, "Total Fact Cards: 0", 
@@ -950,11 +1007,10 @@ root.update_idletasks()
 apply_rounded_corners(root, 15)
 set_static_position()
 root.bind("<s>", set_static_position)
-update_factcard_count()
-update_due_count()
+update_coordinates()
 root.after(100, update_ui)
 
-# Load the first fact card
-load_next_factcard()
+# Show the home page instead of loading the first fact card
+show_home_page()
 
 root.mainloop()
