@@ -765,7 +765,7 @@ def update_category_dropdown():
 
 def adjust_font_size(text):
     """Dynamically adjust font size based on text length"""
-    return max(8, min(12, int(12 - (len(text) / 200))))
+    return max(8, min(12, int(12 - (len(text) / 150))))
 
 def create_label(parent, text, fg="white", cursor=None, font=("Trebuchet MS", 7), side='left'):
     """Create a styled label"""
