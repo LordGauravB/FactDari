@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FactDari Analytics</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <h1>FactDari Analytics</h1>
+        <p>Visualize your learning journey and gain insights into your knowledge growth</p>
+    </header>
+
+    <main>
+        <div class="chart-grid">
+            <div class="chart-container">
+                <h2>Category Distribution</h2>
+                <canvas id="categoryDistributionChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <h2>Cards per Category</h2>
+                <canvas id="cardsPerCategoryChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <h2>View Count vs. Mastery</h2>
+                <canvas id="viewMasteryChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <h2>Interval Growth</h2>
+                <canvas id="intervalGrowthChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <h2>Review Schedule (Next 30 Days)</h2>
+                <canvas id="reviewScheduleChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <h2>Cards Added Over Time</h2>
+                <canvas id="cardsAddedChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <h2>Learning Efficiency</h2>
+                <canvas id="learningEfficiencyChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <h2>Learning Curve</h2>
+                <canvas id="learningCurveChart"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 FactDari - Your Personal Knowledge Companion</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

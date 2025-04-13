@@ -33,10 +33,12 @@ CREATE TABLE FactCards (
     Question NVARCHAR(MAX) NOT NULL,
     Answer NVARCHAR(MAX) NOT NULL,
     DateAdded DATETIME NOT NULL DEFAULT GETDATE(),
+    LastReviewDate DATETIME NULL,
     NextReviewDate DATE NOT NULL DEFAULT GETDATE(),
     CurrentInterval INT NOT NULL DEFAULT 1,
     ViewCount INT NOT NULL DEFAULT 0,
-    Mastery FLOAT NOT NULL DEFAULT 0.0 -- 0.0 to 1.0 score of mastery
+    Mastery FLOAT NOT NULL DEFAULT 0.0, -- 0.0 to 1.0 score of mastery
+    LastEditedDate DATETIME NULL
 )
 GO
 

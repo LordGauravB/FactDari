@@ -7,6 +7,13 @@ from datetime import datetime, timedelta
 import pyttsx3
 from PIL import Image, ImageTk
 import random
+import webbrowser
+import subprocess
+import os
+import threading
+import signal
+import sys
+import atexit
 
 class FactDariApp:
     # Database Constants
@@ -198,6 +205,11 @@ class FactDariApp:
                                   cursor="hand2", borderwidth=0, highlightthickness=0)
         self.speaker_button.place(relx=1.0, rely=0, anchor="ne", x=-5, y=5)
         
+        # Add graph button
+        self.graph_button = tk.Button(self.factcard_frame, image=self.graph_icon, bg='#1e1e1e', command=self.show_analytics, 
+                                cursor="hand2", borderwidth=0, highlightthickness=0)
+        self.graph_button.place(relx=1.0, rely=0, anchor="ne", x=-30, y=5)  # Position it to the left of speaker button
+        
         # Bottom stats frame
         self.stats_frame = tk.Frame(self.root, bg="#1e1e1e")
         
@@ -224,6 +236,8 @@ class FactDariApp:
         self.add_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/add.png").resize((20, 20), Image.Resampling.LANCZOS))
         self.edit_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/edit.png").resize((20, 20), Image.Resampling.LANCZOS))
         self.delete_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/delete.png").resize((20, 20), Image.Resampling.LANCZOS))
+        # Add graph icon
+        self.graph_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/graph.png").resize((20, 20), Image.Resampling.LANCZOS))
     
     def bind_events(self):
         """Bind all event handlers"""
@@ -320,6 +334,44 @@ class FactDariApp:
         engine = pyttsx3.init()
         engine.say(text)
         engine.runAndWait()
+    
+    def show_analytics(self):
+        """Launch the analytics web application"""
+        # Check if Flask server is already running
+        if hasattr(self, 'flask_process') and self.flask_process.poll() is None:
+            # Server is running, just open the browser
+            webbrowser.open("http://localhost:5000")
+        else:
+            # Start the Flask server
+            self.start_flask_server()
+            # Wait a moment for the server to start
+            self.root.after(1000, lambda: webbrowser.open("http://localhost:5000"))
+
+    def start_flask_server(self):
+        """Start the Flask server in a separate process"""
+        # Path to the Flask app.py file
+        flask_app_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "analytics_app.py")
+        
+        # Start Flask server
+        if sys.platform.startswith('win'):
+            self.flask_process = subprocess.Popen(["python", flask_app_path], 
+                                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+        else:
+            # Linux/Mac
+            self.flask_process = subprocess.Popen(["python3", flask_app_path], 
+                                               preexec_fn=os.setsid)
+        
+        # Register exit handler to close Flask server when the main app exits
+        atexit.register(self.close_flask_server)
+
+    def close_flask_server(self):
+        """Close the Flask server when the main application exits"""
+        if hasattr(self, 'flask_process') and self.flask_process.poll() is None:
+            if sys.platform.startswith('win'):
+                subprocess.call(['taskkill', '/F', '/T', '/PID', str(self.flask_process.pid)])
+            else:
+                # Linux/Mac
+                os.killpg(os.getpgid(self.flask_process.pid), signal.SIGTERM)
     
     def get_due_factcard_count(self):
         """Get count of fact cards due for review today"""
@@ -583,7 +635,7 @@ class FactDariApp:
         self.execute_update(
             """
             UPDATE FactCards 
-            SET NextReviewDate = ?, CurrentInterval = ?, Mastery = ?, ViewCount = ViewCount + 1
+            SET NextReviewDate = ?, CurrentInterval = ?, Mastery = ?, ViewCount = ViewCount + 1, LastReviewDate = GETDATE()
             WHERE FactCardID = ?
             """, 
             (next_review_date, new_interval, new_mastery, self.current_factcard_id)
@@ -677,8 +729,8 @@ class FactDariApp:
             # Insert the new fact card - now including default Mastery of 0.0
             self.execute_query(
                 """
-                INSERT INTO FactCards (CategoryID, Question, Answer, NextReviewDate, CurrentInterval, Mastery) 
-                VALUES (?, ?, ?, GETDATE(), 1, 0.0)
+                INSERT INTO FactCards (CategoryID, Question, Answer, NextReviewDate, CurrentInterval, Mastery, DateAdded) 
+                VALUES (?, ?, ?, GETDATE(), 1, 0.0, GETDATE())
                 """, 
                 (category_id, question, answer), 
                 fetch=False
@@ -798,12 +850,12 @@ class FactDariApp:
             # Update the fact card including mastery
             self.execute_query(
                 """
-                UPDATE FactCards 
-                SET CategoryID = ?, Question = ?, Answer = ?, Mastery = ? 
-                WHERE FactCardID = ?
-                """, 
-                (category_id, question, answer, mastery, self.current_factcard_id), 
-                fetch=False
+                    UPDATE FactCards 
+                    SET CategoryID = ?, Question = ?, Answer = ?, Mastery = ?, LastEditedDate = GETDATE()
+                    WHERE FactCardID = ?
+                    """, 
+                    (category_id, question, answer, mastery, self.current_factcard_id), 
+                    fetch=False
             )
             
             edit_window.destroy()

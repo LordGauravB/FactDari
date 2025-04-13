@@ -1,8 +1,9 @@
 erDiagram
-    Categories ||--o{ FactCards : "contains"
-    FactCards ||--o{ FactCardTags : "has"
-    Tags ||--o{ FactCardTags : "used in"
-    
+    Categories ||--o{ FactCards : contains
+    FactCards }o--o{ Tags : has
+    FactCardTags }|--|| FactCards : maps
+    FactCardTags }|--|| Tags : maps
+
     Categories {
         int CategoryID PK
         nvarchar CategoryName
@@ -10,24 +11,26 @@ erDiagram
         bit IsActive
         datetime CreatedDate
     }
-    
+
     FactCards {
         int FactCardID PK
         int CategoryID FK
         nvarchar Question
         nvarchar Answer
         datetime DateAdded
+        datetime LastReviewDate
         date NextReviewDate
         int CurrentInterval
         int ViewCount
         float Mastery
+        datetime LastEditedDate
     }
-    
+
     Tags {
         int TagID PK
         nvarchar TagName
     }
-    
+
     FactCardTags {
         int FactCardID PK,FK
         int TagID PK,FK
