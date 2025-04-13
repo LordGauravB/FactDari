@@ -1,40 +1,34 @@
 erDiagram
-    Categories ||--o{ Facts : contains
-    Facts ||--o{ FactTags : has
-    Tags ||--o{ FactTags : has
-    Facts ||--o{ SavedFacts : saved_as
-
+    Categories ||--o{ FactCards : "contains"
+    FactCards ||--o{ FactCardTags : "has"
+    Tags ||--o{ FactCardTags : "used in"
+    
     Categories {
         int CategoryID PK
         nvarchar CategoryName
         nvarchar Description
         bit IsActive
         datetime CreatedDate
-        datetime LastModifiedDate
     }
-
-    Facts {
-        int FactID PK
+    
+    FactCards {
+        int FactCardID PK
         int CategoryID FK
-        nvarchar FactText
-        int ViewCount
-        bit IsVerified
+        nvarchar Question
+        nvarchar Answer
         datetime DateAdded
-        datetime LastModified
+        date NextReviewDate
+        int CurrentInterval
+        int ViewCount
+        float Mastery
     }
-
+    
     Tags {
         int TagID PK
         nvarchar TagName
     }
-
-    FactTags {
-        int FactID PK,FK
+    
+    FactCardTags {
+        int FactCardID PK,FK
         int TagID PK,FK
-    }
-
-    SavedFacts {
-        int SavedFactID PK
-        int FactID FK
-        datetime DateSaved
     }
