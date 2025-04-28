@@ -1,59 +1,54 @@
-import tkinter as tk
-from tkinter import ttk, simpledialog, messagebox
+#RandomFactsGenerator.py
+import os
+import sys
+import signal
+import atexit
+import config
 import ctypes
-from ctypes import wintypes
 import pyodbc
-from datetime import datetime, timedelta
 import pyttsx3
-from PIL import Image, ImageTk
-import random
 import webbrowser
 import subprocess
-import os
-import threading
-import signal
-import sys
-import atexit
+import tkinter as tk
+from ctypes import wintypes
+from PIL import Image, ImageTk
+from datetime import datetime, timedelta
+from tkinter import ttk, simpledialog, messagebox
 
 class FactDariApp:
-    # Database Constants
-    CONN_STR = (
-        r'DRIVER={SQL Server};'
-        r'SERVER=GAURAVS_DESKTOP\SQLEXPRESS;'
-        r'DATABASE=FactDari;'
-        r'Trusted_Connection=yes;'
-    )
-    
-    # UI Constants
-    WINDOW_WIDTH = 500
-    WINDOW_HEIGHT = 380
-    WINDOW_STATIC_POS = "-1927+7"
-    POPUP_POSITION = "-1923+400"
-    POPUP_ADD_CARD_SIZE = "496x400"
-    POPUP_EDIT_CARD_SIZE = "496x450"
-    POPUP_CATEGORIES_SIZE = "400x500"
-    CORNER_RADIUS = 15
-    
-    # Font Constants
-    TITLE_FONT = ("Trebuchet MS", 14, 'bold')
-    NORMAL_FONT = ("Trebuchet MS", 10)
-    SMALL_FONT = ("Trebuchet MS", 8)
-    LARGE_FONT = ("Trebuchet MS", 16, 'bold')
-    STATS_FONT = ("Trebuchet MS", 9)
-    
-    # Color Constants
-    BG_COLOR = "#1e1e1e"
-    TITLE_BG_COLOR = "#000000"
-    LISTBOX_BG_COLOR = "#2a2a2a"
-    TEXT_COLOR = "white"
-    GREEN_COLOR = "#4CAF50"
-    BLUE_COLOR = "#2196F3"
-    RED_COLOR = "#F44336"
-    YELLOW_COLOR = "#FFC107"
-    GRAY_COLOR = "#607D8B"
-    STATUS_COLOR = "#b66d20"
-
     def __init__(self):
+        # Get database connection string from config
+        self.CONN_STR = config.get_connection_string()
+        
+        # Get UI configurations
+        self.WINDOW_WIDTH = config.UI_CONFIG['window_width']
+        self.WINDOW_HEIGHT = config.UI_CONFIG['window_height']
+        self.WINDOW_STATIC_POS = config.UI_CONFIG['window_static_pos']
+        self.POPUP_POSITION = config.UI_CONFIG['popup_position']
+        self.POPUP_ADD_CARD_SIZE = config.UI_CONFIG['popup_add_card_size']
+        self.POPUP_EDIT_CARD_SIZE = config.UI_CONFIG['popup_edit_card_size']
+        self.POPUP_CATEGORIES_SIZE = config.UI_CONFIG['popup_categories_size']
+        self.CORNER_RADIUS = config.UI_CONFIG['corner_radius']
+        
+        # Colors
+        self.BG_COLOR = config.UI_CONFIG['bg_color']
+        self.TITLE_BG_COLOR = config.UI_CONFIG['title_bg_color']
+        self.LISTBOX_BG_COLOR = config.UI_CONFIG['listbox_bg_color']
+        self.TEXT_COLOR = config.UI_CONFIG['text_color']
+        self.GREEN_COLOR = config.UI_CONFIG['green_color']
+        self.BLUE_COLOR = config.UI_CONFIG['blue_color']
+        self.RED_COLOR = config.UI_CONFIG['red_color']
+        self.YELLOW_COLOR = config.UI_CONFIG['yellow_color']
+        self.GRAY_COLOR = config.UI_CONFIG['gray_color']
+        self.STATUS_COLOR = config.UI_CONFIG['status_color']
+        
+        # Fonts
+        self.TITLE_FONT = config.get_font('title')
+        self.NORMAL_FONT = config.get_font('normal')
+        self.SMALL_FONT = config.get_font('small')
+        self.LARGE_FONT = config.get_font('large')
+        self.STATS_FONT = config.get_font('stats')
+        
         # Instance variables (replacing globals)
         self.x_window = 0
         self.y_window = 0
@@ -98,7 +93,7 @@ class FactDariApp:
         # Category selection - create but don't pack yet
         self.category_frame = tk.Frame(self.title_bar, bg='#000000')
         tk.Label(self.category_frame, text="Category:", fg="white", bg='#000000', 
-                font=("Trebuchet MS", 8)).pack(side="left", padx=5)
+                font=(self.SMALL_FONT[0], self.SMALL_FONT[1])).pack(side="left", padx=5)
         
         self.category_var = tk.StringVar(self.root, value="All Categories")
         self.category_dropdown = ttk.Combobox(self.category_frame, textvariable=self.category_var, state="readonly", width=15)
@@ -106,43 +101,43 @@ class FactDariApp:
         self.category_dropdown.pack(side="left")
         
         # Main content area
-        self.content_frame = tk.Frame(self.root, bg="#1e1e1e")
+        self.content_frame = tk.Frame(self.root, bg=self.BG_COLOR)
         self.content_frame.pack(side="top", fill="both", expand=True, padx=10, pady=5)
         
         # Fact card display
-        self.factcard_frame = tk.Frame(self.content_frame, bg="#1e1e1e")
+        self.factcard_frame = tk.Frame(self.content_frame, bg=self.BG_COLOR)
         self.factcard_frame.pack(side="top", fill="both", expand=True, pady=5)
         
         # Add top padding to push content down
-        self.padding_frame = tk.Frame(self.factcard_frame, bg="#1e1e1e", height=30)
+        self.padding_frame = tk.Frame(self.factcard_frame, bg=self.BG_COLOR, height=30)
         self.padding_frame.pack(side="top", fill="x")
         
-        self.factcard_label = tk.Label(self.factcard_frame, text="Welcome to FactDari!", fg="white", bg="#1e1e1e", 
-                                  font=("Trebuchet MS", 16, 'bold'), wraplength=450, justify="center")
+        self.factcard_label = tk.Label(self.factcard_frame, text="Welcome to FactDari!", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                                  font=self.LARGE_FONT, wraplength=450, justify="center")
         self.factcard_label.pack(side="top", fill="both", expand=True, padx=10, pady=10)
         
         # Create slogan label
         self.slogan_label = tk.Label(self.content_frame, text="Strengthen your knowledge one fact at a time", 
-                              fg="#4CAF50", bg="#1e1e1e", font=("Trebuchet MS", 12, 'italic'))
+                              fg=self.GREEN_COLOR, bg=self.BG_COLOR, font=(self.NORMAL_FONT[0], 12, 'italic'))
         
         # Create start learning button
         self.start_button = tk.Button(self.content_frame, text="Start Learning", command=self.start_learning, 
-                              bg='#4CAF50', fg="white", cursor="hand2", borderwidth=0, 
+                              bg=self.GREEN_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, 
                               highlightthickness=0, padx=20, pady=10,
-                              font=("Trebuchet MS", 14, 'bold'))
+                              font=self.LARGE_FONT)
         
         # Create a frame for Show Answer and Mastery info
-        self.answer_mastery_frame = tk.Frame(self.content_frame, bg="#1e1e1e")
+        self.answer_mastery_frame = tk.Frame(self.content_frame, bg=self.BG_COLOR)
         
         # Show Answer button in the combined frame
         self.show_answer_button = tk.Button(self.answer_mastery_frame, text="Show Answer", command=self.toggle_question_answer, 
-                                      bg='#2196F3', fg="white", cursor="hand2", borderwidth=0, 
+                                      bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, 
                                       highlightthickness=0, padx=10, pady=5, state="disabled")
         self.show_answer_button.pack(fill="x", padx=100, pady=2)
         
         # Mastery level display
-        self.mastery_level_label = tk.Label(self.answer_mastery_frame, text="Mastery: N/A", fg="white", bg="#1e1e1e", 
-                                     font=("Trebuchet MS", 10, 'bold'))
+        self.mastery_level_label = tk.Label(self.answer_mastery_frame, text="Mastery: N/A", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                                     font=self.NORMAL_FONT)
         self.mastery_level_label.pack(side="top", pady=2)
         
         # Add progress bar for mastery
@@ -152,23 +147,23 @@ class FactDariApp:
         # Style the progress bar
         style = ttk.Style()
         style.theme_use('default')
-        style.configure("TProgressbar", thickness=8, troughcolor='#333333', background='#4CAF50')
+        style.configure("TProgressbar", thickness=8, troughcolor='#333333', background=self.GREEN_COLOR)
         
         # Spaced repetition buttons
-        self.sr_frame = tk.Frame(self.content_frame, bg="#1e1e1e")
+        self.sr_frame = tk.Frame(self.content_frame, bg=self.BG_COLOR)
         
-        sr_buttons = tk.Frame(self.sr_frame, bg="#1e1e1e")
+        sr_buttons = tk.Frame(self.sr_frame, bg=self.BG_COLOR)
         sr_buttons.pack(side="top", fill="x")
         
-        self.hard_button = tk.Button(sr_buttons, text="Hard", command=self.on_hard_click, bg='#F44336', fg="white", 
+        self.hard_button = tk.Button(sr_buttons, text="Hard", command=self.on_hard_click, bg=self.RED_COLOR, fg=self.TEXT_COLOR, 
                               cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
         self.hard_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
         
-        self.medium_button = tk.Button(sr_buttons, text="Medium", command=self.on_medium_click, bg='#FFC107', fg="white", 
+        self.medium_button = tk.Button(sr_buttons, text="Medium", command=self.on_medium_click, bg=self.YELLOW_COLOR, fg=self.TEXT_COLOR, 
                                 cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
         self.medium_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
         
-        self.easy_button = tk.Button(sr_buttons, text="Easy", command=self.on_easy_click, bg='#4CAF50', fg="white", 
+        self.easy_button = tk.Button(sr_buttons, text="Easy", command=self.on_easy_click, bg=self.GREEN_COLOR, fg=self.TEXT_COLOR, 
                                cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
         self.easy_button.pack(side="left", expand=True, fill="x")
         
@@ -176,68 +171,67 @@ class FactDariApp:
         self.load_icons()
         
         # Icon buttons frame
-        self.icon_buttons_frame = tk.Frame(self.content_frame, bg="#1e1e1e")
+        self.icon_buttons_frame = tk.Frame(self.content_frame, bg=self.BG_COLOR)
         
         # Add button
-        self.add_icon_button = tk.Button(self.icon_buttons_frame, image=self.add_icon, bg='#1e1e1e', command=self.add_new_factcard,
+        self.add_icon_button = tk.Button(self.icon_buttons_frame, image=self.add_icon, bg=self.BG_COLOR, command=self.add_new_factcard,
                                  cursor="hand2", borderwidth=0, highlightthickness=0)
         self.add_icon_button.pack(side="left", padx=10)
         
         # Create edit button but don't pack it initially
-        self.edit_icon_button = tk.Button(self.icon_buttons_frame, image=self.edit_icon, bg='#1e1e1e', command=self.edit_current_factcard,
+        self.edit_icon_button = tk.Button(self.icon_buttons_frame, image=self.edit_icon, bg=self.BG_COLOR, command=self.edit_current_factcard,
                                   cursor="hand2", borderwidth=0, highlightthickness=0)
         
         # Create delete button but don't pack it initially
-        self.delete_icon_button = tk.Button(self.icon_buttons_frame, image=self.delete_icon, bg='#1e1e1e', command=self.delete_current_factcard,
+        self.delete_icon_button = tk.Button(self.icon_buttons_frame, image=self.delete_icon, bg=self.BG_COLOR, command=self.delete_current_factcard,
                                     cursor="hand2", borderwidth=0, highlightthickness=0)
         
         # Status label - always visible
-        self.status_label = self.create_label(self.icon_buttons_frame, "", fg="#b66d20", 
-                                        font=("Trebuchet MS", 10), side='right')
+        self.status_label = self.create_label(self.icon_buttons_frame, "", fg=self.STATUS_COLOR, 
+                                        font=self.NORMAL_FONT, side='right')
         self.status_label.pack_configure(pady=5, padx=10)
         
         # Add home and speaker buttons
-        self.home_button = tk.Button(self.factcard_frame, image=self.home_icon, bg='#1e1e1e', bd=0, highlightthickness=0, 
-                               cursor="hand2", activebackground='#1e1e1e', command=self.show_home_page)
+        self.home_button = tk.Button(self.factcard_frame, image=self.home_icon, bg=self.BG_COLOR, bd=0, highlightthickness=0, 
+                               cursor="hand2", activebackground=self.BG_COLOR, command=self.show_home_page)
         self.home_button.place(relx=0, rely=0, anchor="nw", x=5, y=5)
         
-        self.speaker_button = tk.Button(self.factcard_frame, image=self.speaker_icon, bg='#1e1e1e', command=self.speak_text, 
+        self.speaker_button = tk.Button(self.factcard_frame, image=self.speaker_icon, bg=self.BG_COLOR, command=self.speak_text, 
                                   cursor="hand2", borderwidth=0, highlightthickness=0)
         self.speaker_button.place(relx=1.0, rely=0, anchor="ne", x=-5, y=5)
         
         # Add graph button
-        self.graph_button = tk.Button(self.factcard_frame, image=self.graph_icon, bg='#1e1e1e', command=self.show_analytics, 
+        self.graph_button = tk.Button(self.factcard_frame, image=self.graph_icon, bg=self.BG_COLOR, command=self.show_analytics, 
                                 cursor="hand2", borderwidth=0, highlightthickness=0)
         self.graph_button.place(relx=1.0, rely=0, anchor="ne", x=-30, y=5)  # Position it to the left of speaker button
         
         # Bottom stats frame
-        self.stats_frame = tk.Frame(self.root, bg="#1e1e1e")
+        self.stats_frame = tk.Frame(self.root, bg=self.BG_COLOR)
         
         # Stats labels
         self.factcard_count_label = self.create_label(self.stats_frame, "Total Fact Cards: 0", 
-                                            font=("Trebuchet MS", 9), side='left')
+                                            font=self.STATS_FONT, side='left')
         self.factcard_count_label.pack_configure(padx=10)
         
         self.due_count_label = self.create_label(self.stats_frame, "Due today: 0", 
-                                       font=("Trebuchet MS", 9), side='left')
+                                       font=self.STATS_FONT, side='left')
         self.due_count_label.pack_configure(padx=10)
         
         self.coordinate_label = self.create_label(self.stats_frame, "Coordinates: ", 
-                                        font=("Trebuchet MS", 9), side='right')
+                                        font=self.STATS_FONT, side='right')
         self.coordinate_label.pack_configure(padx=10)
         
         # Initially disable the review buttons
         self.show_review_buttons(False)
     
     def load_icons(self):
-        """Load all icons used in the application"""
-        self.home_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/home.png").resize((20, 20), Image.Resampling.LANCZOS))
-        self.speaker_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/speaker_icon.png").resize((20, 20), Image.Resampling.LANCZOS))
-        self.add_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/add.png").resize((20, 20), Image.Resampling.LANCZOS))
-        self.edit_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/edit.png").resize((20, 20), Image.Resampling.LANCZOS))
-        self.delete_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/delete.png").resize((20, 20), Image.Resampling.LANCZOS))
-        # Add graph icon
-        self.graph_icon = ImageTk.PhotoImage(Image.open("C:/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/Random-Facts-Generator/Resources/Images/graph.png").resize((20, 20), Image.Resampling.LANCZOS))
+        """Load all icons used in the application using the config module"""
+        self.home_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("home.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.speaker_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("speaker_icon.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.add_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("add.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.edit_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("edit.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.delete_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("delete.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.graph_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("graph.png")).resize((20, 20), Image.Resampling.LANCZOS))
     
     def bind_events(self):
         """Bind all event handlers"""
@@ -350,7 +344,7 @@ class FactDariApp:
     def start_flask_server(self):
         """Start the Flask server in a separate process"""
         # Path to the Flask app.py file
-        flask_app_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "[Python]Analytics.py")
+        flask_app_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Analytics.py")
         
         # Start Flask server
         if sys.platform.startswith('win'):
@@ -542,10 +536,10 @@ class FactDariApp:
         """Load the next due fact card"""
         factcard_text = self.fetch_due_factcard()
         if factcard_text:
-            self.factcard_label.config(text=factcard_text, font=("Trebuchet MS", self.adjust_font_size(factcard_text)))
+            self.factcard_label.config(text=factcard_text, font=(self.NORMAL_FONT[0], self.adjust_font_size(factcard_text)))
             self.update_mastery_display()  # Update the mastery display
         else:
-            self.factcard_label.config(text="No fact cards found.", font=("Trebuchet MS", 12))
+            self.factcard_label.config(text="No fact cards found.", font=(self.NORMAL_FONT[0], 12))
             self.mastery_level_label.config(text="Mastery: N/A")
             self.mastery_progress["value"] = 0
         self.update_due_count()
@@ -677,15 +671,15 @@ class FactDariApp:
         category_names = [cat[0] for cat in categories]
         
         # Create and place widgets
-        tk.Label(add_window, text="Add New Fact Card", fg="white", bg="#1e1e1e", 
-                font=("Trebuchet MS", 14, 'bold')).pack(pady=10)
+        tk.Label(add_window, text="Add New Fact Card", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                font=self.TITLE_FONT).pack(pady=10)
         
         # Category selection
-        cat_frame = tk.Frame(add_window, bg="#1e1e1e")
+        cat_frame = tk.Frame(add_window, bg=self.BG_COLOR)
         cat_frame.pack(fill="x", padx=20, pady=5)
         
-        tk.Label(cat_frame, text="Category:", fg="white", bg="#1e1e1e", 
-                font=("Trebuchet MS", 10)).pack(side="left", padx=5)
+        tk.Label(cat_frame, text="Category:", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                font=self.NORMAL_FONT).pack(side="left", padx=5)
         
         cat_var = tk.StringVar(add_window)
         cat_var.set(category_names[0] if category_names else "No Categories")
@@ -694,23 +688,23 @@ class FactDariApp:
         cat_dropdown.pack(side="left", padx=5, fill="x", expand=True)
         
         # Question
-        q_frame = tk.Frame(add_window, bg="#1e1e1e")
+        q_frame = tk.Frame(add_window, bg=self.BG_COLOR)
         q_frame.pack(fill="x", padx=20, pady=5)
         
-        tk.Label(q_frame, text="Question:", fg="white", bg="#1e1e1e", 
-                font=("Trebuchet MS", 10)).pack(side="top", anchor="w", padx=5)
+        tk.Label(q_frame, text="Question:", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                font=self.NORMAL_FONT).pack(side="top", anchor="w", padx=5)
         
-        question_text = tk.Text(q_frame, height=4, width=40, font=("Trebuchet MS", 10))
+        question_text = tk.Text(q_frame, height=4, width=40, font=self.NORMAL_FONT)
         question_text.pack(fill="x", padx=5, pady=5)
         
         # Answer
-        a_frame = tk.Frame(add_window, bg="#1e1e1e")
+        a_frame = tk.Frame(add_window, bg=self.BG_COLOR)
         a_frame.pack(fill="x", padx=20, pady=5)
         
-        tk.Label(a_frame, text="Answer:", fg="white", bg="#1e1e1e", 
-                font=("Trebuchet MS", 10)).pack(side="top", anchor="w", padx=5)
+        tk.Label(a_frame, text="Answer:", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                font=self.NORMAL_FONT).pack(side="top", anchor="w", padx=5)
         
-        answer_text = tk.Text(a_frame, height=4, width=40, font=("Trebuchet MS", 10))
+        answer_text = tk.Text(a_frame, height=4, width=40, font=self.NORMAL_FONT)
         answer_text.pack(fill="x", padx=5, pady=5)
         
         def save_factcard():
@@ -719,7 +713,7 @@ class FactDariApp:
             answer = answer_text.get("1.0", "end-1c").strip()
             
             if not question or not answer:
-                self.status_label.config(text="Question and answer are required!", fg="#ff0000")
+                self.status_label.config(text="Question and answer are required!", fg=self.RED_COLOR)
                 self.clear_status_after_delay(3000)
                 return
             
@@ -737,7 +731,7 @@ class FactDariApp:
             )
             
             add_window.destroy()
-            self.status_label.config(text="New fact card added successfully!", fg="#4CAF50")
+            self.status_label.config(text="New fact card added successfully!", fg=self.GREEN_COLOR)
             self.clear_status_after_delay(3000)
             self.update_factcard_count()
             self.update_due_count()
@@ -746,10 +740,10 @@ class FactDariApp:
                 self.load_next_factcard()
         
         # Save button
-        save_button = tk.Button(add_window, text="Save Fact Card", bg='#4CAF50', fg="white", 
+        save_button = tk.Button(add_window, text="Save Fact Card", bg=self.GREEN_COLOR, fg=self.TEXT_COLOR, 
                               command=save_factcard, cursor="hand2", borderwidth=0, 
                               highlightthickness=0, padx=10, pady=5,
-                              font=("Trebuchet MS", 10, 'bold'))
+                              font=(self.NORMAL_FONT[0], self.NORMAL_FONT[1], 'bold'))
         save_button.pack(pady=20)
     
     def edit_current_factcard(self):
@@ -778,15 +772,15 @@ class FactDariApp:
         category_names = [cat[0] for cat in categories]
         
         # Create and place widgets
-        tk.Label(edit_window, text="Edit Fact Card", fg="white", bg="#1e1e1e", 
-                font=("Trebuchet MS", 14, 'bold')).pack(pady=10)
+        tk.Label(edit_window, text="Edit Fact Card", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                font=self.TITLE_FONT).pack(pady=10)
         
         # Category selection
-        cat_frame = tk.Frame(edit_window, bg="#1e1e1e")
+        cat_frame = tk.Frame(edit_window, bg=self.BG_COLOR)
         cat_frame.pack(fill="x", padx=20, pady=5)
         
-        tk.Label(cat_frame, text="Category:", fg="white", bg="#1e1e1e", 
-                font=("Trebuchet MS", 10)).pack(side="left", padx=5)
+        tk.Label(cat_frame, text="Category:", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                font=self.NORMAL_FONT).pack(side="left", padx=5)
         
         cat_var = tk.StringVar(edit_window)
         cat_var.set(current_category)
@@ -795,33 +789,33 @@ class FactDariApp:
         cat_dropdown.pack(side="left", padx=5, fill="x", expand=True)
         
         # Question
-        q_frame = tk.Frame(edit_window, bg="#1e1e1e")
+        q_frame = tk.Frame(edit_window, bg=self.BG_COLOR)
         q_frame.pack(fill="x", padx=20, pady=5)
         
-        tk.Label(q_frame, text="Question:", fg="white", bg="#1e1e1e", 
-                font=("Trebuchet MS", 10)).pack(side="top", anchor="w", padx=5)
+        tk.Label(q_frame, text="Question:", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                font=self.NORMAL_FONT).pack(side="top", anchor="w", padx=5)
         
-        question_text = tk.Text(q_frame, height=4, width=40, font=("Trebuchet MS", 10))
+        question_text = tk.Text(q_frame, height=4, width=40, font=self.NORMAL_FONT)
         question_text.insert("1.0", current_question)
         question_text.pack(fill="x", padx=5, pady=5)
         
         # Answer
-        a_frame = tk.Frame(edit_window, bg="#1e1e1e")
+        a_frame = tk.Frame(edit_window, bg=self.BG_COLOR)
         a_frame.pack(fill="x", padx=20, pady=5)
         
-        tk.Label(a_frame, text="Answer:", fg="white", bg="#1e1e1e", 
-                font=("Trebuchet MS", 10)).pack(side="top", anchor="w", padx=5)
+        tk.Label(a_frame, text="Answer:", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                font=self.NORMAL_FONT).pack(side="top", anchor="w", padx=5)
         
-        answer_text = tk.Text(a_frame, height=4, width=40, font=("Trebuchet MS", 10))
+        answer_text = tk.Text(a_frame, height=4, width=40, font=self.NORMAL_FONT)
         answer_text.insert("1.0", current_answer)
         answer_text.pack(fill="x", padx=5, pady=5)
         
         # Mastery level slider
-        m_frame = tk.Frame(edit_window, bg="#1e1e1e")
+        m_frame = tk.Frame(edit_window, bg=self.BG_COLOR)
         m_frame.pack(fill="x", padx=20, pady=5)
         
-        tk.Label(m_frame, text=f"Mastery Level: {int(current_mastery * 100)}%", fg="white", bg="#1e1e1e", 
-                font=("Trebuchet MS", 10)).pack(side="top", anchor="w", padx=5)
+        tk.Label(m_frame, text=f"Mastery Level: {int(current_mastery * 100)}%", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                font=self.NORMAL_FONT).pack(side="top", anchor="w", padx=5)
         
         mastery_var = tk.DoubleVar(edit_window, value=current_mastery)
         
@@ -840,7 +834,7 @@ class FactDariApp:
             mastery = mastery_var.get()
             
             if not question or not answer:
-                self.status_label.config(text="Question and answer are required!", fg="#ff0000")
+                self.status_label.config(text="Question and answer are required!", fg=self.RED_COLOR)
                 self.clear_status_after_delay(3000)
                 return
             
@@ -859,23 +853,23 @@ class FactDariApp:
             )
             
             edit_window.destroy()
-            self.status_label.config(text="Fact card updated successfully!", fg="#4CAF50")
+            self.status_label.config(text="Fact card updated successfully!", fg=self.GREEN_COLOR)
             self.clear_status_after_delay(3000)
             
             # Refresh the current card display
             if self.show_answer:
-                self.factcard_label.config(text=f"Answer: {answer}", font=("Trebuchet MS", self.adjust_font_size(answer)))
+                self.factcard_label.config(text=f"Answer: {answer}", font=(self.NORMAL_FONT[0], self.adjust_font_size(answer)))
             else:
-                self.factcard_label.config(text=f"Question: {question}", font=("Trebuchet MS", self.adjust_font_size(question)))
+                self.factcard_label.config(text=f"Question: {question}", font=(self.NORMAL_FONT[0], self.adjust_font_size(question)))
             
             # Update mastery display
             self.update_mastery_display()
         
         # Update button
-        update_button = tk.Button(edit_window, text="Update Fact Card", bg='#2196F3', fg="white", 
+        update_button = tk.Button(edit_window, text="Update Fact Card", bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, 
                                 command=update_factcard, cursor="hand2", borderwidth=0, 
                                 highlightthickness=0, padx=10, pady=5,
-                                font=("Trebuchet MS", 10, 'bold'))
+                                font=(self.NORMAL_FONT[0], self.NORMAL_FONT[1], 'bold'))
         update_button.pack(pady=20)
     
     def delete_current_factcard(self):
@@ -887,7 +881,7 @@ class FactDariApp:
         if tk.messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this fact card?"):
             # Delete the fact card
             self.execute_query("DELETE FROM FactCards WHERE FactCardID = ?", (self.current_factcard_id,), fetch=False)
-            self.status_label.config(text="Fact card deleted!", fg="#F44336")
+            self.status_label.config(text="Fact card deleted!", fg=self.RED_COLOR)
             self.clear_status_after_delay(3000)
             self.update_factcard_count()
             self.update_due_count()
@@ -1122,7 +1116,7 @@ class FactDariApp:
     
     def create_label(self, parent, text, fg="white", cursor=None, font=("Trebuchet MS", 7), side='left'):
         """Create a styled label"""
-        label = tk.Label(parent, text=text, fg=fg, bg="#1e1e1e", font=font)
+        label = tk.Label(parent, text=text, fg=fg, bg=self.BG_COLOR, font=font)
         if cursor:
             label.configure(cursor=cursor)
         label.pack(side=side)
@@ -1135,7 +1129,7 @@ class FactDariApp:
     def reset_to_welcome(self):
         """Reset to welcome screen"""
         self.factcard_label.config(text="Welcome to FactDari!", 
-                              font=("Trebuchet MS", self.adjust_font_size("Welcome to FactDari!")))
+                              font=(self.NORMAL_FONT[0], self.adjust_font_size("Welcome to FactDari!")))
         self.status_label.config(text="")
         self.show_review_buttons(False)
         self.show_answer_button.config(state="disabled")
