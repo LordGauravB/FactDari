@@ -13,23 +13,80 @@ const getHoverColor = (color) => {
     return `rgba(${r}, ${g}, ${b}, 0.7)`;
 };
 
+// Store chart references globally so we can update them
+const charts = {};
+
 // Initialize charts when the page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Fetch all chart data at once for efficiency
+    // Initial data load
+    fetchAndUpdateCharts();
+    
+    // Set up automatic refresh every 5 minutes
+    setInterval(fetchAndUpdateCharts, 300000); // 300000 ms = 5 minutes
+    
+    // Set up refresh indicator and manual refresh button
+    setupRefreshIndicator(300);
+    
+    // Attach event listener to manual refresh button
+    document.getElementById('manual-refresh-btn').addEventListener('click', fetchAndUpdateCharts);
+});
+
+// Centralized function to fetch data and update all charts
+function fetchAndUpdateCharts() {
     fetch('/api/chart-data')
         .then(response => response.json())
         .then(data => {
-            initializeCategoryDistributionChart(data.categoryDistribution);
-            initializeCardsPerCategoryChart(data.categoryDistribution);
-            initializeViewMasteryChart(data.viewMasteryCorrelation);
-            initializeIntervalGrowthChart(data.intervalGrowth);
-            initializeReviewScheduleChart(data.reviewSchedule);
-            initializeCardsAddedChart(data.cardsAddedOverTime);
-            initializeLearningEfficiencyChart(data.learningEfficiency);
-            initializeLearningCurveChart(data.learningCurve);
+            updateCategoryDistributionChart(data.categoryDistribution);
+            updateCardsPerCategoryChart(data.categoryDistribution);
+            updateViewMasteryChart(data.viewMasteryCorrelation);
+            updateIntervalGrowthChart(data.intervalGrowth);
+            updateReviewScheduleChart(data.reviewSchedule);
+            updateCardsAddedChart(data.cardsAddedOverTime);
+            updateLearningEfficiencyChart(data.learningEfficiency);
+            updateLearningCurveChart(data.learningCurve);
+            
+            // Update last refresh time indicator
+            const now = new Date();
+            document.getElementById('last-refresh-time').textContent = `Last updated: ${now.toLocaleTimeString()}`;
+            
+            // Reset the countdown timer
+            if (window.refreshTimer) {
+                window.refreshTimer.reset();
+            }
         })
         .catch(error => console.error('Error fetching chart data:', error));
-});
+}
+
+// Function to create a visual countdown indicator
+function setupRefreshIndicator(seconds) {
+    // Create a countdown timer
+    window.refreshTimer = {
+        totalSeconds: seconds,
+        intervalId: null,
+        element: document.getElementById('next-refresh'),
+        
+        start: function() {
+            this.intervalId = setInterval(() => {
+                this.totalSeconds--;
+                const minutes = Math.floor(this.totalSeconds / 60);
+                const seconds = this.totalSeconds % 60;
+                this.element.textContent = `Next refresh in: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                if (this.totalSeconds <= 0) {
+                    clearInterval(this.intervalId);
+                }
+            }, 1000);
+        },
+        
+        reset: function() {
+            clearInterval(this.intervalId);
+            this.totalSeconds = seconds;
+            this.start();
+        }
+    };
+    
+    window.refreshTimer.start();
+}
 
 // 1. Category Distribution Pie Chart
 function initializeCategoryDistributionChart(data) {
@@ -38,7 +95,7 @@ function initializeCategoryDistributionChart(data) {
     const labels = data.map(item => item.CategoryName);
     const values = data.map(item => item.CardCount);
     
-    new Chart(ctx, {
+    charts.categoryDistribution = new Chart(ctx, {
         type: 'pie',
         data: {
             labels: labels,
@@ -78,6 +135,24 @@ function initializeCategoryDistributionChart(data) {
     });
 }
 
+// Function to update category distribution chart with new data
+function updateCategoryDistributionChart(data) {
+    if (!charts.categoryDistribution) {
+        initializeCategoryDistributionChart(data);
+        return;
+    }
+    
+    const labels = data.map(item => item.CategoryName);
+    const values = data.map(item => item.CardCount);
+    
+    charts.categoryDistribution.data.labels = labels;
+    charts.categoryDistribution.data.datasets[0].data = values;
+    charts.categoryDistribution.data.datasets[0].backgroundColor = chartColors.slice(0, labels.length);
+    charts.categoryDistribution.data.datasets[0].hoverBackgroundColor = chartColors.slice(0, labels.length).map(getHoverColor);
+    
+    charts.categoryDistribution.update();
+}
+
 // 2. Cards per Category Bar Chart
 function initializeCardsPerCategoryChart(data) {
     const ctx = document.getElementById('cardsPerCategoryChart').getContext('2d');
@@ -85,7 +160,7 @@ function initializeCardsPerCategoryChart(data) {
     const labels = data.map(item => item.CategoryName);
     const values = data.map(item => item.CardCount);
     
-    new Chart(ctx, {
+    charts.cardsPerCategory = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
@@ -134,6 +209,22 @@ function initializeCardsPerCategoryChart(data) {
     });
 }
 
+// Update function for cards per category chart
+function updateCardsPerCategoryChart(data) {
+    if (!charts.cardsPerCategory) {
+        initializeCardsPerCategoryChart(data);
+        return;
+    }
+    
+    const labels = data.map(item => item.CategoryName);
+    const values = data.map(item => item.CardCount);
+    
+    charts.cardsPerCategory.data.labels = labels;
+    charts.cardsPerCategory.data.datasets[0].data = values;
+    
+    charts.cardsPerCategory.update();
+}
+
 // 3. View Count vs. Mastery Scatter Plot
 function initializeViewMasteryChart(data) {
     const ctx = document.getElementById('viewMasteryChart').getContext('2d');
@@ -144,7 +235,7 @@ function initializeViewMasteryChart(data) {
         label: item.Question
     }));
     
-    new Chart(ctx, {
+    charts.viewMastery = new Chart(ctx, {
         type: 'scatter',
         data: {
             datasets: [{
@@ -220,6 +311,23 @@ function initializeViewMasteryChart(data) {
     });
 }
 
+// Update function for view count vs mastery chart
+function updateViewMasteryChart(data) {
+    if (!charts.viewMastery) {
+        initializeViewMasteryChart(data);
+        return;
+    }
+    
+    const scatterData = data.map(item => ({
+        x: item.ViewCount,
+        y: item.MasteryPercentage,
+        label: item.Question
+    }));
+    
+    charts.viewMastery.data.datasets[0].data = scatterData;
+    charts.viewMastery.update();
+}
+
 // 4. Interval Growth Line Chart
 function initializeIntervalGrowthChart(data) {
     const ctx = document.getElementById('intervalGrowthChart').getContext('2d');
@@ -227,7 +335,7 @@ function initializeIntervalGrowthChart(data) {
     const labels = data.map(item => `${item.CurrentInterval} days`);
     const values = data.map(item => item.CardCount);
     
-    new Chart(ctx, {
+    charts.intervalGrowth = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
@@ -282,6 +390,22 @@ function initializeIntervalGrowthChart(data) {
     });
 }
 
+// Update function for interval growth chart
+function updateIntervalGrowthChart(data) {
+    if (!charts.intervalGrowth) {
+        initializeIntervalGrowthChart(data);
+        return;
+    }
+    
+    const labels = data.map(item => `${item.CurrentInterval} days`);
+    const values = data.map(item => item.CardCount);
+    
+    charts.intervalGrowth.data.labels = labels;
+    charts.intervalGrowth.data.datasets[0].data = values;
+    
+    charts.intervalGrowth.update();
+}
+
 // 5. Review Schedule Timeline
 function initializeReviewScheduleChart(data) {
     const ctx = document.getElementById('reviewScheduleChart').getContext('2d');
@@ -289,7 +413,7 @@ function initializeReviewScheduleChart(data) {
     const labels = data.map(item => item.ReviewDate);
     const values = data.map(item => item.CardCount);
     
-    new Chart(ctx, {
+    charts.reviewSchedule = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
@@ -342,6 +466,22 @@ function initializeReviewScheduleChart(data) {
     });
 }
 
+// Update function for review schedule chart
+function updateReviewScheduleChart(data) {
+    if (!charts.reviewSchedule) {
+        initializeReviewScheduleChart(data);
+        return;
+    }
+    
+    const labels = data.map(item => item.ReviewDate);
+    const values = data.map(item => item.CardCount);
+    
+    charts.reviewSchedule.data.labels = labels;
+    charts.reviewSchedule.data.datasets[0].data = values;
+    
+    charts.reviewSchedule.update();
+}
+
 // 6. Cards Added Over Time
 function initializeCardsAddedChart(data) {
     const ctx = document.getElementById('cardsAddedChart').getContext('2d');
@@ -357,7 +497,7 @@ function initializeCardsAddedChart(data) {
         cumulativeValues.push(sum);
     }
     
-    new Chart(ctx, {
+    charts.cardsAdded = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
@@ -414,6 +554,31 @@ function initializeCardsAddedChart(data) {
     });
 }
 
+// Update function for cards added chart
+function updateCardsAddedChart(data) {
+    if (!charts.cardsAdded) {
+        initializeCardsAddedChart(data);
+        return;
+    }
+    
+    const labels = data.map(item => item.Date);
+    const values = data.map(item => item.CardsAdded);
+    
+    // Calculate cumulative values
+    const cumulativeValues = [];
+    let sum = 0;
+    for (const val of values) {
+        sum += val;
+        cumulativeValues.push(sum);
+    }
+    
+    charts.cardsAdded.data.labels = labels;
+    charts.cardsAdded.data.datasets[0].data = values;
+    charts.cardsAdded.data.datasets[1].data = cumulativeValues;
+    
+    charts.cardsAdded.update();
+}
+
 // 7. Learning Efficiency Chart
 function initializeLearningEfficiencyChart(data) {
     const ctx = document.getElementById('learningEfficiencyChart').getContext('2d');
@@ -424,7 +589,7 @@ function initializeLearningEfficiencyChart(data) {
         label: item.Question
     }));
     
-    new Chart(ctx, {
+    charts.learningEfficiency = new Chart(ctx, {
         type: 'scatter',
         data: {
             datasets: [{
@@ -498,6 +663,23 @@ function initializeLearningEfficiencyChart(data) {
     });
 }
 
+// Update function for learning efficiency chart
+function updateLearningEfficiencyChart(data) {
+    if (!charts.learningEfficiency) {
+        initializeLearningEfficiencyChart(data);
+        return;
+    }
+    
+    const scatterData = data.map(item => ({
+        x: item.ViewCount,
+        y: item.EfficiencyScore,
+        label: item.Question
+    }));
+    
+    charts.learningEfficiency.data.datasets[0].data = scatterData;
+    charts.learningEfficiency.update();
+}
+
 // 8. Learning Curve Line Chart
 function initializeLearningCurveChart(data) {
     const ctx = document.getElementById('learningCurveChart').getContext('2d');
@@ -505,7 +687,7 @@ function initializeLearningCurveChart(data) {
     const labels = data.map(item => item.Date);
     const values = data.map(item => item.AverageMastery);
     
-    new Chart(ctx, {
+    charts.learningCurve = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
@@ -562,4 +744,20 @@ function initializeLearningCurveChart(data) {
             }
         }
     });
+}
+
+// Update function for learning curve chart
+function updateLearningCurveChart(data) {
+    if (!charts.learningCurve) {
+        initializeLearningCurveChart(data);
+        return;
+    }
+    
+    const labels = data.map(item => item.Date);
+    const values = data.map(item => item.AverageMastery);
+    
+    charts.learningCurve.data.labels = labels;
+    charts.learningCurve.data.datasets[0].data = values;
+    
+    charts.learningCurve.update();
 }
