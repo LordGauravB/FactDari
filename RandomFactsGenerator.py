@@ -254,35 +254,44 @@ class FactDariApp:
     # Database Methods
     def fetch_query(self, query, params=None):
         """Execute a SELECT query and return the results"""
-        with pyodbc.connect(self.CONN_STR) as conn:
-            with conn.cursor() as cursor:
-                if params:
-                    cursor.execute(query, params)
-                else:
-                    cursor.execute(query)
-                return cursor.fetchall()
+        try:
+            with pyodbc.connect(self.CONN_STR) as conn:
+                with conn.cursor() as cursor:
+                    if params:
+                        cursor.execute(query, params)
+                    else:
+                        cursor.execute(query)
+                    return cursor.fetchall()
+        except Exception as e:
+            print(f"Database error in fetch_query: {e}")
+            return []
     
     def execute_update(self, query, params=None):
         """Execute an UPDATE/INSERT/DELETE query with no return value"""
-        with pyodbc.connect(self.CONN_STR) as conn:
-            with conn.cursor() as cursor:
-                if params:
-                    cursor.execute(query, params)
-                else:
-                    cursor.execute(query)
-                conn.commit()
+        try:
+            with pyodbc.connect(self.CONN_STR) as conn:
+                with conn.cursor() as cursor:
+                    if params:
+                        cursor.execute(query, params)
+                    else:
+                        cursor.execute(query)
+                    conn.commit()
+            return True
+        except Exception as e:
+            print(f"Database error in execute_update: {e}")
+            return False
     
     def execute_query(self, query, params=None, fetch=True):
         """Legacy method for backward compatibility"""
         if fetch:
             return self.fetch_query(query, params)
         else:
-            self.execute_update(query, params)
-            return None
+            return self.execute_update(query, params)
     
     def count_factcards(self):
         """Count total fact cards in the database"""
-        return self.fetch_query("SELECT COUNT(*) FROM FactCards")[0][0]
+        result = self.fetch_query("SELECT COUNT(*) FROM FactCards")
+        return result[0][0] if result and len(result) > 0 else 0
     
     def update_ui(self):
         """Update UI elements periodically"""
@@ -384,7 +393,7 @@ class FactDariApp:
             """
             result = self.fetch_query(query, (current_date, category))
         
-        return result[0][0] if result else 0
+        return result[0][0] if result and len(result) > 0 else 0
     
     def get_next_review_info(self):
         """Get information about the next review date after today"""
@@ -397,7 +406,7 @@ class FactDariApp:
                 FROM FactCards 
                 WHERE NextReviewDate > ?
             """
-            result = self.execute_query(query, (current_date,))
+            result = self.fetch_query(query, (current_date,))
         else:
             query = """
                 SELECT MIN(f.NextReviewDate)
@@ -405,9 +414,9 @@ class FactDariApp:
                 JOIN Categories c ON f.CategoryID = c.CategoryID
                 WHERE f.NextReviewDate > ? AND c.CategoryName = ?
             """
-            result = self.execute_query(query, (current_date, category))
+            result = self.fetch_query(query, (current_date, category))
         
-        if result and result[0][0]:
+        if result and len(result) > 0 and result[0][0]:
             next_date = result[0][0]
             # Count fact cards due on the next date
             if category == "All Categories":
@@ -416,7 +425,7 @@ class FactDariApp:
                     FROM FactCards 
                     WHERE NextReviewDate = ?
                 """
-                count_result = self.execute_query(query, (next_date,))
+                count_result = self.fetch_query(query, (next_date,))
             else:
                 query = """
                     SELECT COUNT(*)
@@ -424,8 +433,8 @@ class FactDariApp:
                     JOIN Categories c ON f.CategoryID = c.CategoryID
                     WHERE f.NextReviewDate = ? AND c.CategoryName = ?
                 """
-                count_result = self.execute_query(query, (next_date, category))
-            count = count_result[0][0] if count_result else 0
+                count_result = self.fetch_query(query, (next_date, category))
+            count = count_result[0][0] if count_result and len(count_result) > 0 else 0
             return next_date, count
         return None, 0
     
@@ -440,15 +449,25 @@ class FactDariApp:
         if self.show_answer:
             # Fetch the answer from the database
             query = "SELECT Answer FROM FactCards WHERE FactCardID = ?"
-            answer = self.fetch_query(query, (self.current_factcard_id,))[0][0]
-            self.factcard_label.config(text=f"Answer: {answer}", font=(self.NORMAL_FONT[0], self.adjust_font_size(answer)))
-            self.show_answer_button.config(text="Show Question")
+            result = self.fetch_query(query, (self.current_factcard_id,))
+            if result and len(result) > 0:
+                answer = result[0][0]
+                self.factcard_label.config(text=f"Answer: {answer}", font=(self.NORMAL_FONT[0], self.adjust_font_size(answer)))
+                self.show_answer_button.config(text="Show Question")
+            else:
+                self.status_label.config(text="Error: Could not retrieve answer", fg=self.RED_COLOR)
+                self.clear_status_after_delay()
         else:
             # Show the question again
             query = "SELECT Question FROM FactCards WHERE FactCardID = ?"
-            question = self.fetch_query(query, (self.current_factcard_id,))[0][0]
-            self.factcard_label.config(text=f"Question: {question}", font=(self.NORMAL_FONT[0], self.adjust_font_size(question)))
-            self.show_answer_button.config(text="Show Answer")
+            result = self.fetch_query(query, (self.current_factcard_id,))
+            if result and len(result) > 0:
+                question = result[0][0]
+                self.factcard_label.config(text=f"Question: {question}", font=(self.NORMAL_FONT[0], self.adjust_font_size(question)))
+                self.show_answer_button.config(text="Show Answer")
+            else:
+                self.status_label.config(text="Error: Could not retrieve question", fg=self.RED_COLOR)
+                self.clear_status_after_delay()
         
         # Keep mastery display updated
         self.update_mastery_display()
@@ -457,22 +476,29 @@ class FactDariApp:
         """Update the visual display of the mastery level for the current card"""
         if self.current_factcard_id:
             query = "SELECT Mastery FROM FactCards WHERE FactCardID = ?"
-            mastery = self.fetch_query(query, (self.current_factcard_id,))[0][0]
+            result = self.fetch_query(query, (self.current_factcard_id,))
             
-            # Update the mastery progress in the UI
-            mastery_percentage = int(mastery * 100)
-            self.mastery_level_label.config(text=f"Mastery: {mastery_percentage}%")
-            
-            # Update progress bar
-            self.mastery_progress["value"] = mastery_percentage
-            
-            # Change color based on mastery level
-            if mastery < 0.3:
-                self.mastery_level_label.config(fg=self.RED_COLOR)  # Red for low mastery
-            elif mastery < 0.7:
-                self.mastery_level_label.config(fg=self.YELLOW_COLOR)  # Yellow for medium mastery
+            if result and len(result) > 0:
+                mastery = result[0][0]
+                
+                # Update the mastery progress in the UI
+                mastery_percentage = int(mastery * 100)
+                self.mastery_level_label.config(text=f"Mastery: {mastery_percentage}%")
+                
+                # Update progress bar
+                self.mastery_progress["value"] = mastery_percentage
+                
+                # Change color based on mastery level
+                if mastery < 0.3:
+                    self.mastery_level_label.config(fg=self.RED_COLOR)  # Red for low mastery
+                elif mastery < 0.7:
+                    self.mastery_level_label.config(fg=self.YELLOW_COLOR)  # Yellow for medium mastery
+                else:
+                    self.mastery_level_label.config(fg=self.GREEN_COLOR)  # Green for high mastery
             else:
-                self.mastery_level_label.config(fg=self.GREEN_COLOR)  # Green for high mastery
+                # Error retrieving mastery
+                self.mastery_level_label.config(text="Mastery: Error")
+                self.mastery_progress["value"] = 0
         else:
             # No card selected
             self.mastery_level_label.config(text="Mastery: N/A")
@@ -498,7 +524,7 @@ class FactDariApp:
                 WHERE NextReviewDate <= ?
                 ORDER BY NextReviewDate, NEWID()
             """
-            factcard = self.execute_query(query, (current_date,))
+            factcard = self.fetch_query(query, (current_date,))
         else:
             query = """
                 SELECT TOP 1 f.FactCardID, f.Question, f.Answer, f.NextReviewDate, f.CurrentInterval, f.Mastery
@@ -507,9 +533,9 @@ class FactDariApp:
                 WHERE c.CategoryName = ? AND f.NextReviewDate <= ?
                 ORDER BY f.NextReviewDate, NEWID()
             """
-            factcard = self.execute_query(query, (category, current_date))
+            factcard = self.fetch_query(query, (category, current_date))
         
-        if factcard:
+        if factcard and len(factcard) > 0:
             # We have a fact card due for review
             factcard_id = factcard[0][0]
             question = factcard[0][1]
@@ -593,8 +619,13 @@ class FactDariApp:
         """Calculate new mastery level and interval based on difficulty rating"""
         # Get current interval and mastery level
         query = "SELECT CurrentInterval, Mastery FROM FactCards WHERE FactCardID = ?"
-        result = self.fetch_query(query, (self.current_factcard_id,))[0]
-        current_interval, current_mastery = result[0], result[1]
+        result = self.fetch_query(query, (self.current_factcard_id,))
+        
+        if not result or len(result) == 0:
+            # Handle missing data case
+            return 0.0, 1
+            
+        current_interval, current_mastery = result[0][0], result[0][1]
         
         if difficulty == "Hard":
             # Decrease mastery when struggling (min 0.0)
@@ -605,13 +636,15 @@ class FactDariApp:
             new_mastery = min(1.0, current_mastery + 0.05)
             # Adjust multiplier based on mastery level
             multiplier = 1.3 + (current_mastery * 0.4)  # ranges from 1.3 to 1.7
-            new_interval = int(current_interval * multiplier)
+            # Use max(1, int(round())) to prevent 0 intervals
+            new_interval = max(1, int(round(current_interval * multiplier)))
         else:  # Easy
             # Larger increase in mastery
             new_mastery = min(1.0, current_mastery + 0.15)
             # Adjust multiplier based on mastery level
             multiplier = 2.0 + (current_mastery * 1.0)  # ranges from 2.0 to 3.0
-            new_interval = int(current_interval * multiplier)
+            # Use max(1, int(round())) to prevent 0 intervals
+            new_interval = max(1, int(round(current_interval * multiplier)))
             
         return new_mastery, new_interval
     
@@ -626,7 +659,7 @@ class FactDariApp:
     
     def _update_factcard_in_database(self, next_review_date, new_interval, new_mastery):
         """Update the fact card in the database with new review schedule and mastery"""
-        self.execute_update(
+        success = self.execute_update(
             """
             UPDATE FactCards 
             SET NextReviewDate = ?, CurrentInterval = ?, Mastery = ?, ViewCount = ViewCount + 1, LastReviewDate = GETDATE()
@@ -634,6 +667,10 @@ class FactDariApp:
             """, 
             (next_review_date, new_interval, new_mastery, self.current_factcard_id)
         )
+        
+        if not success:
+            self.status_label.config(text="Error updating fact card schedule", fg=self.RED_COLOR)
+            self.clear_status_after_delay()
     
     def _show_schedule_feedback(self, difficulty, interval, mastery):
         """Show feedback to the user about the new schedule and mastery level"""
@@ -667,8 +704,8 @@ class FactDariApp:
         add_window.configure(bg=self.BG_COLOR)
         
         # Get categories for dropdown
-        categories = self.execute_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
-        category_names = [cat[0] for cat in categories]
+        categories = self.fetch_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
+        category_names = [cat[0] for cat in categories] if categories else []
         
         # Create and place widgets
         tk.Label(add_window, text="Add New Fact Card", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
@@ -682,7 +719,10 @@ class FactDariApp:
                 font=self.NORMAL_FONT).pack(side="left", padx=5)
         
         cat_var = tk.StringVar(add_window)
-        cat_var.set(category_names[0] if category_names else "No Categories")
+        if category_names:
+            cat_var.set(category_names[0])
+        else:
+            cat_var.set("No Categories")
         
         cat_dropdown = ttk.Combobox(cat_frame, textvariable=cat_var, values=category_names, state="readonly", width=20)
         cat_dropdown.pack(side="left", padx=5, fill="x", expand=True)
@@ -718,26 +758,35 @@ class FactDariApp:
                 return
             
             # Get category ID
-            category_id = self.execute_query("SELECT CategoryID FROM Categories WHERE CategoryName = ?", (category,))[0][0]
+            cat_result = self.fetch_query("SELECT CategoryID FROM Categories WHERE CategoryName = ?", (category,))
+            if not cat_result or len(cat_result) == 0:
+                self.status_label.config(text="Category not found!", fg=self.RED_COLOR)
+                self.clear_status_after_delay(3000)
+                return
+                
+            category_id = cat_result[0][0]
             
             # Insert the new fact card - now including default Mastery of 0.0
-            self.execute_query(
+            success = self.execute_update(
                 """
                 INSERT INTO FactCards (CategoryID, Question, Answer, NextReviewDate, CurrentInterval, Mastery, DateAdded) 
                 VALUES (?, ?, ?, GETDATE(), 1, 0.0, GETDATE())
                 """, 
-                (category_id, question, answer), 
-                fetch=False
+                (category_id, question, answer)
             )
             
-            add_window.destroy()
-            self.status_label.config(text="New fact card added successfully!", fg=self.GREEN_COLOR)
-            self.clear_status_after_delay(3000)
-            self.update_factcard_count()
-            self.update_due_count()
-            # If no current card is shown, load the newly added card
-            if self.current_factcard_id is None:
-                self.load_next_factcard()
+            if success:
+                add_window.destroy()
+                self.status_label.config(text="New fact card added successfully!", fg=self.GREEN_COLOR)
+                self.clear_status_after_delay(3000)
+                self.update_factcard_count()
+                self.update_due_count()
+                # If no current card is shown, load the newly added card
+                if self.current_factcard_id is None:
+                    self.load_next_factcard()
+            else:
+                self.status_label.config(text="Error adding new fact card!", fg=self.RED_COLOR)
+                self.clear_status_after_delay(3000)
         
         # Save button
         save_button = tk.Button(add_window, text="Save Fact Card", bg=self.GREEN_COLOR, fg=self.TEXT_COLOR, 
@@ -758,8 +807,14 @@ class FactDariApp:
         JOIN Categories c ON f.CategoryID = c.CategoryID
         WHERE f.FactCardID = ?
         """
-        data = self.fetch_query(query, (self.current_factcard_id,))[0]
-        current_question, current_answer, current_category, current_mastery = data
+        result = self.fetch_query(query, (self.current_factcard_id,))
+        
+        if not result or len(result) == 0:
+            self.status_label.config(text="Error: Could not retrieve fact card data", fg=self.RED_COLOR)
+            self.clear_status_after_delay()
+            return
+            
+        current_question, current_answer, current_category, current_mastery = result[0]
         
         # Create a popup window
         edit_window = tk.Toplevel(self.root)
@@ -768,8 +823,8 @@ class FactDariApp:
         edit_window.configure(bg=self.BG_COLOR)
         
         # Get categories for dropdown
-        categories = self.execute_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
-        category_names = [cat[0] for cat in categories]
+        categories = self.fetch_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
+        category_names = [cat[0] for cat in categories] if categories else []
         
         # Create and place widgets
         tk.Label(edit_window, text="Edit Fact Card", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
@@ -839,31 +894,40 @@ class FactDariApp:
                 return
             
             # Get category ID
-            category_id = self.execute_query("SELECT CategoryID FROM Categories WHERE CategoryName = ?", (category,))[0][0]
+            cat_result = self.fetch_query("SELECT CategoryID FROM Categories WHERE CategoryName = ?", (category,))
+            if not cat_result or len(cat_result) == 0:
+                self.status_label.config(text="Category not found!", fg=self.RED_COLOR)
+                self.clear_status_after_delay(3000)
+                return
+                
+            category_id = cat_result[0][0]
             
             # Update the fact card including mastery
-            self.execute_query(
+            success = self.execute_update(
                 """
                     UPDATE FactCards 
                     SET CategoryID = ?, Question = ?, Answer = ?, Mastery = ?, LastEditedDate = GETDATE()
                     WHERE FactCardID = ?
                     """, 
-                    (category_id, question, answer, mastery, self.current_factcard_id), 
-                    fetch=False
+                    (category_id, question, answer, mastery, self.current_factcard_id)
             )
             
-            edit_window.destroy()
-            self.status_label.config(text="Fact card updated successfully!", fg=self.GREEN_COLOR)
-            self.clear_status_after_delay(3000)
-            
-            # Refresh the current card display
-            if self.show_answer:
-                self.factcard_label.config(text=f"Answer: {answer}", font=(self.NORMAL_FONT[0], self.adjust_font_size(answer)))
+            if success:
+                edit_window.destroy()
+                self.status_label.config(text="Fact card updated successfully!", fg=self.GREEN_COLOR)
+                self.clear_status_after_delay(3000)
+                
+                # Refresh the current card display
+                if self.show_answer:
+                    self.factcard_label.config(text=f"Answer: {answer}", font=(self.NORMAL_FONT[0], self.adjust_font_size(answer)))
+                else:
+                    self.factcard_label.config(text=f"Question: {question}", font=(self.NORMAL_FONT[0], self.adjust_font_size(question)))
+                
+                # Update mastery display
+                self.update_mastery_display()
             else:
-                self.factcard_label.config(text=f"Question: {question}", font=(self.NORMAL_FONT[0], self.adjust_font_size(question)))
-            
-            # Update mastery display
-            self.update_mastery_display()
+                self.status_label.config(text="Error updating fact card!", fg=self.RED_COLOR)
+                self.clear_status_after_delay(3000)
         
         # Update button
         update_button = tk.Button(edit_window, text="Update Fact Card", bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, 
@@ -880,13 +944,17 @@ class FactDariApp:
         # Ask for confirmation
         if tk.messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this fact card?"):
             # Delete the fact card
-            self.execute_query("DELETE FROM FactCards WHERE FactCardID = ?", (self.current_factcard_id,), fetch=False)
-            self.status_label.config(text="Fact card deleted!", fg=self.RED_COLOR)
-            self.clear_status_after_delay(3000)
-            self.update_factcard_count()
-            self.update_due_count()
-            # Load the next fact card
-            self.load_next_factcard()
+            success = self.execute_update("DELETE FROM FactCards WHERE FactCardID = ?", (self.current_factcard_id,))
+            if success:
+                self.status_label.config(text="Fact card deleted!", fg=self.RED_COLOR)
+                self.clear_status_after_delay(3000)
+                self.update_factcard_count()
+                self.update_due_count()
+                # Load the next fact card
+                self.load_next_factcard()
+            else:
+                self.status_label.config(text="Error deleting fact card!", fg=self.RED_COLOR)
+                self.clear_status_after_delay(3000)
     
     def manage_categories(self):
         """Open a window to manage categories"""
@@ -940,22 +1008,25 @@ class FactDariApp:
             return
         
         # Check if category already exists
-        existing = self.fetch_query("SELECT COUNT(*) FROM Categories WHERE CategoryName = ?", (new_cat,))[0][0]
-        if existing > 0:
+        existing = self.fetch_query("SELECT COUNT(*) FROM Categories WHERE CategoryName = ?", (new_cat,))
+        if existing and existing[0][0] > 0:
             tk.messagebox.showinfo("Error", f"Category '{new_cat}' already exists!")
             return
         
         # Add the new category
-        self.execute_update(
+        success = self.execute_update(
             "INSERT INTO Categories (CategoryName, Description) VALUES (?, '')", 
             (new_cat,)
         )
         
-        entry_widget.delete(0, tk.END)
-        
-        # Refresh UI elements
-        self.update_category_dropdown()
-        return True  # Indicate success for refresh_category_list callback
+        if success:
+            entry_widget.delete(0, tk.END)
+            # Refresh UI elements
+            self.update_category_dropdown()
+            return True  # Indicate success for refresh_category_list callback
+        else:
+            tk.messagebox.showinfo("Error", "Failed to add new category!")
+            return False
     
     def _create_category_list_ui(self, parent):
         """Create the UI for displaying and managing the category list"""
@@ -1024,7 +1095,12 @@ class FactDariApp:
         cat_id = int(cat_text.split("ID: ")[1].strip(")"))
         
         # Get current name
-        cat_name = self.fetch_query("SELECT CategoryName FROM Categories WHERE CategoryID = ?", (cat_id,))[0][0]
+        cat_result = self.fetch_query("SELECT CategoryName FROM Categories WHERE CategoryID = ?", (cat_id,))
+        if not cat_result or len(cat_result) == 0:
+            tk.messagebox.showinfo("Error", "Category not found!")
+            return
+            
+        cat_name = cat_result[0][0]
         
         # Ask for new name
         new_name = simpledialog.askstring("Rename Category", f"New name for '{cat_name}':", initialvalue=cat_name)
@@ -1035,20 +1111,23 @@ class FactDariApp:
         existing = self.fetch_query(
             "SELECT COUNT(*) FROM Categories WHERE CategoryName = ? AND CategoryID != ?", 
             (new_name, cat_id)
-        )[0][0]
+        )
         
-        if existing > 0:
+        if existing and existing[0][0] > 0:
             tk.messagebox.showinfo("Error", f"Category '{new_name}' already exists!")
             return
         
         # Update the category
-        self.execute_update(
+        success = self.execute_update(
             "UPDATE Categories SET CategoryName = ? WHERE CategoryID = ?", 
             (new_name, cat_id)
         )
         
-        refresh_callback()
-        self.update_category_dropdown()
+        if success:
+            refresh_callback()
+            self.update_category_dropdown()
+        else:
+            tk.messagebox.showinfo("Error", "Failed to rename category!")
     
     def _delete_category(self, cat_listbox, refresh_callback):
         """Handle deleting a category"""
@@ -1062,10 +1141,16 @@ class FactDariApp:
         cat_name = cat_text.split(" (ID:")[0]
         
         # Check if category has fact cards
-        card_count = self.fetch_query(
+        card_count_result = self.fetch_query(
             "SELECT COUNT(*) FROM FactCards WHERE CategoryID = ?", 
             (cat_id,)
-        )[0][0]
+        )
+        
+        if not card_count_result:
+            tk.messagebox.showinfo("Error", "Failed to check category content!")
+            return
+            
+        card_count = card_count_result[0][0]
         
         if card_count > 0:
             if not tk.messagebox.askyesno(
@@ -1076,7 +1161,7 @@ class FactDariApp:
                 return
         
         # Delete the category and its fact cards
-        self.execute_update("""
+        success = self.execute_update("""
             BEGIN TRANSACTION;
             
             DELETE FROM FactCardTags WHERE FactCardID IN (SELECT FactCardID FROM FactCards WHERE CategoryID = ?);
@@ -1086,15 +1171,18 @@ class FactDariApp:
             COMMIT TRANSACTION;
         """, (cat_id, cat_id, cat_id))
         
-        refresh_callback()
-        self.update_category_dropdown()
-        self.update_factcard_count()
-        self.update_due_count()
+        if success:
+            refresh_callback()
+            self.update_category_dropdown()
+            self.update_factcard_count()
+            self.update_due_count()
+        else:
+            tk.messagebox.showinfo("Error", "Failed to delete category!")
     
     def load_categories(self):
         """Load categories for the dropdown"""
         query = "SELECT DISTINCT CategoryName FROM Categories WHERE IsActive = 1 ORDER BY CategoryName"
-        categories = self.execute_query(query)
+        categories = self.fetch_query(query)
         category_names = [category[0] for category in categories] if categories else []
         category_names.insert(0, "All Categories")  # Add All Categories option
         return category_names
