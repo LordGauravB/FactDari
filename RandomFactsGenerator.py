@@ -10,10 +10,12 @@ import pyttsx3
 import webbrowser
 import subprocess
 import tkinter as tk
+import json
 from ctypes import wintypes
 from PIL import Image, ImageTk
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from tkinter import ttk, simpledialog, messagebox
+from fsrs_engine import FSRSEngine
 
 class FactDariApp:
     def __init__(self):
@@ -41,6 +43,7 @@ class FactDariApp:
         self.YELLOW_COLOR = config.UI_CONFIG['yellow_color']
         self.GRAY_COLOR = config.UI_CONFIG['gray_color']
         self.STATUS_COLOR = config.UI_CONFIG['status_color']
+        self.AGAIN_COLOR = config.UI_CONFIG.get('again_color', "#FF0000")  # Use config or default
         
         # Fonts
         self.TITLE_FONT = config.get_font('title')
@@ -55,6 +58,10 @@ class FactDariApp:
         self.current_factcard_id = None
         self.show_answer = False
         self.is_home_page = True
+        
+        # Initialize FSRS Engine with weights file from config directory
+        weights_file = os.path.join(config.BASE_DIR, "weights.json")
+        self.fsrs_engine = FSRSEngine(weights_file)
         
         # Create main window
         self.root = tk.Tk()
@@ -135,12 +142,12 @@ class FactDariApp:
                                       highlightthickness=0, padx=10, pady=5, state="disabled")
         self.show_answer_button.pack(fill="x", padx=100, pady=2)
         
-        # Mastery level display
-        self.mastery_level_label = tk.Label(self.answer_mastery_frame, text="Mastery: N/A", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+        # Stability level display (renamed from Mastery)
+        self.mastery_level_label = tk.Label(self.answer_mastery_frame, text="Stability: N/A", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
                                      font=self.NORMAL_FONT)
         self.mastery_level_label.pack(side="top", pady=2)
         
-        # Add progress bar for mastery
+        # Add progress bar for stability
         self.mastery_progress = ttk.Progressbar(self.answer_mastery_frame, orient="horizontal", length=280, mode="determinate")
         self.mastery_progress.pack(side="top", pady=2)
         
@@ -149,22 +156,32 @@ class FactDariApp:
         style.theme_use('default')
         style.configure("TProgressbar", thickness=8, troughcolor='#333333', background=self.GREEN_COLOR)
         
-        # Spaced repetition buttons
+        # Spaced repetition buttons - UPDATED FOR FSRS
         self.sr_frame = tk.Frame(self.content_frame, bg=self.BG_COLOR)
         
         sr_buttons = tk.Frame(self.sr_frame, bg=self.BG_COLOR)
         sr_buttons.pack(side="top", fill="x")
         
-        self.hard_button = tk.Button(sr_buttons, text="Hard", command=self.on_hard_click, bg=self.RED_COLOR, fg=self.TEXT_COLOR, 
-                              cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
+        # Add the "Again" button for FSRS rating 0
+        self.again_button = tk.Button(sr_buttons, text="Again", command=lambda: self.update_factcard_schedule("Again"), 
+                           bg=self.AGAIN_COLOR, fg=self.TEXT_COLOR,  # Bright red to distinguish from "Hard" 
+                           cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
+        self.again_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
+        
+        # Existing buttons but updated for FSRS
+        self.hard_button = tk.Button(sr_buttons, text="Hard", command=lambda: self.update_factcard_schedule("Hard"), 
+                              bg=self.RED_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, 
+                              highlightthickness=0, padx=10, pady=5)
         self.hard_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
         
-        self.medium_button = tk.Button(sr_buttons, text="Medium", command=self.on_medium_click, bg=self.YELLOW_COLOR, fg=self.TEXT_COLOR, 
-                                cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
+        self.medium_button = tk.Button(sr_buttons, text="Good", command=lambda: self.update_factcard_schedule("Medium"), 
+                                cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5,
+                                bg=self.YELLOW_COLOR, fg=self.TEXT_COLOR)
         self.medium_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
         
-        self.easy_button = tk.Button(sr_buttons, text="Easy", command=self.on_easy_click, bg=self.GREEN_COLOR, fg=self.TEXT_COLOR, 
-                               cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
+        self.easy_button = tk.Button(sr_buttons, text="Easy", command=lambda: self.update_factcard_schedule("Easy"), 
+                               bg=self.GREEN_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, 
+                               highlightthickness=0, padx=10, pady=5)
         self.easy_button.pack(side="left", expand=True, fill="x")
         
         # Load icons
@@ -469,39 +486,47 @@ class FactDariApp:
                 self.status_label.config(text="Error: Could not retrieve question", fg=self.RED_COLOR)
                 self.clear_status_after_delay()
         
-        # Keep mastery display updated
-        self.update_mastery_display()
+        # Keep stability display updated
+        self.update_stability_display()
     
-    def update_mastery_display(self):
-        """Update the visual display of the mastery level for the current card"""
+    def update_stability_display(self):
+        """Update the visual display of the stability level for the current card"""
         if self.current_factcard_id:
-            query = "SELECT Mastery FROM FactCards WHERE FactCardID = ?"
+            query = "SELECT Stability, Difficulty FROM FactCards WHERE FactCardID = ?"
             result = self.fetch_query(query, (self.current_factcard_id,))
             
             if result and len(result) > 0:
-                mastery = result[0][0]
+                stability = result[0][0]
+                difficulty = result[0][1]
                 
-                # Update the mastery progress in the UI
-                mastery_percentage = int(mastery * 100)
-                self.mastery_level_label.config(text=f"Mastery: {mastery_percentage}%")
-                
-                # Update progress bar
-                self.mastery_progress["value"] = mastery_percentage
-                
-                # Change color based on mastery level
-                if mastery < 0.3:
-                    self.mastery_level_label.config(fg=self.RED_COLOR)  # Red for low mastery
-                elif mastery < 0.7:
-                    self.mastery_level_label.config(fg=self.YELLOW_COLOR)  # Yellow for medium mastery
+                if stability is not None:
+                    # Cap stability display at 100%
+                    stability_percentage = min(100, int(stability))
+                    
+                    # Update the stability progress in the UI
+                    self.mastery_level_label.config(text=f"Stability: {stability_percentage}%, Difficulty: {int((1-difficulty)*100)}%")
+                    
+                    # Update progress bar
+                    self.mastery_progress["value"] = stability_percentage
+                    
+                    # Change color based on stability level
+                    if stability_percentage < 30:
+                        self.mastery_level_label.config(fg=self.RED_COLOR)  # Red for low stability
+                    elif stability_percentage < 70:
+                        self.mastery_level_label.config(fg=self.YELLOW_COLOR)  # Yellow for medium stability
+                    else:
+                        self.mastery_level_label.config(fg=self.GREEN_COLOR)  # Green for high stability
                 else:
-                    self.mastery_level_label.config(fg=self.GREEN_COLOR)  # Green for high mastery
+                    # No stability data
+                    self.mastery_level_label.config(text="Stability: N/A")
+                    self.mastery_progress["value"] = 0
             else:
-                # Error retrieving mastery
-                self.mastery_level_label.config(text="Mastery: Error")
+                # Error retrieving data
+                self.mastery_level_label.config(text="Stability: Error")
                 self.mastery_progress["value"] = 0
         else:
             # No card selected
-            self.mastery_level_label.config(text="Mastery: N/A")
+            self.mastery_level_label.config(text="Stability: N/A")
             self.mastery_progress["value"] = 0
     
     def clear_status_after_delay(self, delay_ms=3000):
@@ -519,7 +544,7 @@ class FactDariApp:
         # Get fact cards due for review today or earlier
         if category == "All Categories":
             query = """
-                SELECT TOP 1 FactCardID, Question, Answer, NextReviewDate, CurrentInterval, Mastery
+                SELECT TOP 1 FactCardID, Question, Answer, NextReviewDate, CurrentInterval, Stability
                 FROM FactCards
                 WHERE NextReviewDate <= ?
                 ORDER BY NextReviewDate, NEWID()
@@ -527,7 +552,7 @@ class FactDariApp:
             factcard = self.fetch_query(query, (current_date,))
         else:
             query = """
-                SELECT TOP 1 f.FactCardID, f.Question, f.Answer, f.NextReviewDate, f.CurrentInterval, f.Mastery
+                SELECT TOP 1 f.FactCardID, f.Question, f.Answer, f.NextReviewDate, f.CurrentInterval, f.Stability
                 FROM FactCards f
                 JOIN Categories c ON f.CategoryID = c.CategoryID
                 WHERE c.CategoryName = ? AND f.NextReviewDate <= ?
@@ -563,10 +588,10 @@ class FactDariApp:
         factcard_text = self.fetch_due_factcard()
         if factcard_text:
             self.factcard_label.config(text=factcard_text, font=(self.NORMAL_FONT[0], self.adjust_font_size(factcard_text)))
-            self.update_mastery_display()  # Update the mastery display
+            self.update_stability_display()  # Update the stability display
         else:
             self.factcard_label.config(text="No fact cards found.", font=(self.NORMAL_FONT[0], 12))
-            self.mastery_level_label.config(text="Mastery: N/A")
+            self.mastery_level_label.config(text="Stability: N/A")
             self.mastery_progress["value"] = 0
         self.update_due_count()
     
@@ -578,6 +603,7 @@ class FactDariApp:
     def show_review_buttons(self, show):
         """Show or hide the spaced repetition buttons"""
         state = "normal" if show else "disabled"
+        self.again_button.config(state=state)
         self.hard_button.config(state=state)
         self.medium_button.config(state=state)
         self.easy_button.config(state=state)
@@ -592,108 +618,125 @@ class FactDariApp:
             self.edit_icon_button.pack_forget()
             self.delete_icon_button.pack_forget()
     
-    def update_factcard_schedule(self, difficulty):
-        """Update the fact card's review schedule based on difficulty rating and adjust mastery level"""
+    def update_factcard_schedule(self, rating_label):
+        """Update the fact card's review schedule using FSRS"""
         if not self.current_factcard_id:
             return
         
+        # Map UI labels to FSRS numerical ratings
+        rating_map = {"Again": 0, "Hard": 1, "Medium": 2, "Easy": 3}
+        fsrs_rating = rating_map[rating_label]
+        
         # Disable buttons immediately to prevent multiple clicks
         self.show_review_buttons(False)
-            
-        # Calculate new mastery level and interval
-        new_mastery, new_interval = self._calculate_new_mastery_and_interval(difficulty)
         
-        # Calculate the next review date
-        next_review_date = self._calculate_next_review_date(difficulty, new_interval)
-        
-        # Update the database
-        self._update_factcard_in_database(next_review_date, new_interval, new_mastery)
-        
-        # Show feedback to the user
-        self._show_schedule_feedback(difficulty, new_interval, new_mastery)
-        
-        # Load the next fact card after a short delay
-        self.root.after(1000, self.load_next_factcard)
-    
-    def _calculate_new_mastery_and_interval(self, difficulty):
-        """Calculate new mastery level and interval based on difficulty rating"""
-        # Get current interval and mastery level
-        query = "SELECT CurrentInterval, Mastery FROM FactCards WHERE FactCardID = ?"
+        # 1. Get current card state
+        query = """
+            SELECT 
+                Stability, Difficulty, State, NextReviewDate as due,
+                DATEDIFF(day, LastReviewDate, GETDATE()) AS elapsed_days,
+                CurrentInterval
+            FROM FactCards
+            WHERE FactCardID = ?
+        """
         result = self.fetch_query(query, (self.current_factcard_id,))
         
         if not result or len(result) == 0:
-            # Handle missing data case
-            return 0.0, 1
-            
-        current_interval, current_mastery = result[0][0], result[0][1]
-        
-        if difficulty == "Hard":
-            # Decrease mastery when struggling (min 0.0)
-            new_mastery = max(0.0, current_mastery - 0.1)
-            new_interval = 1  # Reset interval
-        elif difficulty == "Medium":
-            # Small increase in mastery
-            new_mastery = min(1.0, current_mastery + 0.05)
-            # Adjust multiplier based on mastery level
-            multiplier = 1.3 + (current_mastery * 0.4)  # ranges from 1.3 to 1.7
-            # Use max(1, int(round())) to prevent 0 intervals
-            new_interval = max(1, int(round(current_interval * multiplier)))
-        else:  # Easy
-            # Larger increase in mastery
-            new_mastery = min(1.0, current_mastery + 0.15)
-            # Adjust multiplier based on mastery level
-            multiplier = 2.0 + (current_mastery * 1.0)  # ranges from 2.0 to 3.0
-            # Use max(1, int(round())) to prevent 0 intervals
-            new_interval = max(1, int(round(current_interval * multiplier)))
-            
-        return new_mastery, new_interval
-    
-    def _calculate_next_review_date(self, difficulty, interval):
-        """Calculate the next review date based on difficulty and interval"""
-        if difficulty == "Hard":
-            # For Hard, set the next review date to TODAY
-            return datetime.now().strftime('%Y-%m-%d')
-        else:
-            # For Medium and Easy, add the interval days
-            return (datetime.now() + timedelta(days=interval)).strftime('%Y-%m-%d')
-    
-    def _update_factcard_in_database(self, next_review_date, new_interval, new_mastery):
-        """Update the fact card in the database with new review schedule and mastery"""
-        success = self.execute_update(
-            """
-            UPDATE FactCards 
-            SET NextReviewDate = ?, CurrentInterval = ?, Mastery = ?, ViewCount = ViewCount + 1, LastReviewDate = GETDATE()
-            WHERE FactCardID = ?
-            """, 
-            (next_review_date, new_interval, new_mastery, self.current_factcard_id)
-        )
-        
-        if not success:
-            self.status_label.config(text="Error updating fact card schedule", fg=self.RED_COLOR)
+            self.status_label.config(text="Error: Failed to retrieve card data", fg=self.RED_COLOR)
             self.clear_status_after_delay()
-    
-    def _show_schedule_feedback(self, difficulty, interval, mastery):
-        """Show feedback to the user about the new schedule and mastery level"""
-        mastery_percentage = int(mastery * 100)
+            return
         
-        if difficulty == "Hard":
-            feedback_text = f"Rated as {difficulty}. Next review today. Mastery: {mastery_percentage}%"
-        else:
-            feedback_text = f"Rated as {difficulty}. Next review in {interval} days. Mastery: {mastery_percentage}%"
+        # Extract data from query result
+        row = result[0]
+        current_interval = row[5] or 1  # Current interval or default to 1
+        
+        # Prepare the row data for FSRS review
+        db_row = {
+            "stability": row[0],    # Stability
+            "difficulty": row[1],   # Difficulty
+            "state": row[2] or 2,   # State (default to 2=Review if NULL)
+            "due": row[3]           # NextReviewDate
+        }
+        
+        # 2. Log the review
+        log_success = self.execute_update("""
+            INSERT INTO ReviewLogs (FactCardID, ReviewDate, Rating, Interval)
+            VALUES (?, GETDATE(), ?, ?)
+        """, (self.current_factcard_id, fsrs_rating, current_interval))
+        
+        if not log_success:
+            print(f"Warning: Failed to log review for card {self.current_factcard_id}")
+        
+        # 3. Calculate new schedule with FSRS
+        try:
+            # Get the updated fields from FSRS
+            fsrs_result = self.fsrs_engine.review(db_row, fsrs_rating)
+            
+            # For UI display and legacy compatibility
+            mastery_value = min(1.0, fsrs_result["stability"] / 100.0)  # Approximate mastery from stability
+            
+            # 4. Update the database
+            update_success = self.execute_update(
+                """
+                UPDATE FactCards 
+                SET Stability = ?, 
+                    Difficulty = ?, 
+                    State = ?,
+                    NextReviewDate = ?, 
+                    CurrentInterval = ?, 
+                    Mastery = ?,  
+                    Lapses = Lapses + ?,
+                    ViewCount = ViewCount + 1, 
+                    LastReviewDate = GETDATE()
+                WHERE FactCardID = ?
+                """, 
+                (
+                    fsrs_result["stability"], 
+                    fsrs_result["difficulty"],
+                    fsrs_result["state"],
+                    fsrs_result["due"],
+                    fsrs_result["interval"],
+                    mastery_value,  
+                    1 if fsrs_result["is_lapse"] else 0,
+                    self.current_factcard_id
+                )
+            )
+            
+            if not update_success:
+                self.status_label.config(text="Error updating card schedule", fg=self.RED_COLOR)
+                self.clear_status_after_delay()
+                return
+                
+            # 5. Show feedback to the user
+            self._show_fsrs_schedule_feedback(rating_label, fsrs_result["interval"], fsrs_result["stability"])
+            
+        except Exception as e:
+            print(f"FSRS scheduling error: {e}")
+            self.status_label.config(text=f"Scheduling error: {str(e)[:50]}", fg=self.RED_COLOR)
+            self.clear_status_after_delay()
+            return
+        
+        # 6. Load the next fact card after a short delay
+        self.root.after(1000, self.load_next_factcard)
+    
+    def _show_fsrs_schedule_feedback(self, rating, interval, stability):
+        """Show feedback to the user about FSRS scheduling"""
+        stability_percent = min(100, int(stability))
+        
+        # Customize feedback based on rating
+        if rating == "Again":
+            feedback_text = f"Card reset. Next review in {interval} days. Stability: {stability_percent}%"
+        elif rating == "Hard":
+            feedback_text = f"Rated as {rating}. Next review in {interval} days. Stability: {stability_percent}%"
+        elif rating == "Medium":
+            feedback_text = f"Rated as Good. Next review in {interval} days. Stability: {stability_percent}%"
+        else:  # Easy
+            feedback_text = f"Rated as {rating}. Next review in {interval} days. Stability: {stability_percent}%"
         
         self.status_label.config(text=feedback_text, fg=self.STATUS_COLOR)
         
         # Schedule clearing the status after 3 seconds
         self.clear_status_after_delay(3000)
-    
-    def on_hard_click(self):
-        self.update_factcard_schedule("Hard")
-    
-    def on_medium_click(self):
-        self.update_factcard_schedule("Medium")
-    
-    def on_easy_click(self):
-        self.update_factcard_schedule("Easy")
     
     def add_new_factcard(self):
         """Add a new fact card to the database"""
@@ -766,11 +809,14 @@ class FactDariApp:
                 
             category_id = cat_result[0][0]
             
-            # Insert the new fact card - now including default Mastery of 0.0
+            # Insert the new fact card - now including FSRS initial values
             success = self.execute_update(
                 """
-                INSERT INTO FactCards (CategoryID, Question, Answer, NextReviewDate, CurrentInterval, Mastery, DateAdded) 
-                VALUES (?, ?, ?, GETDATE(), 1, 0.0, GETDATE())
+                INSERT INTO FactCards (
+                    CategoryID, Question, Answer, NextReviewDate, CurrentInterval, 
+                    Mastery, DateAdded, Stability, Difficulty, State, Lapses
+                ) 
+                VALUES (?, ?, ?, GETDATE(), 1, 0.0, GETDATE(), 0.0, 0.3, 1, 0)
                 """, 
                 (category_id, question, answer)
             )
@@ -802,7 +848,7 @@ class FactDariApp:
         
         # Get current fact card data
         query = """
-        SELECT f.Question, f.Answer, c.CategoryName, f.Mastery
+        SELECT f.Question, f.Answer, c.CategoryName, f.Stability, f.Difficulty, f.State
         FROM FactCards f 
         JOIN Categories c ON f.CategoryID = c.CategoryID
         WHERE f.FactCardID = ?
@@ -814,7 +860,7 @@ class FactDariApp:
             self.clear_status_after_delay()
             return
             
-        current_question, current_answer, current_category, current_mastery = result[0]
+        current_question, current_answer, current_category, current_stability, current_difficulty, current_state = result[0]
         
         # Create a popup window
         edit_window = tk.Toplevel(self.root)
@@ -865,28 +911,71 @@ class FactDariApp:
         answer_text.insert("1.0", current_answer)
         answer_text.pack(fill="x", padx=5, pady=5)
         
-        # Mastery level slider
-        m_frame = tk.Frame(edit_window, bg=self.BG_COLOR)
-        m_frame.pack(fill="x", padx=20, pady=5)
+        # Stability level slider (instead of mastery)
+        s_frame = tk.Frame(edit_window, bg=self.BG_COLOR)
+        s_frame.pack(fill="x", padx=20, pady=5)
         
-        tk.Label(m_frame, text=f"Mastery Level: {int(current_mastery * 100)}%", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+        # Use stability for display if available
+        stability_value = 0.0
+        if current_stability is not None:
+            stability_value = min(100, current_stability) / 100  # Convert to 0-1 range for slider
+        
+        stability_percent = int(stability_value * 100)
+        
+        tk.Label(s_frame, text=f"Stability Level: {stability_percent}%", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
                 font=self.NORMAL_FONT).pack(side="top", anchor="w", padx=5)
         
-        mastery_var = tk.DoubleVar(edit_window, value=current_mastery)
+        stability_var = tk.DoubleVar(edit_window, value=stability_value)
         
-        def update_mastery_label(val):
-            mastery_val = int(float(val) * 100)
-            m_frame.winfo_children()[0].config(text=f"Mastery Level: {mastery_val}%")
+        def update_stability_label(val):
+            stability_val = int(float(val) * 100)
+            s_frame.winfo_children()[0].config(text=f"Stability Level: {stability_val}%")
         
-        mastery_slider = ttk.Scale(m_frame, from_=0.0, to=1.0, orient="horizontal",
-                                variable=mastery_var, command=update_mastery_label)
-        mastery_slider.pack(fill="x", padx=5, pady=5)
+        stability_slider = ttk.Scale(s_frame, from_=0.0, to=1.0, orient="horizontal",
+                                variable=stability_var, command=update_stability_label)
+        stability_slider.pack(fill="x", padx=5, pady=5)
+        
+        # Add difficulty slider for FSRS
+        d_frame = tk.Frame(edit_window, bg=self.BG_COLOR)
+        d_frame.pack(fill="x", padx=20, pady=5)
+        
+        difficulty_value = current_difficulty or 0.3  # Default FSRS difficulty
+        ease_value = 1 - difficulty_value  # Invert so higher = easier for UI
+        ease_percent = int(ease_value * 100)
+        
+        tk.Label(d_frame, text=f"Ease Factor: {ease_percent}%", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                font=self.NORMAL_FONT).pack(side="top", anchor="w", padx=5)
+        
+        difficulty_var = tk.DoubleVar(edit_window, value=ease_value)  # Invert for display
+        
+        def update_difficulty_label(val):
+            ease_val = int(float(val) * 100)
+            d_frame.winfo_children()[0].config(text=f"Ease Factor: {ease_val}%")
+        
+        difficulty_slider = ttk.Scale(d_frame, from_=0.0, to=1.0, orient="horizontal",
+                                    variable=difficulty_var, command=update_difficulty_label)
+        difficulty_slider.pack(fill="x", padx=5, pady=5)
+        
+        # State selection (new for FSRS v5)
+        state_frame = tk.Frame(edit_window, bg=self.BG_COLOR)
+        state_frame.pack(fill="x", padx=20, pady=5)
+        
+        tk.Label(state_frame, text="Card State:", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+                font=self.NORMAL_FONT).pack(side="left", padx=5)
+        
+        state_var = tk.IntVar(edit_window, value=current_state or 2)  # Default to Review (2)
+        
+        ttk.Radiobutton(state_frame, text="Learning", variable=state_var, value=1).pack(side="left", padx=10)
+        ttk.Radiobutton(state_frame, text="Review", variable=state_var, value=2).pack(side="left", padx=10)
+        ttk.Radiobutton(state_frame, text="Relearning", variable=state_var, value=3).pack(side="left", padx=10)
         
         def update_factcard():
             category = cat_var.get()
             question = question_text.get("1.0", "end-1c").strip()
             answer = answer_text.get("1.0", "end-1c").strip()
-            mastery = mastery_var.get()
+            stability = stability_var.get() * 100  # Convert back to 0-100 range
+            difficulty = 1 - difficulty_var.get()   # Invert back
+            state = state_var.get()
             
             if not question or not answer:
                 self.status_label.config(text="Question and answer are required!", fg=self.RED_COLOR)
@@ -902,14 +991,21 @@ class FactDariApp:
                 
             category_id = cat_result[0][0]
             
-            # Update the fact card including mastery
+            # Update the fact card including FSRS parameters
             success = self.execute_update(
                 """
                     UPDATE FactCards 
-                    SET CategoryID = ?, Question = ?, Answer = ?, Mastery = ?, LastEditedDate = GETDATE()
+                    SET CategoryID = ?, Question = ?, Answer = ?, 
+                        Stability = ?, Difficulty = ?, State = ?,
+                        Mastery = ?, LastEditedDate = GETDATE()
                     WHERE FactCardID = ?
                     """, 
-                    (category_id, question, answer, mastery, self.current_factcard_id)
+                    (
+                        category_id, question, answer, 
+                        stability, difficulty, state,
+                        min(1.0, stability / 100.0),  # Keep mastery in sync with stability
+                        self.current_factcard_id
+                    )
             )
             
             if success:
@@ -923,8 +1019,8 @@ class FactDariApp:
                 else:
                     self.factcard_label.config(text=f"Question: {question}", font=(self.NORMAL_FONT[0], self.adjust_font_size(question)))
                 
-                # Update mastery display
-                self.update_mastery_display()
+                # Update stability display
+                self.update_stability_display()
             else:
                 self.status_label.config(text="Error updating fact card!", fg=self.RED_COLOR)
                 self.clear_status_after_delay(3000)
@@ -943,6 +1039,9 @@ class FactDariApp:
         
         # Ask for confirmation
         if tk.messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this fact card?"):
+            # Delete related review logs first
+            self.execute_update("DELETE FROM ReviewLogs WHERE FactCardID = ?", (self.current_factcard_id,))
+            
             # Delete the fact card
             success = self.execute_update("DELETE FROM FactCards WHERE FactCardID = ?", (self.current_factcard_id,))
             if success:
@@ -1165,11 +1264,12 @@ class FactDariApp:
             BEGIN TRANSACTION;
             
             DELETE FROM FactCardTags WHERE FactCardID IN (SELECT FactCardID FROM FactCards WHERE CategoryID = ?);
+            DELETE FROM ReviewLogs WHERE FactCardID IN (SELECT FactCardID FROM FactCards WHERE CategoryID = ?);
             DELETE FROM FactCards WHERE CategoryID = ?;
             DELETE FROM Categories WHERE CategoryID = ?;
             
             COMMIT TRANSACTION;
-        """, (cat_id, cat_id, cat_id))
+        """, (cat_id, cat_id, cat_id, cat_id))
         
         if success:
             refresh_callback()
@@ -1221,7 +1321,7 @@ class FactDariApp:
         self.status_label.config(text="")
         self.show_review_buttons(False)
         self.show_answer_button.config(state="disabled")
-        self.mastery_level_label.config(text="Mastery: N/A")
+        self.mastery_level_label.config(text="Stability: N/A")
         self.mastery_progress["value"] = 0
         self.update_due_count()
     
