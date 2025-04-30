@@ -15,6 +15,7 @@ const getHoverColor = (color) => {
 
 // Store chart references globally so we can update them
 const charts = {};
+let modalChart = null;
 
 // Initialize charts when the page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -29,7 +30,183 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Attach event listener to manual refresh button
     document.getElementById('manual-refresh-btn').addEventListener('click', fetchAndUpdateCharts);
+    
+    // Set up the expand button click handlers
+    setupExpandButtons();
+    
+    // Set up modal close button
+    document.querySelector('.close-modal-btn').addEventListener('click', closeModal);
+    
+    // Close modal when clicking outside the modal content
+    document.getElementById('chart-modal').addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeModal();
+        }
+    });
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeModal();
+        }
+    });
 });
+
+// Set up expand buttons for each chart
+function setupExpandButtons() {
+    const expandButtons = document.querySelectorAll('.expand-btn');
+    
+    expandButtons.forEach(button => {
+        button.addEventListener('click', function(event) {
+            // Prevent default behavior and stop event propagation
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const chartContainer = this.closest('.chart-container');
+            const chartId = chartContainer.dataset.chartId;
+            const chartTitle = chartContainer.querySelector('.chart-header h2').textContent;
+            const chartDescription = chartContainer.querySelector('.chart-description').textContent;
+            
+            // Open the modal with chart data
+            openChartModal(chartId, chartTitle, chartDescription);
+        });
+    });
+}
+
+// Open the modal with an expanded chart
+function openChartModal(chartId, title, description) {
+    // Set modal title and description
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-description').textContent = description;
+    
+    // Show the modal
+    const modal = document.getElementById('chart-modal');
+    
+    // Reset any scrolling position
+    window.scrollTo(0, 0);
+    document.body.style.overflow = 'hidden';
+    
+    // Add the active class after a small delay to ensure proper positioning
+    setTimeout(() => {
+        modal.classList.add('active');
+        
+        // Create a new chart in the modal
+        createModalChart(chartId);
+    }, 50);
+}
+
+// Close the modal
+function closeModal() {
+    const modal = document.getElementById('chart-modal');
+    
+    // First remove active class (for animation)
+    modal.classList.remove('active');
+    
+    // Wait for animation to complete before hiding
+    setTimeout(() => {
+        // Re-enable body scrolling
+        document.body.style.overflow = '';
+        
+        // Destroy the modal chart to prevent memory leaks
+        if (modalChart) {
+            modalChart.destroy();
+            modalChart = null;
+        }
+    }, 300);
+}
+
+// Create a new chart in the modal based on the original chart
+function createModalChart(chartId) {
+    // Destroy previous modal chart if it exists
+    if (modalChart) {
+        modalChart.destroy();
+    }
+    
+    // Get the canvas context for the modal chart
+    const modalCanvas = document.getElementById('modal-chart');
+    const ctx = modalCanvas.getContext('2d');
+    
+    // Get the original chart configuration
+    const originalChart = charts[chartId];
+    
+    if (!originalChart) {
+        console.error(`Chart with ID ${chartId} not found`);
+        return;
+    }
+    
+    // Create a deep copy of the chart data and options to avoid reference issues
+    const chartData = JSON.parse(JSON.stringify(originalChart.data));
+    
+    // Get the chart options and modify for the modal
+    const chartOptions = getOptionsForModalChart(originalChart, chartId);
+    
+    // Create the new chart in the modal
+    modalChart = new Chart(ctx, {
+        type: originalChart.config.type,
+        data: chartData,
+        options: chartOptions
+    });
+}
+
+// Get modified options for the modal chart
+function getOptionsForModalChart(originalChart, chartId) {
+    // Start with the original options
+    const options = JSON.parse(JSON.stringify(originalChart.options));
+    
+    // Increase font sizes for the larger chart
+    if (options.plugins && options.plugins.legend && options.plugins.legend.labels) {
+        options.plugins.legend.labels.font = {
+            ...options.plugins.legend.labels.font,
+            size: 14
+        };
+    }
+    
+    if (options.scales) {
+        // Increase axis label font sizes
+        Object.keys(options.scales).forEach(axisKey => {
+            const axis = options.scales[axisKey];
+            
+            if (axis.title) {
+                axis.title.font = {
+                    ...axis.title.font,
+                    size: 16
+                };
+            }
+            
+            if (axis.ticks) {
+                axis.ticks.font = {
+                    ...axis.ticks.font,
+                    size: 12
+                };
+            }
+        });
+    }
+    
+    // Increase tooltip font size
+    if (!options.plugins) options.plugins = {};
+    if (!options.plugins.tooltip) options.plugins.tooltip = {};
+    options.plugins.tooltip.bodyFont = {
+        family: 'Trebuchet MS',
+        size: 14
+    };
+    options.plugins.tooltip.titleFont = {
+        family: 'Trebuchet MS',
+        size: 14,
+        weight: 'bold'
+    };
+    
+    // For scatter plots, increase point radius
+    if (chartId === 'viewMasteryChart' || chartId === 'learningEfficiencyChart') {
+        options.elements = {
+            point: {
+                radius: 7,
+                hoverRadius: 9
+            }
+        };
+    }
+    
+    return options;
+}
 
 // Centralized function to fetch data and update all charts
 function fetchAndUpdateCharts() {
@@ -46,7 +223,6 @@ function fetchAndUpdateCharts() {
             updateIntervalGrowthChart(data.intervalGrowth);
             updateLearningEfficiencyChart(data.learningEfficiency);
             updateStabilityDistributionChart(data.stabilityDistribution);
-            // Removed: updateLapsesByCategoryChart(data.lapsesByCategory);
             
             // Update last refresh time indicator
             const now = new Date();
@@ -55,6 +231,15 @@ function fetchAndUpdateCharts() {
             // Reset the countdown timer
             if (window.refreshTimer) {
                 window.refreshTimer.reset();
+            }
+            
+            // If a modal chart is open, update it too
+            if (modalChart) {
+                const chartId = document.querySelector('.modal.active') ? 
+                    document.getElementById('modal-title').textContent : null;
+                if (chartId) {
+                    createModalChart(chartId);
+                }
             }
         })
         .catch(error => console.error('Error fetching chart data:', error));
@@ -96,9 +281,9 @@ function initializeCategoryDistributionChart(data) {
     const ctx = document.getElementById('categoryDistributionChart').getContext('2d');
     
     const labels = data.map(item => item.CategoryName);
-    const values = data.map(item => item.CardCount);
+    const values = data.map(item => Math.round(item.CardCount)); // Ensure integer
     
-    charts.categoryDistribution = new Chart(ctx, {
+    charts.categoryDistributionChart = new Chart(ctx, {
         type: 'pie',
         data: {
             labels: labels,
@@ -126,7 +311,8 @@ function initializeCategoryDistributionChart(data) {
                     callbacks: {
                         label: function(context) {
                             const label = context.label || '';
-                            const value = context.raw || 0;
+                            // Ensure card count is an integer
+                            const value = Math.round(context.raw) || 0;
                             const total = context.dataset.data.reduce((acc, cur) => acc + cur, 0);
                             const percentage = Math.round((value / total) * 100);
                             return `${label}: ${value} cards (${percentage}%)`;
@@ -140,20 +326,20 @@ function initializeCategoryDistributionChart(data) {
 
 // Function to update category distribution chart with new data
 function updateCategoryDistributionChart(data) {
-    if (!charts.categoryDistribution) {
+    if (!charts.categoryDistributionChart) {
         initializeCategoryDistributionChart(data);
         return;
     }
     
     const labels = data.map(item => item.CategoryName);
-    const values = data.map(item => item.CardCount);
+    const values = data.map(item => Math.round(item.CardCount)); // Ensure integer
     
-    charts.categoryDistribution.data.labels = labels;
-    charts.categoryDistribution.data.datasets[0].data = values;
-    charts.categoryDistribution.data.datasets[0].backgroundColor = chartColors.slice(0, labels.length);
-    charts.categoryDistribution.data.datasets[0].hoverBackgroundColor = chartColors.slice(0, labels.length).map(getHoverColor);
+    charts.categoryDistributionChart.data.labels = labels;
+    charts.categoryDistributionChart.data.datasets[0].data = values;
+    charts.categoryDistributionChart.data.datasets[0].backgroundColor = chartColors.slice(0, labels.length);
+    charts.categoryDistributionChart.data.datasets[0].hoverBackgroundColor = chartColors.slice(0, labels.length).map(getHoverColor);
     
-    charts.categoryDistribution.update();
+    charts.categoryDistributionChart.update();
 }
 
 // 2. Cards per Category Bar Chart
@@ -161,9 +347,9 @@ function initializeCardsPerCategoryChart(data) {
     const ctx = document.getElementById('cardsPerCategoryChart').getContext('2d');
     
     const labels = data.map(item => item.CategoryName);
-    const values = data.map(item => item.CardCount);
+    const values = data.map(item => Math.round(item.CardCount)); // Ensure integer
     
-    charts.cardsPerCategory = new Chart(ctx, {
+    charts.cardsPerCategoryChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
@@ -217,6 +403,14 @@ function initializeCardsPerCategoryChart(data) {
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            // Ensure card count is an integer
+                            return `${context.label}: ${Math.round(context.raw)} cards`;
+                        }
+                    }
                 }
             }
         }
@@ -225,18 +419,18 @@ function initializeCardsPerCategoryChart(data) {
 
 // Update function for cards per category chart
 function updateCardsPerCategoryChart(data) {
-    if (!charts.cardsPerCategory) {
+    if (!charts.cardsPerCategoryChart) {
         initializeCardsPerCategoryChart(data);
         return;
     }
     
     const labels = data.map(item => item.CategoryName);
-    const values = data.map(item => item.CardCount);
+    const values = data.map(item => Math.round(item.CardCount)); // Ensure integer
     
-    charts.cardsPerCategory.data.labels = labels;
-    charts.cardsPerCategory.data.datasets[0].data = values;
+    charts.cardsPerCategoryChart.data.labels = labels;
+    charts.cardsPerCategoryChart.data.datasets[0].data = values;
     
-    charts.cardsPerCategory.update();
+    charts.cardsPerCategoryChart.update();
 }
 
 // 3. Review Schedule Timeline
@@ -244,9 +438,9 @@ function initializeReviewScheduleChart(data) {
     const ctx = document.getElementById('reviewScheduleChart').getContext('2d');
     
     const labels = data.map(item => item.ReviewDate);
-    const values = data.map(item => item.CardCount);
+    const values = data.map(item => Math.round(item.CardCount)); // Ensure integer
     
-    charts.reviewSchedule = new Chart(ctx, {
+    charts.reviewScheduleChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
@@ -308,6 +502,10 @@ function initializeReviewScheduleChart(data) {
                         title: function(tooltipItems) {
                             const date = new Date(tooltipItems[0].label);
                             return date.toLocaleDateString();
+                        },
+                        label: function(context) {
+                            // Ensure card count is an integer
+                            return `Cards due: ${Math.round(context.raw)}`;
                         }
                     }
                 }
@@ -317,18 +515,18 @@ function initializeReviewScheduleChart(data) {
 }
 
 function updateReviewScheduleChart(data) {
-    if (!charts.reviewSchedule) {
+    if (!charts.reviewScheduleChart) {
         initializeReviewScheduleChart(data);
         return;
     }
     
     const labels = data.map(item => item.ReviewDate);
-    const values = data.map(item => item.CardCount);
+    const values = data.map(item => Math.round(item.CardCount)); // Ensure integer
     
-    charts.reviewSchedule.data.labels = labels;
-    charts.reviewSchedule.data.datasets[0].data = values;
+    charts.reviewScheduleChart.data.labels = labels;
+    charts.reviewScheduleChart.data.datasets[0].data = values;
     
-    charts.reviewSchedule.update();
+    charts.reviewScheduleChart.update();
 }
 
 // 4. Learning Curve
@@ -338,7 +536,7 @@ function initializeLearningCurveChart(data) {
     const labels = data.map(item => item.Date);
     const values = data.map(item => item.AverageMastery);
     
-    charts.learningCurve = new Chart(ctx, {
+    charts.learningCurveChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
@@ -413,7 +611,7 @@ function initializeLearningCurveChart(data) {
 }
 
 function updateLearningCurveChart(data) {
-    if (!charts.learningCurve) {
+    if (!charts.learningCurveChart) {
         initializeLearningCurveChart(data);
         return;
     }
@@ -421,10 +619,10 @@ function updateLearningCurveChart(data) {
     const labels = data.map(item => item.Date);
     const values = data.map(item => item.AverageMastery);
     
-    charts.learningCurve.data.labels = labels;
-    charts.learningCurve.data.datasets[0].data = values;
+    charts.learningCurveChart.data.labels = labels;
+    charts.learningCurveChart.data.datasets[0].data = values;
     
-    charts.learningCurve.update();
+    charts.learningCurveChart.update();
 }
 
 // 5. Cards Added Over Time
@@ -432,7 +630,7 @@ function initializeCardsAddedChart(data) {
     const ctx = document.getElementById('cardsAddedChart').getContext('2d');
     
     const labels = data.map(item => item.Date);
-    const values = data.map(item => item.CardsAdded);
+    const values = data.map(item => Math.round(item.CardsAdded)); // Ensure integer
     
     // Calculate cumulative values
     const cumulativeValues = [];
@@ -442,7 +640,7 @@ function initializeCardsAddedChart(data) {
         cumulativeValues.push(runningTotal);
     });
     
-    charts.cardsAdded = new Chart(ctx, {
+    charts.cardsAddedChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
@@ -481,7 +679,9 @@ function initializeCardsAddedChart(data) {
                         color: 'white',
                         font: {
                             family: 'Trebuchet MS'
-                        }
+                        },
+                        stepSize: 1,
+                        precision: 0
                     },
                     grid: {
                         color: 'rgba(255, 255, 255, 0.1)'
@@ -506,7 +706,9 @@ function initializeCardsAddedChart(data) {
                         color: getHoverColor(chartColors[5]),
                         font: {
                             family: 'Trebuchet MS'
-                        }
+                        },
+                        stepSize: 1,
+                        precision: 0
                     },
                     title: {
                         display: true,
@@ -540,6 +742,19 @@ function initializeCardsAddedChart(data) {
                             family: 'Trebuchet MS'
                         }
                     }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            // Ensure card counts are integers
+                            const value = Math.round(context.raw);
+                            if (context.dataset.label === 'Cards Added') {
+                                return `Cards Added: ${value}`;
+                            } else {
+                                return `Total Cards: ${value}`;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -547,13 +762,13 @@ function initializeCardsAddedChart(data) {
 }
 
 function updateCardsAddedChart(data) {
-    if (!charts.cardsAdded) {
+    if (!charts.cardsAddedChart) {
         initializeCardsAddedChart(data);
         return;
     }
     
     const labels = data.map(item => item.Date);
-    const values = data.map(item => item.CardsAdded);
+    const values = data.map(item => Math.round(item.CardsAdded)); // Ensure integer
     
     // Calculate cumulative values
     const cumulativeValues = [];
@@ -563,24 +778,25 @@ function updateCardsAddedChart(data) {
         cumulativeValues.push(runningTotal);
     });
     
-    charts.cardsAdded.data.labels = labels;
-    charts.cardsAdded.data.datasets[0].data = values;
-    charts.cardsAdded.data.datasets[1].data = cumulativeValues;
+    charts.cardsAddedChart.data.labels = labels;
+    charts.cardsAddedChart.data.datasets[0].data = values;
+    charts.cardsAddedChart.data.datasets[1].data = cumulativeValues;
     
-    charts.cardsAdded.update();
+    charts.cardsAddedChart.update();
 }
 
 // 6. View vs Mastery Correlation
 function initializeViewMasteryChart(data) {
     const ctx = document.getElementById('viewMasteryChart').getContext('2d');
     
+    // Ensure view count is an integer for each point
     const values = data.map(item => ({
-        x: item.ViewCount,
-        y: item.MasteryPercentage,
+        x: Math.round(item.ViewCount), // Ensure integer view count
+        y: item.MasteryPercentage, 
         question: item.Question
     }));
     
-    charts.viewMastery = new Chart(ctx, {
+    charts.viewMasteryChart = new Chart(ctx, {
         type: 'scatter',
         data: {
             datasets: [{
@@ -623,7 +839,9 @@ function initializeViewMasteryChart(data) {
                         color: 'white',
                         font: {
                             family: 'Trebuchet MS'
-                        }
+                        },
+                        stepSize: 1,
+                        precision: 0
                     },
                     grid: {
                         color: 'rgba(255, 255, 255, 0.1)'
@@ -648,7 +866,7 @@ function initializeViewMasteryChart(data) {
                         label: function(context) {
                             const data = context.dataset.data[context.dataIndex];
                             return [
-                                `Views: ${data.x}, Mastery: ${data.y.toFixed(1)}%`,
+                                `Views: ${Math.round(data.x)}, Mastery: ${data.y.toFixed(1)}%`,
                                 `Q: ${data.question.substring(0, 30)}${data.question.length > 30 ? '...' : ''}`
                             ];
                         }
@@ -660,20 +878,21 @@ function initializeViewMasteryChart(data) {
 }
 
 function updateViewMasteryChart(data) {
-    if (!charts.viewMastery) {
+    if (!charts.viewMasteryChart) {
         initializeViewMasteryChart(data);
         return;
     }
     
+    // Ensure view count is an integer for each point
     const values = data.map(item => ({
-        x: item.ViewCount,
+        x: Math.round(item.ViewCount), // Ensure integer view count
         y: item.MasteryPercentage,
         question: item.Question
     }));
     
-    charts.viewMastery.data.datasets[0].data = values;
+    charts.viewMasteryChart.data.datasets[0].data = values;
     
-    charts.viewMastery.update();
+    charts.viewMasteryChart.update();
 }
 
 // 7. Interval Growth Distribution
@@ -684,9 +903,9 @@ function initializeIntervalGrowthChart(data) {
     data.sort((a, b) => a.CurrentInterval - b.CurrentInterval);
     
     const labels = data.map(item => item.CurrentInterval + ' days');
-    const values = data.map(item => item.CardCount);
+    const values = data.map(item => Math.round(item.CardCount)); // Ensure integer
     
-    charts.intervalGrowth = new Chart(ctx, {
+    charts.intervalGrowthChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
@@ -749,6 +968,14 @@ function initializeIntervalGrowthChart(data) {
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            // Ensure card count is an integer
+                            return `Cards: ${Math.round(context.raw)}`;
+                        }
+                    }
                 }
             }
         }
@@ -756,7 +983,7 @@ function initializeIntervalGrowthChart(data) {
 }
 
 function updateIntervalGrowthChart(data) {
-    if (!charts.intervalGrowth) {
+    if (!charts.intervalGrowthChart) {
         initializeIntervalGrowthChart(data);
         return;
     }
@@ -765,25 +992,26 @@ function updateIntervalGrowthChart(data) {
     data.sort((a, b) => a.CurrentInterval - b.CurrentInterval);
     
     const labels = data.map(item => item.CurrentInterval + ' days');
-    const values = data.map(item => item.CardCount);
+    const values = data.map(item => Math.round(item.CardCount)); // Ensure integer
     
-    charts.intervalGrowth.data.labels = labels;
-    charts.intervalGrowth.data.datasets[0].data = values;
+    charts.intervalGrowthChart.data.labels = labels;
+    charts.intervalGrowthChart.data.datasets[0].data = values;
     
-    charts.intervalGrowth.update();
+    charts.intervalGrowthChart.update();
 }
 
 // 8. Learning Efficiency
 function initializeLearningEfficiencyChart(data) {
     const ctx = document.getElementById('learningEfficiencyChart').getContext('2d');
     
+    // Ensure view count is an integer for each point
     const values = data.map(item => ({
-        x: item.ViewCount,
+        x: Math.round(item.ViewCount), // Ensure integer view count
         y: item.EfficiencyScore,
         question: item.Question
     }));
     
-    charts.learningEfficiency = new Chart(ctx, {
+    charts.learningEfficiencyChart = new Chart(ctx, {
         type: 'scatter',
         data: {
             datasets: [{
@@ -826,7 +1054,9 @@ function initializeLearningEfficiencyChart(data) {
                         color: 'white',
                         font: {
                             family: 'Trebuchet MS'
-                        }
+                        },
+                        stepSize: 1,
+                        precision: 0
                     },
                     grid: {
                         color: 'rgba(255, 255, 255, 0.1)'
@@ -851,7 +1081,7 @@ function initializeLearningEfficiencyChart(data) {
                         label: function(context) {
                             const data = context.dataset.data[context.dataIndex];
                             return [
-                                `Views: ${data.x}, Efficiency: ${data.y.toFixed(1)}%`,
+                                `Views: ${Math.round(data.x)}, Efficiency: ${data.y.toFixed(1)}%`,
                                 `Q: ${data.question.substring(0, 30)}${data.question.length > 30 ? '...' : ''}`
                             ];
                         }
@@ -863,20 +1093,21 @@ function initializeLearningEfficiencyChart(data) {
 }
 
 function updateLearningEfficiencyChart(data) {
-    if (!charts.learningEfficiency) {
+    if (!charts.learningEfficiencyChart) {
         initializeLearningEfficiencyChart(data);
         return;
     }
     
+    // Ensure view count is an integer for each point
     const values = data.map(item => ({
-        x: item.ViewCount,
+        x: Math.round(item.ViewCount), // Ensure integer view count
         y: item.EfficiencyScore,
         question: item.Question
     }));
     
-    charts.learningEfficiency.data.datasets[0].data = values;
+    charts.learningEfficiencyChart.data.datasets[0].data = values;
     
-    charts.learningEfficiency.update();
+    charts.learningEfficiencyChart.update();
 }
 
 // 9. FSRS Stability Distribution
@@ -884,9 +1115,9 @@ function initializeStabilityDistributionChart(data) {
     const ctx = document.getElementById('stabilityDistributionChart').getContext('2d');
     
     const labels = data.map(item => item.StabilityRange);
-    const values = data.map(item => item.CardCount);
+    const values = data.map(item => Math.round(item.CardCount)); // Ensure integer
     
-    charts.stabilityDistribution = new Chart(ctx, {
+    charts.stabilityDistributionChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
@@ -953,7 +1184,8 @@ function initializeStabilityDistributionChart(data) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `Cards: ${context.raw}`;
+                            // Ensure card count is an integer
+                            return `Cards: ${Math.round(context.raw)}`;
                         }
                     }
                 }
@@ -963,16 +1195,16 @@ function initializeStabilityDistributionChart(data) {
 }
 
 function updateStabilityDistributionChart(data) {
-    if (!charts.stabilityDistribution) {
+    if (!charts.stabilityDistributionChart) {
         initializeStabilityDistributionChart(data);
         return;
     }
     
     const labels = data.map(item => item.StabilityRange);
-    const values = data.map(item => item.CardCount);
+    const values = data.map(item => Math.round(item.CardCount)); // Ensure integer
     
-    charts.stabilityDistribution.data.labels = labels;
-    charts.stabilityDistribution.data.datasets[0].data = values;
+    charts.stabilityDistributionChart.data.labels = labels;
+    charts.stabilityDistributionChart.data.datasets[0].data = values;
     
-    charts.stabilityDistribution.update();
+    charts.stabilityDistributionChart.update();
 }
