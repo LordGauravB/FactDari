@@ -153,6 +153,37 @@ def learning_curve():
     data = fetch_query(query)
     return jsonify(data)
 
+@app.route('/api/stability-distribution')
+def stability_distribution():
+    """Get distribution of card stability values"""
+    query = """
+    SELECT 
+        CASE
+            WHEN Stability <= 1 THEN '0-1'
+            WHEN Stability <= 5 THEN '1-5'
+            WHEN Stability <= 10 THEN '5-10'
+            WHEN Stability <= 20 THEN '10-20'
+            WHEN Stability <= 50 THEN '20-50'
+            WHEN Stability <= 100 THEN '50-100'
+            ELSE '100+'
+        END as StabilityRange,
+        COUNT(FactCardID) as CardCount,
+        MIN(Stability) as MinStability
+    FROM FactCards
+    GROUP BY CASE
+            WHEN Stability <= 1 THEN '0-1'
+            WHEN Stability <= 5 THEN '1-5'
+            WHEN Stability <= 10 THEN '5-10'
+            WHEN Stability <= 20 THEN '10-20'
+            WHEN Stability <= 50 THEN '20-50'
+            WHEN Stability <= 100 THEN '50-100'
+            ELSE '100+'
+        END
+    ORDER BY MinStability
+    """
+    data = fetch_query(query)
+    return jsonify(data)
+
 @app.route('/api/chart-data')
 def chart_data():
     """Get all chart data in a single request"""
@@ -229,7 +260,33 @@ def chart_data():
                 CONVERT(varchar, DATEADD(day, DATEDIFF(day, 0, LastReviewDate), 0), 23)
             ORDER BY 
                 CONVERT(varchar, DATEADD(day, DATEDIFF(day, 0, LastReviewDate), 0), 23)
+        """),
+        'stabilityDistribution': fetch_query("""
+            SELECT 
+                CASE
+                    WHEN Stability <= 1 THEN '0-1'
+                    WHEN Stability <= 5 THEN '1-5'
+                    WHEN Stability <= 10 THEN '5-10'
+                    WHEN Stability <= 20 THEN '10-20'
+                    WHEN Stability <= 50 THEN '20-50'
+                    WHEN Stability <= 100 THEN '50-100'
+                    ELSE '100+'
+                END as StabilityRange,
+                COUNT(FactCardID) as CardCount,
+                MIN(Stability) as MinStability
+            FROM FactCards
+            GROUP BY CASE
+                    WHEN Stability <= 1 THEN '0-1'
+                    WHEN Stability <= 5 THEN '1-5'
+                    WHEN Stability <= 10 THEN '5-10'
+                    WHEN Stability <= 20 THEN '10-20'
+                    WHEN Stability <= 50 THEN '20-50'
+                    WHEN Stability <= 100 THEN '50-100'
+                    ELSE '100+'
+                END
+            ORDER BY MIN(Stability)
         """)
+        # Removed: lapsesByCategory data section
     }
     return jsonify(data)
 

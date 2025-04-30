@@ -36,14 +36,17 @@ function fetchAndUpdateCharts() {
     fetch('/api/chart-data')
         .then(response => response.json())
         .then(data => {
+            // Update all charts with the received data
             updateCategoryDistributionChart(data.categoryDistribution);
             updateCardsPerCategoryChart(data.categoryDistribution);
+            updateReviewScheduleChart(data.reviewSchedule);
+            updateLearningCurveChart(data.learningCurve);
+            updateCardsAddedChart(data.cardsAddedOverTime);
             updateViewMasteryChart(data.viewMasteryCorrelation);
             updateIntervalGrowthChart(data.intervalGrowth);
-            updateReviewScheduleChart(data.reviewSchedule);
-            updateCardsAddedChart(data.cardsAddedOverTime);
             updateLearningEfficiencyChart(data.learningEfficiency);
-            updateLearningCurveChart(data.learningCurve);
+            updateStabilityDistributionChart(data.stabilityDistribution);
+            // Removed: updateLapsesByCategoryChart(data.lapsesByCategory);
             
             // Update last refresh time indicator
             const now = new Date();
@@ -182,10 +185,21 @@ function initializeCardsPerCategoryChart(data) {
                         color: 'white',
                         font: {
                             family: 'Trebuchet MS'
-                        }
+                        },
+                        stepSize: 1,
+                        precision: 0
                     },
                     grid: {
                         color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Number of Cards',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
                     }
                 },
                 x: {
@@ -225,188 +239,7 @@ function updateCardsPerCategoryChart(data) {
     charts.cardsPerCategory.update();
 }
 
-// 3. View Count vs. Mastery Scatter Plot
-function initializeViewMasteryChart(data) {
-    const ctx = document.getElementById('viewMasteryChart').getContext('2d');
-    
-    const scatterData = data.map(item => ({
-        x: item.ViewCount,
-        y: item.MasteryPercentage,
-        label: item.Question
-    }));
-    
-    charts.viewMastery = new Chart(ctx, {
-        type: 'scatter',
-        data: {
-            datasets: [{
-                label: 'Cards',
-                data: scatterData,
-                backgroundColor: chartColors[2],
-                borderColor: 'rgba(0, 0, 0, 0.1)',
-                pointRadius: 6,
-                pointHoverRadius: 8
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    title: {
-                        display: true,
-                        text: 'Mastery Level (%)',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    }
-                },
-                x: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'View Count',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const item = context.raw;
-                            let label = item.label || '';
-                            if (label.length > 30) {
-                                label = label.substr(0, 30) + '...';
-                            }
-                            return `${label} (Views: ${item.x}, Mastery: ${Math.round(item.y)}%)`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Update function for view count vs mastery chart
-function updateViewMasteryChart(data) {
-    if (!charts.viewMastery) {
-        initializeViewMasteryChart(data);
-        return;
-    }
-    
-    const scatterData = data.map(item => ({
-        x: item.ViewCount,
-        y: item.MasteryPercentage,
-        label: item.Question
-    }));
-    
-    charts.viewMastery.data.datasets[0].data = scatterData;
-    charts.viewMastery.update();
-}
-
-// 4. Interval Growth Line Chart
-function initializeIntervalGrowthChart(data) {
-    const ctx = document.getElementById('intervalGrowthChart').getContext('2d');
-    
-    const labels = data.map(item => `${item.CurrentInterval} days`);
-    const values = data.map(item => item.CardCount);
-    
-    charts.intervalGrowth = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Number of Cards',
-                data: values,
-                fill: false,
-                borderColor: chartColors[3],
-                tension: 0.1,
-                pointBackgroundColor: chartColors[3],
-                pointRadius: 5,
-                pointHoverRadius: 7
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Number of Cards',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    }
-                },
-                x: {
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Update function for interval growth chart
-function updateIntervalGrowthChart(data) {
-    if (!charts.intervalGrowth) {
-        initializeIntervalGrowthChart(data);
-        return;
-    }
-    
-    const labels = data.map(item => `${item.CurrentInterval} days`);
-    const values = data.map(item => item.CardCount);
-    
-    charts.intervalGrowth.data.labels = labels;
-    charts.intervalGrowth.data.datasets[0].data = values;
-    
-    charts.intervalGrowth.update();
-}
-
-// 5. Review Schedule Timeline
+// 3. Review Schedule Timeline
 function initializeReviewScheduleChart(data) {
     const ctx = document.getElementById('reviewScheduleChart').getContext('2d');
     
@@ -420,7 +253,8 @@ function initializeReviewScheduleChart(data) {
             datasets: [{
                 label: 'Cards Due',
                 data: values,
-                backgroundColor: chartColors[4],
+                backgroundColor: chartColors[2],
+                hoverBackgroundColor: getHoverColor(chartColors[2]),
                 borderWidth: 0
             }]
         },
@@ -430,22 +264,25 @@ function initializeReviewScheduleChart(data) {
             scales: {
                 y: {
                     beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Number of Cards',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
                     ticks: {
                         color: 'white',
                         font: {
                             family: 'Trebuchet MS'
-                        }
+                        },
+                        stepSize: 1,
+                        precision: 0
                     },
                     grid: {
                         color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Cards Due',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
                     }
                 },
                 x: {
@@ -454,11 +291,24 @@ function initializeReviewScheduleChart(data) {
                         font: {
                             family: 'Trebuchet MS'
                         },
-                        maxRotation: 45,
+                        maxRotation: 90,
                         minRotation: 45
                     },
                     grid: {
                         display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            const date = new Date(tooltipItems[0].label);
+                            return date.toLocaleDateString();
+                        }
                     }
                 }
             }
@@ -466,7 +316,6 @@ function initializeReviewScheduleChart(data) {
     });
 }
 
-// Update function for review schedule chart
 function updateReviewScheduleChart(data) {
     if (!charts.reviewSchedule) {
         initializeReviewScheduleChart(data);
@@ -482,205 +331,7 @@ function updateReviewScheduleChart(data) {
     charts.reviewSchedule.update();
 }
 
-// 6. Cards Added Over Time
-function initializeCardsAddedChart(data) {
-    const ctx = document.getElementById('cardsAddedChart').getContext('2d');
-    
-    const labels = data.map(item => item.Date);
-    const values = data.map(item => item.CardsAdded);
-    
-    // Calculate cumulative values
-    const cumulativeValues = [];
-    let sum = 0;
-    for (const val of values) {
-        sum += val;
-        cumulativeValues.push(sum);
-    }
-    
-    charts.cardsAdded = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Cards Added',
-                    data: values,
-                    backgroundColor: chartColors[5],
-                    borderColor: chartColors[5],
-                    type: 'bar'
-                },
-                {
-                    label: 'Cumulative Total',
-                    data: cumulativeValues,
-                    borderColor: chartColors[0],
-                    backgroundColor: 'transparent',
-                    type: 'line',
-                    tension: 0.1,
-                    pointRadius: 3
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    }
-                },
-                x: {
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        },
-                        maxRotation: 45,
-                        minRotation: 45
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Update function for cards added chart
-function updateCardsAddedChart(data) {
-    if (!charts.cardsAdded) {
-        initializeCardsAddedChart(data);
-        return;
-    }
-    
-    const labels = data.map(item => item.Date);
-    const values = data.map(item => item.CardsAdded);
-    
-    // Calculate cumulative values
-    const cumulativeValues = [];
-    let sum = 0;
-    for (const val of values) {
-        sum += val;
-        cumulativeValues.push(sum);
-    }
-    
-    charts.cardsAdded.data.labels = labels;
-    charts.cardsAdded.data.datasets[0].data = values;
-    charts.cardsAdded.data.datasets[1].data = cumulativeValues;
-    
-    charts.cardsAdded.update();
-}
-
-// 7. Learning Efficiency Chart
-function initializeLearningEfficiencyChart(data) {
-    const ctx = document.getElementById('learningEfficiencyChart').getContext('2d');
-    
-    const scatterData = data.map(item => ({
-        x: item.ViewCount,
-        y: item.EfficiencyScore,
-        label: item.Question
-    }));
-    
-    charts.learningEfficiency = new Chart(ctx, {
-        type: 'scatter',
-        data: {
-            datasets: [{
-                label: 'Efficiency Score',
-                data: scatterData,
-                backgroundColor: chartColors[6],
-                pointRadius: 6,
-                pointHoverRadius: 8
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Efficiency Score (Mastery % per View)',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    }
-                },
-                x: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'View Count',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const item = context.raw;
-                            let label = item.label || '';
-                            if (label.length > 30) {
-                                label = label.substr(0, 30) + '...';
-                            }
-                            return `${label} (Views: ${item.x}, Efficiency: ${Math.round(item.y * 100) / 100})`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Update function for learning efficiency chart
-function updateLearningEfficiencyChart(data) {
-    if (!charts.learningEfficiency) {
-        initializeLearningEfficiencyChart(data);
-        return;
-    }
-    
-    const scatterData = data.map(item => ({
-        x: item.ViewCount,
-        y: item.EfficiencyScore,
-        label: item.Question
-    }));
-    
-    charts.learningEfficiency.data.datasets[0].data = scatterData;
-    charts.learningEfficiency.update();
-}
-
-// 8. Learning Curve Line Chart
+// 4. Learning Curve
 function initializeLearningCurveChart(data) {
     const ctx = document.getElementById('learningCurveChart').getContext('2d');
     
@@ -692,15 +343,14 @@ function initializeLearningCurveChart(data) {
         data: {
             labels: labels,
             datasets: [{
-                label: 'Average Mastery Level',
+                label: 'Average Mastery %',
                 data: values,
-                borderColor: chartColors[7],
-                backgroundColor: 'rgba(121, 85, 72, 0.1)',
-                fill: true,
+                backgroundColor: 'rgba(156, 39, 176, 0.2)', // Purple
+                borderColor: chartColors[4], // Purple border
+                borderWidth: 2,
                 tension: 0.3,
-                pointBackgroundColor: chartColors[7],
-                pointRadius: 5,
-                pointHoverRadius: 7
+                pointRadius: 3,
+                fill: true
             }]
         },
         options: {
@@ -710,14 +360,6 @@ function initializeLearningCurveChart(data) {
                 y: {
                     beginAtZero: true,
                     max: 100,
-                    title: {
-                        display: true,
-                        text: 'Average Mastery Level (%)',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
                     ticks: {
                         color: 'white',
                         font: {
@@ -726,6 +368,15 @@ function initializeLearningCurveChart(data) {
                     },
                     grid: {
                         color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Average Mastery %',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
                     }
                 },
                 x: {
@@ -734,11 +385,26 @@ function initializeLearningCurveChart(data) {
                         font: {
                             family: 'Trebuchet MS'
                         },
-                        maxRotation: 45,
+                        maxRotation: 90,
                         minRotation: 45
                     },
                     grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            return tooltipItems[0].label;
+                        },
+                        label: function(context) {
+                            return `Average Mastery: ${context.raw.toFixed(1)}%`;
+                        }
                     }
                 }
             }
@@ -746,7 +412,6 @@ function initializeLearningCurveChart(data) {
     });
 }
 
-// Update function for learning curve chart
 function updateLearningCurveChart(data) {
     if (!charts.learningCurve) {
         initializeLearningCurveChart(data);
@@ -760,4 +425,554 @@ function updateLearningCurveChart(data) {
     charts.learningCurve.data.datasets[0].data = values;
     
     charts.learningCurve.update();
+}
+
+// 5. Cards Added Over Time
+function initializeCardsAddedChart(data) {
+    const ctx = document.getElementById('cardsAddedChart').getContext('2d');
+    
+    const labels = data.map(item => item.Date);
+    const values = data.map(item => item.CardsAdded);
+    
+    // Calculate cumulative values
+    const cumulativeValues = [];
+    let runningTotal = 0;
+    values.forEach(val => {
+        runningTotal += val;
+        cumulativeValues.push(runningTotal);
+    });
+    
+    charts.cardsAdded = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Cards Added',
+                    data: values,
+                    backgroundColor: chartColors[5],
+                    borderColor: chartColors[5],
+                    borderWidth: 2,
+                    tension: 0.1,
+                    pointRadius: 3,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Total Cards',
+                    data: cumulativeValues,
+                    backgroundColor: 'rgba(0, 188, 212, 0.2)', // Cyan
+                    borderColor: getHoverColor(chartColors[5]),
+                    borderWidth: 2,
+                    tension: 0.1,
+                    pointRadius: 0,
+                    fill: true,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    position: 'left',
+                    ticks: {
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS'
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Daily Cards Added',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
+                    }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    grid: {
+                        drawOnChartArea: false
+                    },
+                    ticks: {
+                        color: getHoverColor(chartColors[5]),
+                        font: {
+                            family: 'Trebuchet MS'
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Total Cards',
+                        color: getHoverColor(chartColors[5]),
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS'
+                        },
+                        maxRotation: 90,
+                        minRotation: 45
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS'
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateCardsAddedChart(data) {
+    if (!charts.cardsAdded) {
+        initializeCardsAddedChart(data);
+        return;
+    }
+    
+    const labels = data.map(item => item.Date);
+    const values = data.map(item => item.CardsAdded);
+    
+    // Calculate cumulative values
+    const cumulativeValues = [];
+    let runningTotal = 0;
+    values.forEach(val => {
+        runningTotal += val;
+        cumulativeValues.push(runningTotal);
+    });
+    
+    charts.cardsAdded.data.labels = labels;
+    charts.cardsAdded.data.datasets[0].data = values;
+    charts.cardsAdded.data.datasets[1].data = cumulativeValues;
+    
+    charts.cardsAdded.update();
+}
+
+// 6. View vs Mastery Correlation
+function initializeViewMasteryChart(data) {
+    const ctx = document.getElementById('viewMasteryChart').getContext('2d');
+    
+    const values = data.map(item => ({
+        x: item.ViewCount,
+        y: item.MasteryPercentage,
+        question: item.Question
+    }));
+    
+    charts.viewMastery = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Cards',
+                data: values,
+                backgroundColor: chartColors[3],
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS'
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Mastery %',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
+                    }
+                },
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS'
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'View Count',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const data = context.dataset.data[context.dataIndex];
+                            return [
+                                `Views: ${data.x}, Mastery: ${data.y.toFixed(1)}%`,
+                                `Q: ${data.question.substring(0, 30)}${data.question.length > 30 ? '...' : ''}`
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateViewMasteryChart(data) {
+    if (!charts.viewMastery) {
+        initializeViewMasteryChart(data);
+        return;
+    }
+    
+    const values = data.map(item => ({
+        x: item.ViewCount,
+        y: item.MasteryPercentage,
+        question: item.Question
+    }));
+    
+    charts.viewMastery.data.datasets[0].data = values;
+    
+    charts.viewMastery.update();
+}
+
+// 7. Interval Growth Distribution
+function initializeIntervalGrowthChart(data) {
+    const ctx = document.getElementById('intervalGrowthChart').getContext('2d');
+    
+    // Sort data by interval
+    data.sort((a, b) => a.CurrentInterval - b.CurrentInterval);
+    
+    const labels = data.map(item => item.CurrentInterval + ' days');
+    const values = data.map(item => item.CardCount);
+    
+    charts.intervalGrowth = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Number of Cards',
+                data: values,
+                backgroundColor: chartColors[6],
+                hoverBackgroundColor: getHoverColor(chartColors[6]),
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS'
+                        },
+                        stepSize: 1,
+                        precision: 0
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Number of Cards',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS'
+                        }
+                    },
+                    grid: {
+                        display: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Interval Length',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+function updateIntervalGrowthChart(data) {
+    if (!charts.intervalGrowth) {
+        initializeIntervalGrowthChart(data);
+        return;
+    }
+    
+    // Sort data by interval
+    data.sort((a, b) => a.CurrentInterval - b.CurrentInterval);
+    
+    const labels = data.map(item => item.CurrentInterval + ' days');
+    const values = data.map(item => item.CardCount);
+    
+    charts.intervalGrowth.data.labels = labels;
+    charts.intervalGrowth.data.datasets[0].data = values;
+    
+    charts.intervalGrowth.update();
+}
+
+// 8. Learning Efficiency
+function initializeLearningEfficiencyChart(data) {
+    const ctx = document.getElementById('learningEfficiencyChart').getContext('2d');
+    
+    const values = data.map(item => ({
+        x: item.ViewCount,
+        y: item.EfficiencyScore,
+        question: item.Question
+    }));
+    
+    charts.learningEfficiency = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Cards',
+                data: values,
+                backgroundColor: chartColors[7],
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS'
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Efficiency Score (Mastery/Views)',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
+                    }
+                },
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS'
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'View Count',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const data = context.dataset.data[context.dataIndex];
+                            return [
+                                `Views: ${data.x}, Efficiency: ${data.y.toFixed(1)}%`,
+                                `Q: ${data.question.substring(0, 30)}${data.question.length > 30 ? '...' : ''}`
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateLearningEfficiencyChart(data) {
+    if (!charts.learningEfficiency) {
+        initializeLearningEfficiencyChart(data);
+        return;
+    }
+    
+    const values = data.map(item => ({
+        x: item.ViewCount,
+        y: item.EfficiencyScore,
+        question: item.Question
+    }));
+    
+    charts.learningEfficiency.data.datasets[0].data = values;
+    
+    charts.learningEfficiency.update();
+}
+
+// 9. FSRS Stability Distribution
+function initializeStabilityDistributionChart(data) {
+    const ctx = document.getElementById('stabilityDistributionChart').getContext('2d');
+    
+    const labels = data.map(item => item.StabilityRange);
+    const values = data.map(item => item.CardCount);
+    
+    charts.stabilityDistribution = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Number of Cards',
+                data: values,
+                backgroundColor: chartColors[8],
+                hoverBackgroundColor: getHoverColor(chartColors[8]),
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS'
+                        },
+                        stepSize: 1,
+                        precision: 0
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Number of Cards',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS'
+                        }
+                    },
+                    grid: {
+                        display: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Memory Stability Range',
+                        color: 'white',
+                        font: {
+                            family: 'Trebuchet MS',
+                            size: 12
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Cards: ${context.raw}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateStabilityDistributionChart(data) {
+    if (!charts.stabilityDistribution) {
+        initializeStabilityDistributionChart(data);
+        return;
+    }
+    
+    const labels = data.map(item => item.StabilityRange);
+    const values = data.map(item => item.CardCount);
+    
+    charts.stabilityDistribution.data.labels = labels;
+    charts.stabilityDistribution.data.datasets[0].data = values;
+    
+    charts.stabilityDistribution.update();
 }
