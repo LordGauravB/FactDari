@@ -636,7 +636,7 @@ class FactDariApp:
         if not self.current_factcard_id:
             return
         
-        # Map UI labels to FSRS v5 ratings (which are 1-based)
+        # FIXED: Map UI labels to FSRS v5 ratings (which are 1-based)
         rating_map = {"Again": 1, "Hard": 2, "Medium": 3, "Easy": 4}
         fsrs_rating = rating_map[rating_label]
         
@@ -706,14 +706,14 @@ class FactDariApp:
             # For UI display and legacy compatibility
             mastery_value = min(1.0, fsrs_result["stability"] / 100.0)  # Approximate mastery from stability
             
-            # 4. Update the database - USE THE DUE DATE DIRECTLY FROM FSRS
+            # 4. Update the database - FIXED to use a parameterized date that SQL Server can handle properly
             update_success = self.execute_update(
                 """
                 UPDATE FactCards 
                 SET Stability = ?, 
                     Difficulty = ?, 
                     State = ?,
-                    NextReviewDate = ?, 
+                    NextReviewDate = DATEADD(day, ?, GETDATE()), 
                     CurrentInterval = ?, 
                     Mastery = ?,  
                     Lapses = Lapses + ?,
@@ -725,7 +725,7 @@ class FactDariApp:
                     fsrs_result["stability"], 
                     fsrs_result["difficulty"],
                     fsrs_result["state"],
-                    fsrs_result["due"],         # Use the due date returned by FSRS directly
+                    fsrs_result["interval"],  # Use interval directly for DATEADD
                     fsrs_result["interval"],
                     mastery_value,  
                     1 if fsrs_result["is_lapse"] else 0,

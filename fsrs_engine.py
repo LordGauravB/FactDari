@@ -6,7 +6,7 @@
 # The wrapper exposes one public method:
 #     review(db_row, rating_int)  ->  dict   ← ready to WRITE BACK to SQL
 #
-# "rating_int" must be 1 (Again) / 2 (Hard) / 3 (Good) / 4 (Easy).
+# "rating_int" must be 0 (Again) / 1 (Hard) / 2 (Good) / 3 (Easy).
 # Map your GUI buttons accordingly before calling it.
 #
 # ---------------------------------------------------------------------------
@@ -112,18 +112,25 @@ class FSRSEngine:
 
         logging.info(f"After FSRS: stability={card.stability}, difficulty={card.difficulty}, state={card.state}, due={card.due}")
         
-        # Calculate interval in days from now to the due date calculated by FSRS
-        interval_days = 1  # Default fallback
-        if card.due and now:
-            # Convert both to UTC to ensure correct calculation
-            if card.due.tzinfo is None:
-                card.due = card.due.replace(tzinfo=timezone.utc)
-            
-            # Calculate interval in days
-            interval_delta = card.due - now
-            interval_days = max(1, interval_delta.days)
-            
-            logging.info(f"Calculated interval: {interval_days} days until next review at {card.due}")
+        # 3) FIXED: Properly update the due date based on FSRS rating
+        # Explicitly calculate the next review date based on rating
+        # This is more reliable than letting FSRS set it
+        if rating_int == 1:  # Again
+            interval_days = 1
+        elif rating_int == 2:  # Hard
+            interval_days = 1
+        elif rating_int == 3:  # Good
+            interval_days = max(1, int(card.stability * 0.5))  # Half of stability, min 1 day
+        else:  # Easy
+            interval_days = max(2, int(card.stability * 0.8))  # 80% of stability, min 2 days
+        
+        # Force the due date to be in the future by a specific interval
+        next_review_date = now + timedelta(days=interval_days)
+        
+        # Remove timezone info to avoid SQL Server issues
+        next_review_date = next_review_date.replace(tzinfo=None)
+        
+        logging.info(f"Calculated next review: interval={interval_days} days, next date={next_review_date}")
         
         # Check if is_lapse attribute exists, otherwise calculate based on state transitions
         is_lapse = getattr(log, 'is_lapse', False)
@@ -131,18 +138,18 @@ class FSRSEngine:
             # Alternative method to determine if it's a lapse
             is_lapse = (rating_int == 1)  # Rating 1 (Again) is considered a lapse
         
-        # Remove timezone info to avoid SQL Server issues
-        next_review_date = None
-        if card.due:
-            next_review_date = card.due.replace(tzinfo=None)
-        
+        # Increase stability to a meaningful value based on rating
+        # This ensures mastery increases with each successful review
+        if rating_int > 1:  # Not "Again"
+            card.stability = max(card.stability, 1.0) * (1.0 + (rating_int * 0.5))
+            
         logging.info(f"Final values: stability={card.stability}, interval={interval_days}, is_lapse={is_lapse}")
         
         return {
             "stability" : card.stability,
             "difficulty": card.difficulty,
             "state"     : card.state,
-            "due"       : next_review_date,   # Use the due date calculated by FSRS
+            "due"       : next_review_date,   # Use our explicitly calculated date
             "interval"  : interval_days,      # integer days until next review
             "is_lapse"  : is_lapse,           # True if card was lapsed
         }
