@@ -517,7 +517,7 @@ class FactDariApp:
                     stability_percentage = min(100, int(stability))
                     
                     # Update the stability progress in the UI
-                    self.mastery_level_label.config(text=f"Stability: {stability_percentage}%, Difficulty: {int((1-difficulty)*100)}%")
+                    self.mastery_level_label.config(text=f"Memory Strength: {stability_percentage}%")
                     
                     # Update progress bar
                     self.mastery_progress["value"] = stability_percentage
