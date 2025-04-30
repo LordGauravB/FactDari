@@ -88,6 +88,14 @@ class FactDariApp:
         # Show the home page
         self.show_home_page()
     
+    def load_categories(self):
+        """Load categories for the dropdown"""
+        query = "SELECT DISTINCT CategoryName FROM Categories WHERE IsActive = 1 ORDER BY CategoryName"
+        categories = self.fetch_query(query)
+        category_names = [category[0] for category in categories] if categories else []
+        category_names.insert(0, "All Categories")  # Add All Categories option
+        return category_names
+
     def setup_ui(self):
         """Set up all UI elements"""
         # Title bar
@@ -399,14 +407,19 @@ class FactDariApp:
         category = self.category_var.get()
         
         if category == "All Categories":
-            query = "SELECT COUNT(*) FROM FactCards WHERE NextReviewDate <= ?"
+            query = """
+            SELECT COUNT(*) 
+            FROM FactCards 
+            WHERE CONVERT(date, NextReviewDate) <= CONVERT(date, ?)
+            """
             result = self.fetch_query(query, (current_date,))
         else:
             query = """
             SELECT COUNT(*) 
             FROM FactCards f
             JOIN Categories c ON f.CategoryID = c.CategoryID
-            WHERE f.NextReviewDate <= ? AND c.CategoryName = ?
+            WHERE CONVERT(date, f.NextReviewDate) <= CONVERT(date, ?) 
+            AND c.CategoryName = ?
             """
             result = self.fetch_query(query, (current_date, category))
         
@@ -617,107 +630,107 @@ class FactDariApp:
             # Hide buttons if there's no fact card
             self.edit_icon_button.pack_forget()
             self.delete_icon_button.pack_forget()
+
+def update_factcard_schedule(self, rating_label):
+    """Update the fact card's review schedule using FSRS"""
+    if not self.current_factcard_id:
+        return
     
-    def update_factcard_schedule(self, rating_label):
-        """Update the fact card's review schedule using FSRS"""
-        if not self.current_factcard_id:
-            return
+    # FIXED: Map UI labels to FSRS v5 ratings (which are 1-based)
+    rating_map = {"Again": 1, "Hard": 2, "Medium": 3, "Easy": 4}
+    fsrs_rating = rating_map[rating_label]
+    
+    # Disable buttons immediately to prevent multiple clicks
+    self.show_review_buttons(False)
+    
+    # 1. Get current card state
+    query = """
+        SELECT 
+            Stability, Difficulty, State, NextReviewDate as due,
+            DATEDIFF(day, LastReviewDate, GETDATE()) AS elapsed_days,
+            CurrentInterval
+        FROM FactCards
+        WHERE FactCardID = ?
+    """
+    result = self.fetch_query(query, (self.current_factcard_id,))
+    
+    if not result or len(result) == 0:
+        self.status_label.config(text="Error: Failed to retrieve card data", fg=self.RED_COLOR)
+        self.clear_status_after_delay()
+        return
+    
+    # Extract data from query result
+    row = result[0]
+    current_interval = row[5] or 1  # Current interval or default to 1
+    
+    # Prepare the row data for FSRS review
+    db_row = {
+        "stability": row[0],    # Stability
+        "difficulty": row[1],   # Difficulty
+        "state": row[2] or 2,   # State (default to 2=Review if NULL)
+        "due": row[3]           # NextReviewDate
+    }
+    
+    # 2. Log the review
+    log_success = self.execute_update("""
+        INSERT INTO ReviewLogs (FactCardID, ReviewDate, Rating, Interval)
+        VALUES (?, GETDATE(), ?, ?)
+    """, (self.current_factcard_id, fsrs_rating, current_interval))
+    
+    if not log_success:
+        print(f"Warning: Failed to log review for card {self.current_factcard_id}")
+    
+    # 3. Calculate new schedule with FSRS
+    try:
+        # Get the updated fields from FSRS
+        fsrs_result = self.fsrs_engine.review(db_row, fsrs_rating)
         
-        # Map UI labels to FSRS numerical ratings
-        rating_map = {"Again": 0, "Hard": 1, "Medium": 2, "Easy": 3}
-        fsrs_rating = rating_map[rating_label]
+        # For UI display and legacy compatibility
+        mastery_value = min(1.0, fsrs_result["stability"] / 100.0)  # Approximate mastery from stability
         
-        # Disable buttons immediately to prevent multiple clicks
-        self.show_review_buttons(False)
-        
-        # 1. Get current card state
-        query = """
-            SELECT 
-                Stability, Difficulty, State, NextReviewDate as due,
-                DATEDIFF(day, LastReviewDate, GETDATE()) AS elapsed_days,
-                CurrentInterval
-            FROM FactCards
+        # 4. Update the database - FIXED to use a parameterized date that SQL Server can handle properly
+        update_success = self.execute_update(
+            """
+            UPDATE FactCards 
+            SET Stability = ?, 
+                Difficulty = ?, 
+                State = ?,
+                NextReviewDate = DATEADD(day, ?, GETDATE()), 
+                CurrentInterval = ?, 
+                Mastery = ?,  
+                Lapses = Lapses + ?,
+                ViewCount = ViewCount + 1, 
+                LastReviewDate = GETDATE()
             WHERE FactCardID = ?
-        """
-        result = self.fetch_query(query, (self.current_factcard_id,))
-        
-        if not result or len(result) == 0:
-            self.status_label.config(text="Error: Failed to retrieve card data", fg=self.RED_COLOR)
-            self.clear_status_after_delay()
-            return
-        
-        # Extract data from query result
-        row = result[0]
-        current_interval = row[5] or 1  # Current interval or default to 1
-        
-        # Prepare the row data for FSRS review
-        db_row = {
-            "stability": row[0],    # Stability
-            "difficulty": row[1],   # Difficulty
-            "state": row[2] or 2,   # State (default to 2=Review if NULL)
-            "due": row[3]           # NextReviewDate
-        }
-        
-        # 2. Log the review
-        log_success = self.execute_update("""
-            INSERT INTO ReviewLogs (FactCardID, ReviewDate, Rating, Interval)
-            VALUES (?, GETDATE(), ?, ?)
-        """, (self.current_factcard_id, fsrs_rating, current_interval))
-        
-        if not log_success:
-            print(f"Warning: Failed to log review for card {self.current_factcard_id}")
-        
-        # 3. Calculate new schedule with FSRS
-        try:
-            # Get the updated fields from FSRS
-            fsrs_result = self.fsrs_engine.review(db_row, fsrs_rating)
-            
-            # For UI display and legacy compatibility
-            mastery_value = min(1.0, fsrs_result["stability"] / 100.0)  # Approximate mastery from stability
-            
-            # 4. Update the database
-            update_success = self.execute_update(
-                """
-                UPDATE FactCards 
-                SET Stability = ?, 
-                    Difficulty = ?, 
-                    State = ?,
-                    NextReviewDate = ?, 
-                    CurrentInterval = ?, 
-                    Mastery = ?,  
-                    Lapses = Lapses + ?,
-                    ViewCount = ViewCount + 1, 
-                    LastReviewDate = GETDATE()
-                WHERE FactCardID = ?
-                """, 
-                (
-                    fsrs_result["stability"], 
-                    fsrs_result["difficulty"],
-                    fsrs_result["state"],
-                    fsrs_result["due"],
-                    fsrs_result["interval"],
-                    mastery_value,  
-                    1 if fsrs_result["is_lapse"] else 0,
-                    self.current_factcard_id
-                )
+            """, 
+            (
+                fsrs_result["stability"], 
+                fsrs_result["difficulty"],
+                fsrs_result["state"],
+                fsrs_result["interval"],  # Use interval directly for DATEADD
+                fsrs_result["interval"],
+                mastery_value,  
+                1 if fsrs_result["is_lapse"] else 0,
+                self.current_factcard_id
             )
-            
-            if not update_success:
-                self.status_label.config(text="Error updating card schedule", fg=self.RED_COLOR)
-                self.clear_status_after_delay()
-                return
-                
-            # 5. Show feedback to the user
-            self._show_fsrs_schedule_feedback(rating_label, fsrs_result["interval"], fsrs_result["stability"])
-            
-        except Exception as e:
-            print(f"FSRS scheduling error: {e}")
-            self.status_label.config(text=f"Scheduling error: {str(e)[:50]}", fg=self.RED_COLOR)
+        )
+        
+        if not update_success:
+            self.status_label.config(text="Error updating card schedule", fg=self.RED_COLOR)
             self.clear_status_after_delay()
             return
+            
+        # 5. Show feedback to the user
+        self._show_fsrs_schedule_feedback(rating_label, fsrs_result["interval"], fsrs_result["stability"])
         
-        # 6. Load the next fact card after a short delay
-        self.root.after(1000, self.load_next_factcard)
+    except Exception as e:
+        print(f"FSRS scheduling error: {e}")
+        self.status_label.config(text=f"Scheduling error: {str(e)[:50]}", fg=self.RED_COLOR)
+        self.clear_status_after_delay()
+        return
+    
+    # 6. Load the next fact card after a short delay
+    self.root.after(1000, self.load_next_factcard)
     
     def _show_fsrs_schedule_feedback(self, rating, interval, stability):
         """Show feedback to the user about FSRS scheduling"""
@@ -1278,14 +1291,6 @@ class FactDariApp:
             self.update_due_count()
         else:
             tk.messagebox.showinfo("Error", "Failed to delete category!")
-    
-    def load_categories(self):
-        """Load categories for the dropdown"""
-        query = "SELECT DISTINCT CategoryName FROM Categories WHERE IsActive = 1 ORDER BY CategoryName"
-        categories = self.fetch_query(query)
-        category_names = [category[0] for category in categories] if categories else []
-        category_names.insert(0, "All Categories")  # Add All Categories option
-        return category_names
     
     def update_category_dropdown(self):
         """Update the category dropdown with current categories"""

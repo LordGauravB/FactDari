@@ -2,16 +2,12 @@ from flask import Flask, render_template, jsonify
 import pyodbc
 from datetime import datetime, timedelta
 import json
+import config  # Import the config module
 
 app = Flask(__name__)
 
-# Database connection string - same as in the main app
-CONN_STR = (
-    r'DRIVER={SQL Server};'
-    r'SERVER=GAURAVS_DESKTOP\SQLEXPRESS;'
-    r'DATABASE=FactDari;'
-    r'Trusted_Connection=yes;'
-)
+# Get database connection string from config
+CONN_STR = config.get_connection_string()
 
 def fetch_query(query, params=None):
     """Execute a SELECT query and return the results"""
