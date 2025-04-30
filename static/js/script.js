@@ -1,8 +1,25 @@
-// Chart color palette
-const chartColors = [
-    '#4CAF50', '#2196F3', '#FFC107', '#F44336', '#9C27B0', 
-    '#00BCD4', '#FF9800', '#795548', '#607D8B', '#E91E63'
-];
+// Use Chart configuration from config.py (now available as CHART_CONFIG)
+// If CHART_CONFIG is not defined, fall back to default values
+if (typeof CHART_CONFIG === 'undefined') {
+    console.warn("CHART_CONFIG not found, using default values");
+    CHART_CONFIG = {
+        colors: [
+            '#4CAF50', '#2196F3', '#FFC107', '#F44336', '#9C27B0', 
+            '#00BCD4', '#FF9800', '#795548', '#607D8B', '#E91E63'
+        ],
+        fontFamily: "Trebuchet MS",
+        axisTitleSize: 16,
+        axisTickSize: 14,
+        legendFontSize: 14,
+        tooltipTitleSize: 14,
+        tooltipBodySize: 13,
+        pointRadius: 5,
+        hoverPointRadius: 7,
+        lineThickness: 2,
+        gridColor: 'rgba(255, 255, 255, 0.1)',
+        textColor: 'white'
+    };
+}
 
 // Get lighter version of each color for hover effects
 const getHoverColor = (color) => {
@@ -12,6 +29,64 @@ const getHoverColor = (color) => {
     const b = parseInt(color.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, 0.7)`;
 };
+
+// Create a standard axis configuration function
+function getAxisConfig(titleText, isYAxis = true) {
+    return {
+        beginAtZero: true,
+        ticks: {
+            color: CHART_CONFIG.textColor,
+            font: {
+                family: CHART_CONFIG.fontFamily,
+                size: CHART_CONFIG.axisTickSize
+            },
+            ...(isYAxis ? { precision: 0 } : {})
+        },
+        grid: {
+            color: CHART_CONFIG.gridColor,
+            display: isYAxis // Only show grid for Y axis
+        },
+        title: {
+            display: true,
+            text: titleText,
+            color: CHART_CONFIG.textColor,
+            font: {
+                family: CHART_CONFIG.fontFamily,
+                size: CHART_CONFIG.axisTitleSize
+            }
+        }
+    };
+}
+
+// Create a standard legend configuration
+function getLegendConfig(display = true) {
+    return {
+        display: display,
+        labels: {
+            color: CHART_CONFIG.textColor,
+            font: {
+                family: CHART_CONFIG.fontFamily,
+                size: CHART_CONFIG.legendFontSize
+            }
+        }
+    };
+}
+
+// Create a standard tooltip configuration
+function getTooltipConfig(callbacks = {}) {
+    return {
+        bodyFont: {
+            family: CHART_CONFIG.fontFamily,
+            size: CHART_CONFIG.tooltipBodySize
+        },
+        titleFont: {
+            family: CHART_CONFIG.fontFamily,
+            size: CHART_CONFIG.tooltipTitleSize,
+            weight: 'bold'
+        },
+        callbacks: callbacks
+    };
+}
 
 // Store chart references globally so we can update them
 const charts = {};
@@ -157,7 +232,7 @@ function getOptionsForModalChart(originalChart, chartId) {
     if (options.plugins && options.plugins.legend && options.plugins.legend.labels) {
         options.plugins.legend.labels.font = {
             ...options.plugins.legend.labels.font,
-            size: 14
+            size: CHART_CONFIG.legendFontSize + 2 // Even larger for modal
         };
     }
     
@@ -169,14 +244,14 @@ function getOptionsForModalChart(originalChart, chartId) {
             if (axis.title) {
                 axis.title.font = {
                     ...axis.title.font,
-                    size: 16
+                    size: CHART_CONFIG.axisTitleSize + 2 // Even larger for modal
                 };
             }
             
             if (axis.ticks) {
                 axis.ticks.font = {
                     ...axis.ticks.font,
-                    size: 12
+                    size: CHART_CONFIG.axisTickSize + 2 // Even larger for modal
                 };
             }
         });
@@ -186,12 +261,12 @@ function getOptionsForModalChart(originalChart, chartId) {
     if (!options.plugins) options.plugins = {};
     if (!options.plugins.tooltip) options.plugins.tooltip = {};
     options.plugins.tooltip.bodyFont = {
-        family: 'Trebuchet MS',
-        size: 14
+        family: CHART_CONFIG.fontFamily,
+        size: CHART_CONFIG.tooltipBodySize + 2
     };
     options.plugins.tooltip.titleFont = {
-        family: 'Trebuchet MS',
-        size: 14,
+        family: CHART_CONFIG.fontFamily,
+        size: CHART_CONFIG.tooltipTitleSize + 2,
         weight: 'bold'
     };
     
@@ -199,8 +274,8 @@ function getOptionsForModalChart(originalChart, chartId) {
     if (chartId === 'viewMasteryChart' || chartId === 'learningEfficiencyChart') {
         options.elements = {
             point: {
-                radius: 7,
-                hoverRadius: 9
+                radius: CHART_CONFIG.pointRadius + 2,
+                hoverRadius: CHART_CONFIG.hoverPointRadius + 2
             }
         };
     }
@@ -276,7 +351,7 @@ function setupRefreshIndicator(seconds) {
     window.refreshTimer.start();
 }
 
-// 1. Category Distribution Pie Chart
+// 1. Category Distribution Pie Chart - UPDATED
 function initializeCategoryDistributionChart(data) {
     const ctx = document.getElementById('categoryDistributionChart').getContext('2d');
     
@@ -289,8 +364,8 @@ function initializeCategoryDistributionChart(data) {
             labels: labels,
             datasets: [{
                 data: values,
-                backgroundColor: chartColors.slice(0, labels.length),
-                hoverBackgroundColor: chartColors.slice(0, labels.length).map(getHoverColor),
+                backgroundColor: CHART_CONFIG.colors.slice(0, labels.length),
+                hoverBackgroundColor: CHART_CONFIG.colors.slice(0, labels.length).map(getHoverColor),
                 borderWidth: 1
             }]
         },
@@ -301,24 +376,23 @@ function initializeCategoryDistributionChart(data) {
                 legend: {
                     position: 'right',
                     labels: {
-                        color: 'white',
+                        color: CHART_CONFIG.textColor,
                         font: {
-                            family: 'Trebuchet MS'
+                            family: CHART_CONFIG.fontFamily,
+                            size: CHART_CONFIG.legendFontSize
                         }
                     }
                 },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            // Ensure card count is an integer
-                            const value = Math.round(context.raw) || 0;
-                            const total = context.dataset.data.reduce((acc, cur) => acc + cur, 0);
-                            const percentage = Math.round((value / total) * 100);
-                            return `${label}: ${value} cards (${percentage}%)`;
-                        }
+                tooltip: getTooltipConfig({
+                    label: function(context) {
+                        const label = context.label || '';
+                        // Ensure card count is an integer
+                        const value = Math.round(context.raw) || 0;
+                        const total = context.dataset.data.reduce((acc, cur) => acc + cur, 0);
+                        const percentage = Math.round((value / total) * 100);
+                        return `${label}: ${value} cards (${percentage}%)`;
                     }
-                }
+                })
             }
         }
     });
@@ -336,13 +410,13 @@ function updateCategoryDistributionChart(data) {
     
     charts.categoryDistributionChart.data.labels = labels;
     charts.categoryDistributionChart.data.datasets[0].data = values;
-    charts.categoryDistributionChart.data.datasets[0].backgroundColor = chartColors.slice(0, labels.length);
-    charts.categoryDistributionChart.data.datasets[0].hoverBackgroundColor = chartColors.slice(0, labels.length).map(getHoverColor);
+    charts.categoryDistributionChart.data.datasets[0].backgroundColor = CHART_CONFIG.colors.slice(0, labels.length);
+    charts.categoryDistributionChart.data.datasets[0].hoverBackgroundColor = CHART_CONFIG.colors.slice(0, labels.length).map(getHoverColor);
     
     charts.categoryDistributionChart.update();
 }
 
-// 2. Cards per Category Bar Chart
+// 2. Cards per Category Bar Chart - UPDATED
 function initializeCardsPerCategoryChart(data) {
     const ctx = document.getElementById('cardsPerCategoryChart').getContext('2d');
     
@@ -356,8 +430,8 @@ function initializeCardsPerCategoryChart(data) {
             datasets: [{
                 label: 'Number of Cards',
                 data: values,
-                backgroundColor: chartColors[1],
-                hoverBackgroundColor: getHoverColor(chartColors[1]),
+                backgroundColor: CHART_CONFIG.colors[1],
+                hoverBackgroundColor: getHoverColor(CHART_CONFIG.colors[1]),
                 borderWidth: 0
             }]
         },
@@ -365,53 +439,17 @@ function initializeCardsPerCategoryChart(data) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        },
-                        stepSize: 1,
-                        precision: 0
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'Number of Cards',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
-                },
-                x: {
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
+                y: getAxisConfig('Number of Cards', true),
+                x: getAxisConfig('Categories', false)
             },
             plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            // Ensure card count is an integer
-                            return `${context.label}: ${Math.round(context.raw)} cards`;
-                        }
+                legend: getLegendConfig(false),
+                tooltip: getTooltipConfig({
+                    label: function(context) {
+                        // Ensure card count is an integer
+                        return `${context.label}: ${Math.round(context.raw)} cards`;
                     }
-                }
+                })
             }
         }
     });
@@ -433,7 +471,7 @@ function updateCardsPerCategoryChart(data) {
     charts.cardsPerCategoryChart.update();
 }
 
-// 3. Review Schedule Timeline
+// 3. Review Schedule Timeline - UPDATED
 function initializeReviewScheduleChart(data) {
     const ctx = document.getElementById('reviewScheduleChart').getContext('2d');
     
@@ -447,8 +485,8 @@ function initializeReviewScheduleChart(data) {
             datasets: [{
                 label: 'Cards Due',
                 data: values,
-                backgroundColor: chartColors[2],
-                hoverBackgroundColor: getHoverColor(chartColors[2]),
+                backgroundColor: CHART_CONFIG.colors[2],
+                hoverBackgroundColor: getHoverColor(CHART_CONFIG.colors[2]),
                 borderWidth: 0
             }]
         },
@@ -456,59 +494,21 @@ function initializeReviewScheduleChart(data) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        },
-                        stepSize: 1,
-                        precision: 0
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'Cards Due',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
-                },
-                x: {
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        },
-                        maxRotation: 90,
-                        minRotation: 45
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
+                y: getAxisConfig('Cards Due', true),
+                x: getAxisConfig('Review Date', false)
             },
             plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        title: function(tooltipItems) {
-                            const date = new Date(tooltipItems[0].label);
-                            return date.toLocaleDateString();
-                        },
-                        label: function(context) {
-                            // Ensure card count is an integer
-                            return `Cards due: ${Math.round(context.raw)}`;
-                        }
+                legend: getLegendConfig(false),
+                tooltip: getTooltipConfig({
+                    title: function(tooltipItems) {
+                        const date = new Date(tooltipItems[0].label);
+                        return date.toLocaleDateString();
+                    },
+                    label: function(context) {
+                        // Ensure card count is an integer
+                        return `Cards due: ${Math.round(context.raw)}`;
                     }
-                }
+                })
             }
         }
     });
@@ -529,7 +529,7 @@ function updateReviewScheduleChart(data) {
     charts.reviewScheduleChart.update();
 }
 
-// 4. Learning Curve
+// 4. Learning Curve - UPDATED
 function initializeLearningCurveChart(data) {
     const ctx = document.getElementById('learningCurveChart').getContext('2d');
     
@@ -544,10 +544,10 @@ function initializeLearningCurveChart(data) {
                 label: 'Average Mastery %',
                 data: values,
                 backgroundColor: 'rgba(156, 39, 176, 0.2)', // Purple
-                borderColor: chartColors[4], // Purple border
-                borderWidth: 2,
+                borderColor: CHART_CONFIG.colors[4], // Purple border
+                borderWidth: CHART_CONFIG.lineThickness,
                 tension: 0.3,
-                pointRadius: 3,
+                pointRadius: CHART_CONFIG.pointRadius,
                 fill: true
             }]
         },
@@ -556,55 +556,21 @@ function initializeLearningCurveChart(data) {
             maintainAspectRatio: false,
             scales: {
                 y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'Average Mastery %',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
+                    ...getAxisConfig('Average Mastery %', true),
+                    max: 100
                 },
-                x: {
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        },
-                        maxRotation: 90,
-                        minRotation: 45
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
+                x: getAxisConfig('Date', false)
             },
             plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        title: function(tooltipItems) {
-                            return tooltipItems[0].label;
-                        },
-                        label: function(context) {
-                            return `Average Mastery: ${context.raw.toFixed(1)}%`;
-                        }
+                legend: getLegendConfig(false),
+                tooltip: getTooltipConfig({
+                    title: function(tooltipItems) {
+                        return tooltipItems[0].label;
+                    },
+                    label: function(context) {
+                        return `Average Mastery: ${context.raw.toFixed(1)}%`;
                     }
-                }
+                })
             }
         }
     });
@@ -625,7 +591,7 @@ function updateLearningCurveChart(data) {
     charts.learningCurveChart.update();
 }
 
-// 5. Cards Added Over Time
+// 5. Cards Added Over Time - UPDATED
 function initializeCardsAddedChart(data) {
     const ctx = document.getElementById('cardsAddedChart').getContext('2d');
     
@@ -648,19 +614,19 @@ function initializeCardsAddedChart(data) {
                 {
                     label: 'Cards Added',
                     data: values,
-                    backgroundColor: chartColors[5],
-                    borderColor: chartColors[5],
-                    borderWidth: 2,
+                    backgroundColor: CHART_CONFIG.colors[5],
+                    borderColor: CHART_CONFIG.colors[5],
+                    borderWidth: CHART_CONFIG.lineThickness,
                     tension: 0.1,
-                    pointRadius: 3,
+                    pointRadius: CHART_CONFIG.pointRadius,
                     yAxisID: 'y'
                 },
                 {
                     label: 'Total Cards',
                     data: cumulativeValues,
                     backgroundColor: 'rgba(0, 188, 212, 0.2)', // Cyan
-                    borderColor: getHoverColor(chartColors[5]),
-                    borderWidth: 2,
+                    borderColor: getHoverColor(CHART_CONFIG.colors[5]),
+                    borderWidth: CHART_CONFIG.lineThickness,
                     tension: 0.1,
                     pointRadius: 0,
                     fill: true,
@@ -673,28 +639,8 @@ function initializeCardsAddedChart(data) {
             maintainAspectRatio: false,
             scales: {
                 y: {
-                    beginAtZero: true,
-                    position: 'left',
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        },
-                        stepSize: 1,
-                        precision: 0
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'Daily Cards Added',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
+                    ...getAxisConfig('Daily Cards Added', true),
+                    position: 'left'
                 },
                 y1: {
                     beginAtZero: true,
@@ -703,9 +649,10 @@ function initializeCardsAddedChart(data) {
                         drawOnChartArea: false
                     },
                     ticks: {
-                        color: getHoverColor(chartColors[5]),
+                        color: getHoverColor(CHART_CONFIG.colors[5]),
                         font: {
-                            family: 'Trebuchet MS'
+                            family: CHART_CONFIG.fontFamily,
+                            size: CHART_CONFIG.axisTickSize
                         },
                         stepSize: 1,
                         precision: 0
@@ -713,49 +660,28 @@ function initializeCardsAddedChart(data) {
                     title: {
                         display: true,
                         text: 'Total Cards',
-                        color: getHoverColor(chartColors[5]),
+                        color: getHoverColor(CHART_CONFIG.colors[5]),
                         font: {
-                            family: 'Trebuchet MS',
-                            size: 12
+                            family: CHART_CONFIG.fontFamily,
+                            size: CHART_CONFIG.axisTitleSize
                         }
                     }
                 },
-                x: {
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        },
-                        maxRotation: 90,
-                        minRotation: 45
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
+                x: getAxisConfig('Date', false)
             },
             plugins: {
-                legend: {
-                    labels: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
+                legend: getLegendConfig(true),
+                tooltip: getTooltipConfig({
+                    label: function(context) {
+                        // Ensure card counts are integers
+                        const value = Math.round(context.raw);
+                        if (context.dataset.label === 'Cards Added') {
+                            return `Cards Added: ${value}`;
+                        } else {
+                            return `Total Cards: ${value}`;
                         }
                     }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            // Ensure card counts are integers
-                            const value = Math.round(context.raw);
-                            if (context.dataset.label === 'Cards Added') {
-                                return `Cards Added: ${value}`;
-                            } else {
-                                return `Total Cards: ${value}`;
-                            }
-                        }
-                    }
-                }
+                })
             }
         }
     });
@@ -785,7 +711,7 @@ function updateCardsAddedChart(data) {
     charts.cardsAddedChart.update();
 }
 
-// 6. View vs Mastery Correlation
+// 6. View vs Mastery Correlation - UPDATED
 function initializeViewMasteryChart(data) {
     const ctx = document.getElementById('viewMasteryChart').getContext('2d');
     
@@ -802,9 +728,9 @@ function initializeViewMasteryChart(data) {
             datasets: [{
                 label: 'Cards',
                 data: values,
-                backgroundColor: chartColors[3],
-                pointRadius: 5,
-                pointHoverRadius: 7
+                backgroundColor: CHART_CONFIG.colors[3],
+                pointRadius: CHART_CONFIG.pointRadius,
+                pointHoverRadius: CHART_CONFIG.hoverPointRadius
             }]
         },
         options: {
@@ -812,66 +738,22 @@ function initializeViewMasteryChart(data) {
             maintainAspectRatio: false,
             scales: {
                 y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'Mastery %',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
+                    ...getAxisConfig('Mastery %', true),
+                    max: 100
                 },
-                x: {
-                    beginAtZero: true,
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        },
-                        stepSize: 1,
-                        precision: 0
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'View Count',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
-                }
+                x: getAxisConfig('View Count', true)
             },
             plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const data = context.dataset.data[context.dataIndex];
-                            return [
-                                `Views: ${Math.round(data.x)}, Mastery: ${data.y.toFixed(1)}%`,
-                                `Q: ${data.question.substring(0, 30)}${data.question.length > 30 ? '...' : ''}`
-                            ];
-                        }
+                legend: getLegendConfig(false),
+                tooltip: getTooltipConfig({
+                    label: function(context) {
+                        const data = context.dataset.data[context.dataIndex];
+                        return [
+                            `Views: ${Math.round(data.x)}, Mastery: ${data.y.toFixed(1)}%`,
+                            `Q: ${data.question.substring(0, 30)}${data.question.length > 30 ? '...' : ''}`
+                        ];
                     }
-                }
+                })
             }
         }
     });
@@ -895,7 +777,7 @@ function updateViewMasteryChart(data) {
     charts.viewMasteryChart.update();
 }
 
-// 7. Interval Growth Distribution
+// 7. Interval Growth Distribution - UPDATED
 function initializeIntervalGrowthChart(data) {
     const ctx = document.getElementById('intervalGrowthChart').getContext('2d');
     
@@ -912,8 +794,8 @@ function initializeIntervalGrowthChart(data) {
             datasets: [{
                 label: 'Number of Cards',
                 data: values,
-                backgroundColor: chartColors[6],
-                hoverBackgroundColor: getHoverColor(chartColors[6]),
+                backgroundColor: CHART_CONFIG.colors[6],
+                hoverBackgroundColor: getHoverColor(CHART_CONFIG.colors[6]),
                 borderWidth: 0
             }]
         },
@@ -921,62 +803,17 @@ function initializeIntervalGrowthChart(data) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        },
-                        stepSize: 1,
-                        precision: 0
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'Number of Cards',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
-                },
-                x: {
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        display: false
-                    },
-                    title: {
-                        display: true,
-                        text: 'Interval Length',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
-                }
+                y: getAxisConfig('Number of Cards', true),
+                x: getAxisConfig('Interval Length', false)
             },
             plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            // Ensure card count is an integer
-                            return `Cards: ${Math.round(context.raw)}`;
-                        }
+                legend: getLegendConfig(false),
+                tooltip: getTooltipConfig({
+                    label: function(context) {
+                        // Ensure card count is an integer
+                        return `Cards: ${Math.round(context.raw)}`;
                     }
-                }
+                })
             }
         }
     });
@@ -1000,7 +837,7 @@ function updateIntervalGrowthChart(data) {
     charts.intervalGrowthChart.update();
 }
 
-// 8. Learning Efficiency
+// 8. Learning Efficiency - UPDATED
 function initializeLearningEfficiencyChart(data) {
     const ctx = document.getElementById('learningEfficiencyChart').getContext('2d');
     
@@ -1017,9 +854,9 @@ function initializeLearningEfficiencyChart(data) {
             datasets: [{
                 label: 'Cards',
                 data: values,
-                backgroundColor: chartColors[7],
-                pointRadius: 5,
-                pointHoverRadius: 7
+                backgroundColor: CHART_CONFIG.colors[7],
+                pointRadius: CHART_CONFIG.pointRadius,
+                pointHoverRadius: CHART_CONFIG.hoverPointRadius
             }]
         },
         options: {
@@ -1027,66 +864,22 @@ function initializeLearningEfficiencyChart(data) {
             maintainAspectRatio: false,
             scales: {
                 y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'Efficiency Score (Mastery/Views)',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
+                    ...getAxisConfig('Efficiency Score (Mastery/Views)', true),
+                    max: 100
                 },
-                x: {
-                    beginAtZero: true,
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        },
-                        stepSize: 1,
-                        precision: 0
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'View Count',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
-                }
+                x: getAxisConfig('View Count', true)
             },
             plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const data = context.dataset.data[context.dataIndex];
-                            return [
-                                `Views: ${Math.round(data.x)}, Efficiency: ${data.y.toFixed(1)}%`,
-                                `Q: ${data.question.substring(0, 30)}${data.question.length > 30 ? '...' : ''}`
-                            ];
-                        }
+                legend: getLegendConfig(false),
+                tooltip: getTooltipConfig({
+                    label: function(context) {
+                        const data = context.dataset.data[context.dataIndex];
+                        return [
+                            `Views: ${Math.round(data.x)}, Efficiency: ${data.y.toFixed(1)}%`,
+                            `Q: ${data.question.substring(0, 30)}${data.question.length > 30 ? '...' : ''}`
+                        ];
                     }
-                }
+                })
             }
         }
     });
@@ -1110,7 +903,7 @@ function updateLearningEfficiencyChart(data) {
     charts.learningEfficiencyChart.update();
 }
 
-// 9. FSRS Stability Distribution
+// 9. FSRS Stability Distribution - UPDATED
 function initializeStabilityDistributionChart(data) {
     const ctx = document.getElementById('stabilityDistributionChart').getContext('2d');
     
@@ -1124,8 +917,8 @@ function initializeStabilityDistributionChart(data) {
             datasets: [{
                 label: 'Number of Cards',
                 data: values,
-                backgroundColor: chartColors[8],
-                hoverBackgroundColor: getHoverColor(chartColors[8]),
+                backgroundColor: CHART_CONFIG.colors[8],
+                hoverBackgroundColor: getHoverColor(CHART_CONFIG.colors[8]),
                 borderWidth: 0
             }]
         },
@@ -1133,62 +926,17 @@ function initializeStabilityDistributionChart(data) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        },
-                        stepSize: 1,
-                        precision: 0
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'Number of Cards',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
-                },
-                x: {
-                    ticks: {
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS'
-                        }
-                    },
-                    grid: {
-                        display: false
-                    },
-                    title: {
-                        display: true,
-                        text: 'Memory Stability Range',
-                        color: 'white',
-                        font: {
-                            family: 'Trebuchet MS',
-                            size: 12
-                        }
-                    }
-                }
+                y: getAxisConfig('Number of Cards', true),
+                x: getAxisConfig('Memory Stability Range', false)
             },
             plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            // Ensure card count is an integer
-                            return `Cards: ${Math.round(context.raw)}`;
-                        }
+                legend: getLegendConfig(false),
+                tooltip: getTooltipConfig({
+                    label: function(context) {
+                        // Ensure card count is an integer
+                        return `Cards: ${Math.round(context.raw)}`;
                     }
-                }
+                })
             }
         }
     });

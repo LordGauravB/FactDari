@@ -6,6 +6,10 @@
     <title>FactDari Analytics</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Import chart configuration from Python
+        {{ chart_config|safe }}
+    </script>
 </head>
 <body>
     <header>

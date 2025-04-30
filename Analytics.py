@@ -23,7 +23,8 @@ def fetch_query(query, params=None):
 @app.route('/')
 def index():
     """Render the main analytics page"""
-    return render_template('index.html')
+    # Pass chart configuration to the template
+    return render_template('index.html', chart_config=config.get_chart_config_js())
 
 @app.route('/api/category-distribution')
 def category_distribution():
@@ -286,7 +287,6 @@ def chart_data():
                 END
             ORDER BY MIN(Stability)
         """)
-        # Removed: lapsesByCategory data section
     }
     return jsonify(data)
 
