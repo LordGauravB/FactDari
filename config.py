@@ -8,7 +8,8 @@ BASE_DIR = os.environ.get('MEMODARI_BASE_DIR', os.path.dirname(os.path.abspath(_
 
 # Resource paths - allow override via environment variables
 RESOURCES_DIR = os.environ.get('MEMODARI_RESOURCES_DIR', os.path.join(BASE_DIR, "Resources"))
-IMAGES_DIR = os.environ.get('MEMODARI_IMAGES_DIR', os.path.join(RESOURCES_DIR, "Images"))
+ICONS_DIR = os.environ.get('MEMODARI_ICONS_DIR', os.path.join(RESOURCES_DIR, "application_icons"))
+APPLICATION_IMAGES_DIR = os.environ.get('MEMODARI_APPLICATION_IMAGES_DIR', os.path.join(RESOURCES_DIR, "application_images"))
 
 # Log directory
 LOG_DIR = os.environ.get('MEMODARI_LOG_DIR', os.path.join(BASE_DIR, "util"))
@@ -35,7 +36,7 @@ UI_CONFIG = {
     'window_static_pos': "-1927+7",
     'popup_position': "-1923+400",
     'popup_add_card_size': "496x400",
-    'popup_edit_card_size': "496x450",
+    'popup_edit_card_size': "496x520",
     'popup_categories_size': "400x500",
     'corner_radius': 15,
     
@@ -86,7 +87,12 @@ CHART_CONFIG = {
 
 # Helper functions
 def get_image_path(image_name):
-    return os.path.join(IMAGES_DIR, image_name)
+    """Get path to application images"""
+    return os.path.join(APPLICATION_IMAGES_DIR, image_name)
+
+def get_icon_path(icon_name):
+    """Get path to application icons"""
+    return os.path.join(ICONS_DIR, icon_name)
 
 def get_connection_string():
     return (

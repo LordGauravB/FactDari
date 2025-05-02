@@ -276,12 +276,12 @@ class MemoDariApp:
     
     def load_icons(self):
         """Load all icons used in the application using the config module"""
-        self.home_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("home.png")).resize((20, 20), Image.Resampling.LANCZOS))
-        self.speaker_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("speaker_icon.png")).resize((20, 20), Image.Resampling.LANCZOS))
-        self.add_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("add.png")).resize((20, 20), Image.Resampling.LANCZOS))
-        self.edit_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("edit.png")).resize((20, 20), Image.Resampling.LANCZOS))
-        self.delete_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("delete.png")).resize((20, 20), Image.Resampling.LANCZOS))
-        self.graph_icon = ImageTk.PhotoImage(Image.open(config.get_image_path("graph.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.home_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("Home.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.speaker_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("speaker_icon.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.add_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("add.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.edit_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("edit.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.delete_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("delete.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.graph_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("graph.png")).resize((20, 20), Image.Resampling.LANCZOS))
     
     def bind_events(self):
         """Bind all event handlers"""
@@ -1063,18 +1063,8 @@ class MemoDariApp:
                                     variable=difficulty_var, command=update_difficulty_label)
         difficulty_slider.pack(fill="x", padx=5, pady=5)
         
-        # State selection (new for FSRS v5)
-        state_frame = tk.Frame(edit_window, bg=self.BG_COLOR)
-        state_frame.pack(fill="x", padx=20, pady=5)
-        
-        tk.Label(state_frame, text="Card State:", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
-                font=self.NORMAL_FONT).pack(side="left", padx=5)
-        
+        # Hidden state variable (removed from UI)
         state_var = tk.IntVar(edit_window, value=current_state or 2)  # Default to Review (2)
-        
-        ttk.Radiobutton(state_frame, text="Learning", variable=state_var, value=1).pack(side="left", padx=10)
-        ttk.Radiobutton(state_frame, text="Review", variable=state_var, value=2).pack(side="left", padx=10)
-        ttk.Radiobutton(state_frame, text="Relearning", variable=state_var, value=3).pack(side="left", padx=10)
         
         def update_factcard():
             category = cat_var.get()
@@ -1104,7 +1094,7 @@ class MemoDariApp:
                     UPDATE FactCards 
                     SET CategoryID = ?, Question = ?, Answer = ?, 
                         Stability = ?, Difficulty = ?, State = ?,
-                        Mastery = ?, LastEditedDate = GETDATE()
+                        Mastery = ?
                     WHERE FactCardID = ?
                     """, 
                     (

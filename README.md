@@ -13,37 +13,44 @@ A feature-rich desktop widget application for learning through flashcards, power
 - **Desktop Widget**: Runs as a desktop widget that can be configured to launch at startup
 
 ## Screenshots
-*Insert screenshots here - recommended sections:*
+
 1. Main flashcard interface
    
-   1.1 Home
+   1.1 Home/Landing
    
    <p align="center">
-   <img src="image-1.png" alt="Home Interface">
+   <img src="Resources/application_images/landing.png" alt="Home Interface">
    </p>
    
    1.2 Learning UI
    
    <p align="center">
-   <img src="image-2.png" alt="Learning Interface">
+   <img src="Resources/application_images/learning.png" alt="Learning Interface">
    </p>
 
 2. Analytics dashboard
    
    <p align="center">
-   <img src="image.png" alt="Analytics Dashboard">
+   <img src="Resources/application_images/analytics_dashboard.png" alt="Analytics Dashboard">
    </p>
-   
+
 
 3. Card management screen
    
    3.1 Add Card
    <p align="center">
-   <img src="image-3.png" alt="Analytics Dashboard">
+   <img src="Resources/application_images/add_card.png" alt="Add Card">
+   </p>
+   
    3.2 Edit Card
+   <p align="center">
+   <img src="Resources/application_images/edit_card.png" alt="Edit Card">
+   </p>
    
    3.3 Delete Card
-
+   <p align="center">
+   <img src="Resources/application_images/delete_card.png" alt="Delete Card">
+   </p>
 ## Installation
 
 1. Clone this repository
