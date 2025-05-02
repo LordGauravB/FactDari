@@ -378,7 +378,7 @@ class FactDariApp:
     def start_flask_server(self):
         """Start the Flask server in a separate process"""
         # Path to the Flask app.py file
-        flask_app_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Analytics.py")
+        flask_app_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "analytics.py")
         
         # Start Flask server
         if sys.platform.startswith('win'):

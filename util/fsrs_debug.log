@@ -1,0 +1,24 @@
+2025-05-02 10:55:07,590 - root - INFO - Starting review for rating 4, current time: 2025-05-02 09:55:07.590451+00:00
+2025-05-02 10:55:07,592 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 10:55:07,592 - root - INFO - Initial due date: 2025-04-30 00:00:00+00:00
+2025-05-02 10:55:07,592 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1, due=2025-04-30 00:00:00+00:00
+2025-05-02 10:55:07,592 - root - INFO - Calculated next review: interval=2 days, next date=2025-05-04 09:55:07.590451
+2025-05-02 10:55:07,592 - root - INFO - Final values: stability=3.0, interval=2, is_lapse=False
+2025-05-02 10:55:09,756 - root - INFO - Starting review for rating 3, current time: 2025-05-02 09:55:09.756463+00:00
+2025-05-02 10:55:09,757 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 10:55:09,757 - root - INFO - Initial due date: 2025-04-30 00:00:00+00:00
+2025-05-02 10:55:09,757 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1, due=2025-04-30 00:00:00+00:00
+2025-05-02 10:55:09,757 - root - INFO - Calculated next review: interval=1 days, next date=2025-05-03 09:55:09.756463
+2025-05-02 10:55:09,757 - root - INFO - Final values: stability=2.5, interval=1, is_lapse=False
+2025-05-02 10:55:11,435 - root - INFO - Starting review for rating 3, current time: 2025-05-02 09:55:11.435125+00:00
+2025-05-02 10:55:11,437 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 10:55:11,437 - root - INFO - Initial due date: 2025-04-30 00:00:00+00:00
+2025-05-02 10:55:11,437 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1, due=2025-04-30 00:00:00+00:00
+2025-05-02 10:55:11,437 - root - INFO - Calculated next review: interval=1 days, next date=2025-05-03 09:55:11.435125
+2025-05-02 10:55:11,437 - root - INFO - Final values: stability=2.5, interval=1, is_lapse=False
+2025-05-02 10:55:12,900 - root - INFO - Starting review for rating 4, current time: 2025-05-02 09:55:12.900473+00:00
+2025-05-02 10:55:12,902 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 10:55:12,902 - root - INFO - Initial due date: 2025-04-30 00:00:00+00:00
+2025-05-02 10:55:12,902 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1, due=2025-04-30 00:00:00+00:00
+2025-05-02 10:55:12,902 - root - INFO - Calculated next review: interval=2 days, next date=2025-05-04 09:55:12.900473
+2025-05-02 10:55:12,902 - root - INFO - Final values: stability=3.0, interval=2, is_lapse=False

@@ -97,11 +97,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial data load
     fetchAndUpdateCharts();
     
-    // Set up automatic refresh every 5 minutes
-    setInterval(fetchAndUpdateCharts, 300000); // 300000 ms = 5 minutes
+    // Set up automatic refresh every 2 minutes
+    setInterval(fetchAndUpdateCharts, 120000); // 120000 ms = 2 minutes
     
     // Set up refresh indicator and manual refresh button
-    setupRefreshIndicator(300);
+    setupRefreshIndicator(120);
     
     // Attach event listener to manual refresh button
     document.getElementById('manual-refresh-btn').addEventListener('click', fetchAndUpdateCharts);
