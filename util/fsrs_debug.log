@@ -425,3 +425,704 @@
 2025-05-02 11:49:10,972 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
 2025-05-02 11:49:10,972 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
 2025-05-02 11:49:10,972 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:58:06,711 - root - INFO - Starting review for rating 1, current time: 2025-05-02 10:58:06.711938+00:00
+2025-05-02 11:58:06,713 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:06,714 - root - INFO - Starting review for rating 2, current time: 2025-05-02 10:58:06.714483+00:00
+2025-05-02 11:58:06,716 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:06,717 - root - INFO - Starting review for rating 3, current time: 2025-05-02 10:58:06.717753+00:00
+2025-05-02 11:58:06,719 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:06,720 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:58:06.720963+00:00
+2025-05-02 11:58:06,722 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:47,584 - root - INFO - Starting review for rating 1, current time: 2025-05-02 10:58:47.584030+00:00
+2025-05-02 11:58:47,585 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:47,585 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:58:47,585 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:47,585 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:58:47,588 - root - INFO - Starting review for rating 2, current time: 2025-05-02 10:58:47.588068+00:00
+2025-05-02 11:58:47,589 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:47,589 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:58:47,589 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:47,589 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:58:47,591 - root - INFO - Starting review for rating 3, current time: 2025-05-02 10:58:47.591520+00:00
+2025-05-02 11:58:47,593 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:47,593 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:58:47,593 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:47,593 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:58:47,596 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:58:47.596059+00:00
+2025-05-02 11:58:47,597 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:47,597 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:58:47,597 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:58:47,597 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 12:00:37,339 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:00:37.339285+00:00
+2025-05-02 12:00:37,341 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:00:37,341 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:00:37,341 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:00:37,341 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 12:00:37,342 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:00:37.342053+00:00
+2025-05-02 12:00:37,343 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:00:37,343 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:00:37,343 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:00:37,343 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 12:00:37,343 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:00:37.343751+00:00
+2025-05-02 12:00:37,346 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:00:37,346 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:00:37,346 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:00:37,346 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 12:00:37,348 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:00:37.348770+00:00
+2025-05-02 12:00:37,349 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:00:37,349 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:00:37,349 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:00:37,349 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 12:00:37,349 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:00:37.349934+00:00
+2025-05-02 12:00:37,352 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:00:37,352 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:00:37,352 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:00:37,352 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 12:01:57,312 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:01:57.312186+00:00
+2025-05-02 12:01:57,314 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:01:57,314 - root - INFO - Initial due date: 2025-05-02 11:01:57.312186+00:00
+2025-05-02 12:01:57,314 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:01:57,314 - root - INFO - FSRS scheduled: due=2025-05-02 11:01:57.312186+00:00, interval=1 days
+2025-05-02 12:05:42,867 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:05:42,867 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:05:42,867 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:05:42,868 - root - INFO - Starting review for rating 1, current time: 2025-05-02 11:05:42.868771+00:00
+2025-05-02 12:05:42,868 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 11, 5, 42, 867770, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:05:42,870 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:05:42,870 - root - INFO - Initial due date: 2025-05-02 11:05:42.867770+00:00
+2025-05-02 12:05:42,870 - root - DEBUG - Using rating: 1 (from rating_int: 1)
+2025-05-02 12:05:42,870 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746183942868, state=1, step=0, stability=0.07103426959802099, difficulty=3.4469453633111073, due=2025-05-02 11:06:42.868771+00:00, last_review=2025-05-02 11:05:42.868771+00:00), ReviewLog(card_id=1746183942868, rating=1, review_datetime=2025-05-02 11:05:42.868771+00:00, review_duration=None))
+2025-05-02 12:05:42,870 - root - DEBUG - Card object after review: {'card_id': 1746183942868, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 11, 5, 42, 867770, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:05:42,870 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:05:42,870 - root - INFO - Applied manual fallback values: stability=0.1, difficulty=0.44999999999999996, state=3
+2025-05-02 12:05:42,870 - root - INFO - After FSRS: stability=0.1, difficulty=0.44999999999999996, state=3
+2025-05-02 12:05:42,870 - root - INFO - FSRS scheduled: due=2025-05-03 11:05:42.868771+00:00, interval=1 days
+2025-05-02 12:05:42,870 - root - DEBUG - Final result: {'stability': 0.1, 'difficulty': 0.44999999999999996, 'state': 3, 'due': datetime.datetime(2025, 5, 3, 11, 5, 42, 868771), 'interval': 1, 'is_lapse': True}
+2025-05-02 12:05:42,870 - root - INFO - Starting review for rating 2, current time: 2025-05-02 11:05:42.870259+00:00
+2025-05-02 12:05:42,870 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 11, 5, 42, 867770, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:05:42,872 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:05:42,872 - root - INFO - Initial due date: 2025-05-02 11:05:42.867770+00:00
+2025-05-02 12:05:42,872 - root - DEBUG - Using rating: 2 (from rating_int: 2)
+2025-05-02 12:05:42,872 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746183942870, state=1, step=0, stability=2.808272678152998, difficulty=1.880199035311108, due=2025-05-02 11:11:12.870259+00:00, last_review=2025-05-02 11:05:42.870259+00:00), ReviewLog(card_id=1746183942870, rating=2, review_datetime=2025-05-02 11:05:42.870259+00:00, review_duration=None))
+2025-05-02 12:05:42,872 - root - DEBUG - Card object after review: {'card_id': 1746183942870, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 11, 5, 42, 867770, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:05:42,872 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:05:42,872 - root - INFO - Applied manual fallback values: stability=0.12, difficulty=0.35, state=2
+2025-05-02 12:05:42,872 - root - INFO - After FSRS: stability=0.12, difficulty=0.35, state=2
+2025-05-02 12:05:42,872 - root - INFO - FSRS scheduled: due=2025-05-03 11:05:42.870259+00:00, interval=1 days
+2025-05-02 12:05:42,872 - root - DEBUG - Final result: {'stability': 0.12, 'difficulty': 0.35, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 5, 42, 870259), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:05:42,872 - root - INFO - Starting review for rating 3, current time: 2025-05-02 11:05:42.872784+00:00
+2025-05-02 12:05:42,872 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 11, 5, 42, 867770, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:05:42,874 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:05:42,874 - root - INFO - Initial due date: 2025-05-02 11:05:42.867770+00:00
+2025-05-02 12:05:42,874 - root - DEBUG - Using rating: 3 (from rating_int: 3)
+2025-05-02 12:05:42,875 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746183942872, state=1, step=1, stability=11.798802065455714, difficulty=1.0, due=2025-05-02 11:15:42.872784+00:00, last_review=2025-05-02 11:05:42.872784+00:00), ReviewLog(card_id=1746183942872, rating=3, review_datetime=2025-05-02 11:05:42.872784+00:00, review_duration=None))
+2025-05-02 12:05:42,875 - root - DEBUG - Card object after review: {'card_id': 1746183942872, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 11, 5, 42, 867770, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:05:42,875 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:05:42,875 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.25, state=2
+2025-05-02 12:05:42,875 - root - INFO - After FSRS: stability=1.0, difficulty=0.25, state=2
+2025-05-02 12:05:42,875 - root - INFO - FSRS scheduled: due=2025-05-03 11:05:42.872784+00:00, interval=1 days
+2025-05-02 12:05:42,875 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.25, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 5, 42, 872784), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:05:42,877 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:05:42.877316+00:00
+2025-05-02 12:05:42,877 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 11, 5, 42, 867770, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:05:42,878 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:05:42,878 - root - INFO - Initial due date: 2025-05-02 11:05:42.867770+00:00
+2025-05-02 12:05:42,878 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:05:42,878 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746183942877, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-09 11:05:42.877316+00:00, last_review=2025-05-02 11:05:42.877316+00:00), ReviewLog(card_id=1746183942877, rating=4, review_datetime=2025-05-02 11:05:42.877316+00:00, review_duration=None))
+2025-05-02 12:05:42,878 - root - DEBUG - Card object after review: {'card_id': 1746183942877, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 11, 5, 42, 867770, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:05:42,878 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:05:42,878 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:05:42,878 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:05:42,878 - root - INFO - FSRS scheduled: due=2025-05-03 11:05:42.877316+00:00, interval=1 days
+2025-05-02 12:05:42,878 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 5, 42, 877316), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:05:42,879 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:05:42,879 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:05:42,879 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:05:42,879 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:05:42.879572+00:00
+2025-05-02 12:05:42,879 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 11, 5, 42, 879572, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:05:42,881 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:05:42,882 - root - INFO - Initial due date: 2025-05-02 11:05:42.879572+00:00
+2025-05-02 12:05:42,882 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:05:42,882 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746183942879, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-05 11:05:42.879572+00:00, last_review=2025-05-02 11:05:42.879572+00:00), ReviewLog(card_id=1746183942879, rating=4, review_datetime=2025-05-02 11:05:42.879572+00:00, review_duration=None))
+2025-05-02 12:05:42,882 - root - DEBUG - Card object after review: {'card_id': 1746183942879, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 11, 5, 42, 879572, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:05:42,882 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:05:42,882 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:05:42,882 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:05:42,882 - root - INFO - FSRS scheduled: due=2025-05-03 11:05:42.879572+00:00, interval=1 days
+2025-05-02 12:05:42,882 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 5, 42, 879572), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:05:42,883 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:05:42.883092+00:00
+2025-05-02 12:05:42,883 - root - DEBUG - Input db_row: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 5, 42, 879572)}
+2025-05-02 12:05:42,885 - root - INFO - Initial card state: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:05:42,885 - root - INFO - Initial due date: 2025-05-03 11:05:42.879572+00:00
+2025-05-02 12:05:42,885 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:05:42,885 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746183942883, state=2, step=0, stability=269.30175191538257, difficulty=1.0, due=2026-01-16 11:05:42.883092+00:00, last_review=2025-05-02 11:05:42.883092+00:00), ReviewLog(card_id=1746183942883, rating=4, review_datetime=2025-05-02 11:05:42.883092+00:00, review_duration=None))
+2025-05-02 12:05:42,885 - root - DEBUG - Card object after review: {'card_id': 1746183942883, 'state': 2, 'step': 0, 'stability': 1.0, 'difficulty': 0.19999999999999998, 'due': datetime.datetime(2025, 5, 3, 11, 5, 42, 879572, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:05:42,885 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:05:42,885 - root - INFO - Applied manual fallback values: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:05:42,885 - root - INFO - After FSRS: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:05:42,885 - root - INFO - FSRS scheduled: due=2025-05-05 11:05:42.883092+00:00, interval=3 days
+2025-05-02 12:05:42,885 - root - DEBUG - Final result: {'stability': 3.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 5, 11, 5, 42, 883092), 'interval': 3, 'is_lapse': False}
+2025-05-02 12:05:42,885 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:05:42.885597+00:00
+2025-05-02 12:05:42,885 - root - DEBUG - Input db_row: {'stability': 3.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 5, 11, 5, 42, 883092)}
+2025-05-02 12:05:42,887 - root - INFO - Initial card state: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:05:42,888 - root - INFO - Initial due date: 2025-05-05 11:05:42.883092+00:00
+2025-05-02 12:05:42,888 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:05:42,888 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746183942885, state=2, step=0, stability=715.6473131444973, difficulty=1.0, due=2027-03-24 11:05:42.885597+00:00, last_review=2025-05-02 11:05:42.885597+00:00), ReviewLog(card_id=1746183942885, rating=4, review_datetime=2025-05-02 11:05:42.885597+00:00, review_duration=None))
+2025-05-02 12:05:42,888 - root - DEBUG - Card object after review: {'card_id': 1746183942885, 'state': 2, 'step': 0, 'stability': 3.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 5, 11, 5, 42, 883092, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:05:42,888 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:05:42,888 - root - INFO - Applied manual fallback values: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:05:42,888 - root - INFO - After FSRS: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:05:42,888 - root - INFO - FSRS scheduled: due=2025-05-11 11:05:42.885597+00:00, interval=9 days
+2025-05-02 12:05:42,888 - root - DEBUG - Final result: {'stability': 9.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 11, 11, 5, 42, 885597), 'interval': 9, 'is_lapse': False}
+2025-05-02 12:05:42,889 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:05:42.889121+00:00
+2025-05-02 12:05:42,889 - root - DEBUG - Input db_row: {'stability': 9.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 11, 11, 5, 42, 885597)}
+2025-05-02 12:05:42,891 - root - INFO - Initial card state: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:05:42,891 - root - INFO - Initial due date: 2025-05-11 11:05:42.885597+00:00
+2025-05-02 12:05:42,891 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:05:42,891 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746183942889, state=2, step=0, stability=1884.5258453170181, difficulty=1.0, due=2030-06-26 11:05:42.889121+00:00, last_review=2025-05-02 11:05:42.889121+00:00), ReviewLog(card_id=1746183942889, rating=4, review_datetime=2025-05-02 11:05:42.889121+00:00, review_duration=None))
+2025-05-02 12:05:42,891 - root - DEBUG - Card object after review: {'card_id': 1746183942889, 'state': 2, 'step': 0, 'stability': 9.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 11, 11, 5, 42, 885597, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:05:42,891 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:05:42,891 - root - INFO - Applied manual fallback values: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:05:42,891 - root - INFO - After FSRS: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:05:42,891 - root - INFO - FSRS scheduled: due=2025-05-29 11:05:42.889121+00:00, interval=27 days
+2025-05-02 12:05:42,891 - root - DEBUG - Final result: {'stability': 27.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 29, 11, 5, 42, 889121), 'interval': 27, 'is_lapse': False}
+2025-05-02 12:05:42,891 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:05:42.891627+00:00
+2025-05-02 12:05:42,891 - root - DEBUG - Input db_row: {'stability': 27.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 29, 11, 5, 42, 889121)}
+2025-05-02 12:05:42,892 - root - INFO - Initial card state: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:05:42,892 - root - INFO - Initial due date: 2025-05-29 11:05:42.889121+00:00
+2025-05-02 12:05:42,892 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:05:42,892 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746183942891, state=2, step=0, stability=4962.957985908919, difficulty=1.0, due=2038-12-10 11:05:42.891627+00:00, last_review=2025-05-02 11:05:42.891627+00:00), ReviewLog(card_id=1746183942891, rating=4, review_datetime=2025-05-02 11:05:42.891627+00:00, review_duration=None))
+2025-05-02 12:05:42,892 - root - DEBUG - Card object after review: {'card_id': 1746183942891, 'state': 2, 'step': 0, 'stability': 27.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 29, 11, 5, 42, 889121, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:05:42,892 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:05:42,892 - root - INFO - Applied manual fallback values: stability=81.0, difficulty=0.1, state=2
+2025-05-02 12:05:42,892 - root - INFO - After FSRS: stability=81.0, difficulty=0.1, state=2
+2025-05-02 12:05:42,892 - root - INFO - FSRS scheduled: due=2025-07-22 11:05:42.891627+00:00, interval=81 days
+2025-05-02 12:05:42,892 - root - DEBUG - Final result: {'stability': 81.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 7, 22, 11, 5, 42, 891627), 'interval': 81, 'is_lapse': False}
+2025-05-02 12:06:40,018 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:06:40.018751+00:00
+2025-05-02 12:06:40,020 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:06:40,020 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:06:40,020 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:06:40,020 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 12:06:41,708 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:06:41.708646+00:00
+2025-05-02 12:06:41,710 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:06:41,710 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:06:41,710 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:06:41,710 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 12:06:45,386 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:06:45.386647+00:00
+2025-05-02 12:06:45,388 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:06:45,388 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:06:45,388 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:06:45,388 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 12:06:46,754 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:06:46.754169+00:00
+2025-05-02 12:06:46,756 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:06:46,756 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:06:46,756 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:06:46,756 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 12:06:48,486 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:06:48.486511+00:00
+2025-05-02 12:06:48,488 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:06:48,488 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:06:48,488 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:06:48,488 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 12:07:05,518 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:07:05,518 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:07:05,519 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:07:05,577 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2025-05-02 12:07:05,577 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 5041
+2025-05-02 12:07:05,581 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2025-05-02 12:07:05,581 - PIL.PngImagePlugin - DEBUG - STREAM b'pHYs' 41 9
+2025-05-02 12:07:05,581 - PIL.PngImagePlugin - DEBUG - STREAM b'iTXt' 62 1530
+2025-05-02 12:07:05,581 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 1604 29081
+2025-05-02 12:07:05,610 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2025-05-02 12:07:05,610 - PIL.PngImagePlugin - DEBUG - STREAM b'sRGB' 41 1
+2025-05-02 12:07:05,610 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 54 8192
+2025-05-02 12:07:05,613 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2025-05-02 12:07:05,613 - PIL.PngImagePlugin - DEBUG - STREAM b'sRGB' 41 1
+2025-05-02 12:07:05,613 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 54 8192
+2025-05-02 12:07:05,615 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2025-05-02 12:07:05,615 - PIL.PngImagePlugin - DEBUG - STREAM b'sRGB' 41 1
+2025-05-02 12:07:05,615 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 54 8192
+2025-05-02 12:07:05,618 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2025-05-02 12:07:05,618 - PIL.PngImagePlugin - DEBUG - STREAM b'sRGB' 41 1
+2025-05-02 12:07:05,618 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 54 8192
+2025-05-02 12:07:17,017 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:07:17.017062+00:00
+2025-05-02 12:07:17,017 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0)}
+2025-05-02 12:07:17,019 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:07:17,019 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:07:17,019 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:07:17,019 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184037017, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-06 11:07:17.017062+00:00, last_review=2025-05-02 11:07:17.017062+00:00), ReviewLog(card_id=1746184037017, rating=4, review_datetime=2025-05-02 11:07:17.017062+00:00, review_duration=None))
+2025-05-02 12:07:17,019 - root - DEBUG - Card object after review: {'card_id': 1746184037017, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:07:17,019 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:07:17,019 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:07:17,019 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:07:17,019 - root - INFO - FSRS scheduled: due=2025-05-03 11:07:17.017062+00:00, interval=1 days
+2025-05-02 12:07:17,019 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 7, 17, 17062), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:07:18,620 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:07:18.620173+00:00
+2025-05-02 12:07:18,621 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0)}
+2025-05-02 12:07:18,622 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:07:18,622 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:07:18,622 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:07:18,622 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184038621, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-05 11:07:18.620173+00:00, last_review=2025-05-02 11:07:18.620173+00:00), ReviewLog(card_id=1746184038621, rating=4, review_datetime=2025-05-02 11:07:18.620173+00:00, review_duration=None))
+2025-05-02 12:07:18,622 - root - DEBUG - Card object after review: {'card_id': 1746184038621, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:07:18,622 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:07:18,622 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:07:18,622 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:07:18,622 - root - INFO - FSRS scheduled: due=2025-05-03 11:07:18.620173+00:00, interval=1 days
+2025-05-02 12:07:18,622 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 7, 18, 620173), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:07:20,118 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:07:20.118263+00:00
+2025-05-02 12:07:20,118 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0)}
+2025-05-02 12:07:20,120 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:07:20,120 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:07:20,120 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:07:20,120 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184040118, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-04 11:07:20.118263+00:00, last_review=2025-05-02 11:07:20.118263+00:00), ReviewLog(card_id=1746184040118, rating=4, review_datetime=2025-05-02 11:07:20.118263+00:00, review_duration=None))
+2025-05-02 12:07:20,120 - root - DEBUG - Card object after review: {'card_id': 1746184040118, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:07:20,120 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:07:20,120 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:07:20,120 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:07:20,120 - root - INFO - FSRS scheduled: due=2025-05-03 11:07:20.118263+00:00, interval=1 days
+2025-05-02 12:07:20,120 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 7, 20, 118263), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:07:21,541 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:07:21.541840+00:00
+2025-05-02 12:07:21,542 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0)}
+2025-05-02 12:07:21,543 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:07:21,543 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:07:21,543 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:07:21,543 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184041542, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-03 11:07:21.541840+00:00, last_review=2025-05-02 11:07:21.541840+00:00), ReviewLog(card_id=1746184041542, rating=4, review_datetime=2025-05-02 11:07:21.541840+00:00, review_duration=None))
+2025-05-02 12:07:21,543 - root - DEBUG - Card object after review: {'card_id': 1746184041542, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:07:21,543 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:07:21,543 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:07:21,543 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:07:21,543 - root - INFO - FSRS scheduled: due=2025-05-03 11:07:21.541840+00:00, interval=1 days
+2025-05-02 12:07:21,543 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 7, 21, 541840), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:07:23,120 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:07:23.120510+00:00
+2025-05-02 12:07:23,121 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0)}
+2025-05-02 12:07:23,122 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:07:23,122 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:07:23,122 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:07:23,122 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184043121, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-06 11:07:23.120510+00:00, last_review=2025-05-02 11:07:23.120510+00:00), ReviewLog(card_id=1746184043121, rating=4, review_datetime=2025-05-02 11:07:23.120510+00:00, review_duration=None))
+2025-05-02 12:07:23,122 - root - DEBUG - Card object after review: {'card_id': 1746184043121, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:07:23,122 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:07:23,122 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:07:23,122 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:07:23,122 - root - INFO - FSRS scheduled: due=2025-05-03 11:07:23.120510+00:00, interval=1 days
+2025-05-02 12:07:23,122 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 7, 23, 120510), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:09:29,636 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:09:29.636762+00:00
+2025-05-02 12:09:29,637 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0)}
+2025-05-02 12:09:29,639 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:09:29,639 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:09:29,639 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:09:29,639 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184169637, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-03 11:09:29.636762+00:00, last_review=2025-05-02 11:09:29.636762+00:00), ReviewLog(card_id=1746184169637, rating=4, review_datetime=2025-05-02 11:09:29.636762+00:00, review_duration=None))
+2025-05-02 12:09:29,639 - root - DEBUG - Card object after review: {'card_id': 1746184169637, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:09:29,639 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:09:29,639 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:09:29,639 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:09:29,639 - root - INFO - FSRS scheduled: due=2025-05-03 11:09:29.636762+00:00, interval=1 days
+2025-05-02 12:09:29,639 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 9, 29, 636762), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:09:31,052 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:09:31.052562+00:00
+2025-05-02 12:09:31,052 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0)}
+2025-05-02 12:09:31,053 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:09:31,053 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:09:31,053 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:09:31,053 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184171052, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-07 11:09:31.052562+00:00, last_review=2025-05-02 11:09:31.052562+00:00), ReviewLog(card_id=1746184171052, rating=4, review_datetime=2025-05-02 11:09:31.052562+00:00, review_duration=None))
+2025-05-02 12:09:31,053 - root - DEBUG - Card object after review: {'card_id': 1746184171052, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:09:31,053 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:09:31,053 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:09:31,053 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:09:31,053 - root - INFO - FSRS scheduled: due=2025-05-03 11:09:31.052562+00:00, interval=1 days
+2025-05-02 12:09:31,053 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 9, 31, 52562), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:09:32,456 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:09:32.456512+00:00
+2025-05-02 12:09:32,456 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0)}
+2025-05-02 12:09:32,458 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:09:32,458 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:09:32,458 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:09:32,458 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184172457, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-05 11:09:32.456512+00:00, last_review=2025-05-02 11:09:32.456512+00:00), ReviewLog(card_id=1746184172457, rating=4, review_datetime=2025-05-02 11:09:32.456512+00:00, review_duration=None))
+2025-05-02 12:09:32,458 - root - DEBUG - Card object after review: {'card_id': 1746184172457, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:09:32,458 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:09:32,458 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:09:32,458 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:09:32,458 - root - INFO - FSRS scheduled: due=2025-05-03 11:09:32.456512+00:00, interval=1 days
+2025-05-02 12:09:32,458 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 9, 32, 456512), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:09:33,848 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:09:33.848618+00:00
+2025-05-02 12:09:33,848 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0)}
+2025-05-02 12:09:33,850 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:09:33,850 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:09:33,850 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:09:33,850 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184173848, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-08 11:09:33.848618+00:00, last_review=2025-05-02 11:09:33.848618+00:00), ReviewLog(card_id=1746184173848, rating=4, review_datetime=2025-05-02 11:09:33.848618+00:00, review_duration=None))
+2025-05-02 12:09:33,850 - root - DEBUG - Card object after review: {'card_id': 1746184173848, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:09:33,850 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:09:33,850 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:09:33,850 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:09:33,850 - root - INFO - FSRS scheduled: due=2025-05-03 11:09:33.848618+00:00, interval=1 days
+2025-05-02 12:09:33,850 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 9, 33, 848618), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:09:35,446 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:09:35.446566+00:00
+2025-05-02 12:09:35,447 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0)}
+2025-05-02 12:09:35,448 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:09:35,448 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:09:35,448 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:09:35,448 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184175447, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-08 11:09:35.446566+00:00, last_review=2025-05-02 11:09:35.446566+00:00), ReviewLog(card_id=1746184175447, rating=4, review_datetime=2025-05-02 11:09:35.446566+00:00, review_duration=None))
+2025-05-02 12:09:35,448 - root - DEBUG - Card object after review: {'card_id': 1746184175447, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:09:35,448 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:09:35,448 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:09:35,448 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:09:35,448 - root - INFO - FSRS scheduled: due=2025-05-03 11:09:35.446566+00:00, interval=1 days
+2025-05-02 12:09:35,448 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 9, 35, 446566), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:10:02,850 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:10:02,850 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:10:02,850 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:10:02,850 - root - INFO - Starting review for rating 1, current time: 2025-05-02 11:10:02.850377+00:00
+2025-05-02 12:10:02,851 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 11, 10, 2, 850377, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:10:02,852 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:10:02,852 - root - INFO - Initial due date: 2025-05-02 11:10:02.850377+00:00
+2025-05-02 12:10:02,852 - root - DEBUG - Using rating: 1 (from rating_int: 1)
+2025-05-02 12:10:02,852 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184202851, state=1, step=0, stability=0.07103426959802099, difficulty=3.4469453633111073, due=2025-05-02 11:11:02.850377+00:00, last_review=2025-05-02 11:10:02.850377+00:00), ReviewLog(card_id=1746184202851, rating=1, review_datetime=2025-05-02 11:10:02.850377+00:00, review_duration=None))
+2025-05-02 12:10:02,852 - root - DEBUG - Card object after review: {'card_id': 1746184202851, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 11, 10, 2, 850377, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:10:02,852 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:10:02,852 - root - INFO - Applied manual fallback values: stability=0.1, difficulty=0.44999999999999996, state=3
+2025-05-02 12:10:02,852 - root - INFO - After FSRS: stability=0.1, difficulty=0.44999999999999996, state=3
+2025-05-02 12:10:02,852 - root - INFO - FSRS scheduled: due=2025-05-03 11:10:02.850377+00:00, interval=1 days
+2025-05-02 12:10:02,852 - root - DEBUG - Final result: {'stability': 0.1, 'difficulty': 0.44999999999999996, 'state': 3, 'due': datetime.datetime(2025, 5, 3, 11, 10, 2, 850377), 'interval': 1, 'is_lapse': True}
+2025-05-02 12:10:02,853 - root - INFO - Starting review for rating 2, current time: 2025-05-02 11:10:02.853108+00:00
+2025-05-02 12:10:02,853 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 11, 10, 2, 850377, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:10:02,854 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:10:02,854 - root - INFO - Initial due date: 2025-05-02 11:10:02.850377+00:00
+2025-05-02 12:10:02,854 - root - DEBUG - Using rating: 2 (from rating_int: 2)
+2025-05-02 12:10:02,854 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184202853, state=1, step=0, stability=2.808272678152998, difficulty=1.880199035311108, due=2025-05-02 11:15:32.853108+00:00, last_review=2025-05-02 11:10:02.853108+00:00), ReviewLog(card_id=1746184202853, rating=2, review_datetime=2025-05-02 11:10:02.853108+00:00, review_duration=None))
+2025-05-02 12:10:02,854 - root - DEBUG - Card object after review: {'card_id': 1746184202853, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 11, 10, 2, 850377, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:10:02,854 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:10:02,854 - root - INFO - Applied manual fallback values: stability=0.12, difficulty=0.35, state=2
+2025-05-02 12:10:02,854 - root - INFO - After FSRS: stability=0.12, difficulty=0.35, state=2
+2025-05-02 12:10:02,854 - root - INFO - FSRS scheduled: due=2025-05-03 11:10:02.853108+00:00, interval=1 days
+2025-05-02 12:10:02,854 - root - DEBUG - Final result: {'stability': 0.12, 'difficulty': 0.35, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 10, 2, 853108), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:10:02,855 - root - INFO - Starting review for rating 3, current time: 2025-05-02 11:10:02.855666+00:00
+2025-05-02 12:10:02,855 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 11, 10, 2, 850377, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:10:02,857 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:10:02,857 - root - INFO - Initial due date: 2025-05-02 11:10:02.850377+00:00
+2025-05-02 12:10:02,857 - root - DEBUG - Using rating: 3 (from rating_int: 3)
+2025-05-02 12:10:02,857 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184202855, state=1, step=1, stability=11.798802065455714, difficulty=1.0, due=2025-05-02 11:20:02.855666+00:00, last_review=2025-05-02 11:10:02.855666+00:00), ReviewLog(card_id=1746184202855, rating=3, review_datetime=2025-05-02 11:10:02.855666+00:00, review_duration=None))
+2025-05-02 12:10:02,857 - root - DEBUG - Card object after review: {'card_id': 1746184202855, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 11, 10, 2, 850377, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:10:02,857 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:10:02,857 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.25, state=2
+2025-05-02 12:10:02,857 - root - INFO - After FSRS: stability=1.0, difficulty=0.25, state=2
+2025-05-02 12:10:02,857 - root - INFO - FSRS scheduled: due=2025-05-03 11:10:02.855666+00:00, interval=1 days
+2025-05-02 12:10:02,857 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.25, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 10, 2, 855666), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:10:02,857 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:10:02.857675+00:00
+2025-05-02 12:10:02,857 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 11, 10, 2, 850377, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:10:02,860 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:10:02,860 - root - INFO - Initial due date: 2025-05-02 11:10:02.850377+00:00
+2025-05-02 12:10:02,860 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:10:02,860 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184202857, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-08 11:10:02.857675+00:00, last_review=2025-05-02 11:10:02.857675+00:00), ReviewLog(card_id=1746184202857, rating=4, review_datetime=2025-05-02 11:10:02.857675+00:00, review_duration=None))
+2025-05-02 12:10:02,860 - root - DEBUG - Card object after review: {'card_id': 1746184202857, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 11, 10, 2, 850377, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:10:02,860 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:10:02,860 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:10:02,860 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:10:02,860 - root - INFO - FSRS scheduled: due=2025-05-03 11:10:02.857675+00:00, interval=1 days
+2025-05-02 12:10:02,860 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 10, 2, 857675), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:10:02,860 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:10:02,860 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:10:02,860 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:10:02,861 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:10:02.861215+00:00
+2025-05-02 12:10:02,861 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 11, 10, 2, 860009, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:10:02,863 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:10:02,863 - root - INFO - Initial due date: 2025-05-02 11:10:02.860009+00:00
+2025-05-02 12:10:02,863 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:10:02,863 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184202861, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-09 11:10:02.861215+00:00, last_review=2025-05-02 11:10:02.861215+00:00), ReviewLog(card_id=1746184202861, rating=4, review_datetime=2025-05-02 11:10:02.861215+00:00, review_duration=None))
+2025-05-02 12:10:02,863 - root - DEBUG - Card object after review: {'card_id': 1746184202861, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 11, 10, 2, 860009, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:10:02,863 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:10:02,863 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:10:02,863 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:10:02,863 - root - INFO - FSRS scheduled: due=2025-05-03 11:10:02.861215+00:00, interval=1 days
+2025-05-02 12:10:02,863 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 10, 2, 861215), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:10:02,863 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:10:02.863214+00:00
+2025-05-02 12:10:02,863 - root - DEBUG - Input db_row: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 10, 2, 861215)}
+2025-05-02 12:10:02,865 - root - INFO - Initial card state: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:10:02,865 - root - INFO - Initial due date: 2025-05-03 11:10:02.861215+00:00
+2025-05-02 12:10:02,865 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:10:02,865 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184202863, state=2, step=0, stability=269.30175191538257, difficulty=1.0, due=2026-01-19 11:10:02.863214+00:00, last_review=2025-05-02 11:10:02.863214+00:00), ReviewLog(card_id=1746184202863, rating=4, review_datetime=2025-05-02 11:10:02.863214+00:00, review_duration=None))
+2025-05-02 12:10:02,865 - root - DEBUG - Card object after review: {'card_id': 1746184202863, 'state': 2, 'step': 0, 'stability': 1.0, 'difficulty': 0.19999999999999998, 'due': datetime.datetime(2025, 5, 3, 11, 10, 2, 861215, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:10:02,865 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:10:02,865 - root - INFO - Applied manual fallback values: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:10:02,865 - root - INFO - After FSRS: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:10:02,865 - root - INFO - FSRS scheduled: due=2025-05-05 11:10:02.863214+00:00, interval=3 days
+2025-05-02 12:10:02,865 - root - DEBUG - Final result: {'stability': 3.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 5, 11, 10, 2, 863214), 'interval': 3, 'is_lapse': False}
+2025-05-02 12:10:02,865 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:10:02.865281+00:00
+2025-05-02 12:10:02,865 - root - DEBUG - Input db_row: {'stability': 3.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 5, 11, 10, 2, 863214)}
+2025-05-02 12:10:02,867 - root - INFO - Initial card state: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:10:02,867 - root - INFO - Initial due date: 2025-05-05 11:10:02.863214+00:00
+2025-05-02 12:10:02,867 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:10:02,867 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184202865, state=2, step=0, stability=715.6473131444973, difficulty=1.0, due=2027-03-30 11:10:02.865281+00:00, last_review=2025-05-02 11:10:02.865281+00:00), ReviewLog(card_id=1746184202865, rating=4, review_datetime=2025-05-02 11:10:02.865281+00:00, review_duration=None))
+2025-05-02 12:10:02,867 - root - DEBUG - Card object after review: {'card_id': 1746184202865, 'state': 2, 'step': 0, 'stability': 3.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 5, 11, 10, 2, 863214, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:10:02,867 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:10:02,867 - root - INFO - Applied manual fallback values: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:10:02,867 - root - INFO - After FSRS: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:10:02,867 - root - INFO - FSRS scheduled: due=2025-05-11 11:10:02.865281+00:00, interval=9 days
+2025-05-02 12:10:02,867 - root - DEBUG - Final result: {'stability': 9.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 11, 11, 10, 2, 865281), 'interval': 9, 'is_lapse': False}
+2025-05-02 12:10:02,867 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:10:02.867026+00:00
+2025-05-02 12:10:02,867 - root - DEBUG - Input db_row: {'stability': 9.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 11, 11, 10, 2, 865281)}
+2025-05-02 12:10:02,869 - root - INFO - Initial card state: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:10:02,869 - root - INFO - Initial due date: 2025-05-11 11:10:02.865281+00:00
+2025-05-02 12:10:02,869 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:10:02,869 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184202868, state=2, step=0, stability=1884.5258453170181, difficulty=1.0, due=2030-08-04 11:10:02.867026+00:00, last_review=2025-05-02 11:10:02.867026+00:00), ReviewLog(card_id=1746184202868, rating=4, review_datetime=2025-05-02 11:10:02.867026+00:00, review_duration=None))
+2025-05-02 12:10:02,869 - root - DEBUG - Card object after review: {'card_id': 1746184202868, 'state': 2, 'step': 0, 'stability': 9.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 11, 11, 10, 2, 865281, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:10:02,869 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:10:02,869 - root - INFO - Applied manual fallback values: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:10:02,869 - root - INFO - After FSRS: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:10:02,869 - root - INFO - FSRS scheduled: due=2025-05-29 11:10:02.867026+00:00, interval=27 days
+2025-05-02 12:10:02,869 - root - DEBUG - Final result: {'stability': 27.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 29, 11, 10, 2, 867026), 'interval': 27, 'is_lapse': False}
+2025-05-02 12:10:02,869 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:10:02.869186+00:00
+2025-05-02 12:10:02,869 - root - DEBUG - Input db_row: {'stability': 27.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 29, 11, 10, 2, 867026)}
+2025-05-02 12:10:02,870 - root - INFO - Initial card state: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:10:02,870 - root - INFO - Initial due date: 2025-05-29 11:10:02.867026+00:00
+2025-05-02 12:10:02,870 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:10:02,870 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184202869, state=2, step=0, stability=4962.957985908919, difficulty=1.0, due=2039-01-18 11:10:02.869186+00:00, last_review=2025-05-02 11:10:02.869186+00:00), ReviewLog(card_id=1746184202869, rating=4, review_datetime=2025-05-02 11:10:02.869186+00:00, review_duration=None))
+2025-05-02 12:10:02,870 - root - DEBUG - Card object after review: {'card_id': 1746184202869, 'state': 2, 'step': 0, 'stability': 27.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 29, 11, 10, 2, 867026, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:10:02,870 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:10:02,870 - root - INFO - Applied manual fallback values: stability=81.0, difficulty=0.1, state=2
+2025-05-02 12:10:02,870 - root - INFO - After FSRS: stability=81.0, difficulty=0.1, state=2
+2025-05-02 12:10:02,870 - root - INFO - FSRS scheduled: due=2025-07-22 11:10:02.869186+00:00, interval=81 days
+2025-05-02 12:10:02,870 - root - DEBUG - Final result: {'stability': 81.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 7, 22, 11, 10, 2, 869186), 'interval': 81, 'is_lapse': False}
+2025-05-02 12:11:19,048 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:11:19,048 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:11:19,048 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:11:19,049 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:11:19.049123+00:00
+2025-05-02 12:11:19,049 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 11, 11, 19, 48130, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:11:19,050 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:11:19,050 - root - INFO - Initial due date: 2025-05-02 11:11:19.048130+00:00
+2025-05-02 12:11:19,050 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:11:19,050 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184279049, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-09 11:11:19.049123+00:00, last_review=2025-05-02 11:11:19.049123+00:00), ReviewLog(card_id=1746184279049, rating=4, review_datetime=2025-05-02 11:11:19.049123+00:00, review_duration=None))
+2025-05-02 12:11:19,050 - root - DEBUG - Card object after review: {'card_id': 1746184279049, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 11, 11, 19, 48130, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:11:19,051 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:11:19,051 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:11:19,051 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:11:19,051 - root - INFO - FSRS scheduled: due=2025-05-03 11:11:19.049123+00:00, interval=1 days
+2025-05-02 12:11:19,051 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 11, 19, 49123), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:11:19,051 - root - INFO - Starting review for rating 3, current time: 2025-05-02 11:11:19.051543+00:00
+2025-05-02 12:11:19,052 - root - DEBUG - Input db_row: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 11, 19, 49123)}
+2025-05-02 12:11:19,053 - root - INFO - Initial card state: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:11:19,053 - root - INFO - Initial due date: 2025-05-03 11:11:19.049123+00:00
+2025-05-02 12:11:19,053 - root - DEBUG - Using rating: 3 (from rating_int: 3)
+2025-05-02 12:11:19,053 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184279052, state=2, step=0, stability=90.73903000715185, difficulty=1.0, due=2025-07-28 11:11:19.051543+00:00, last_review=2025-05-02 11:11:19.051543+00:00), ReviewLog(card_id=1746184279052, rating=3, review_datetime=2025-05-02 11:11:19.051543+00:00, review_duration=None))
+2025-05-02 12:11:19,053 - root - DEBUG - Card object after review: {'card_id': 1746184279052, 'state': 2, 'step': 0, 'stability': 1.0, 'difficulty': 0.19999999999999998, 'due': datetime.datetime(2025, 5, 3, 11, 11, 19, 49123, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:11:19,053 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:11:19,053 - root - INFO - Applied manual fallback values: stability=1.5, difficulty=0.14999999999999997, state=2
+2025-05-02 12:11:19,053 - root - INFO - After FSRS: stability=1.5, difficulty=0.14999999999999997, state=2
+2025-05-02 12:11:19,053 - root - INFO - FSRS scheduled: due=2025-05-03 11:11:19.051543+00:00, interval=1 days
+2025-05-02 12:11:19,053 - root - DEBUG - Final result: {'stability': 1.5, 'difficulty': 0.14999999999999997, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 11, 19, 51543), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:11:19,054 - root - INFO - Starting review for rating 2, current time: 2025-05-02 11:11:19.054671+00:00
+2025-05-02 12:11:19,054 - root - DEBUG - Input db_row: {'stability': 1.5, 'difficulty': 0.14999999999999997, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 11, 19, 51543)}
+2025-05-02 12:11:19,056 - root - INFO - Initial card state: stability=1.5, difficulty=0.14999999999999997, state=2
+2025-05-02 12:11:19,056 - root - INFO - Initial due date: 2025-05-03 11:11:19.051543+00:00
+2025-05-02 12:11:19,056 - root - DEBUG - Using rating: 2 (from rating_int: 2)
+2025-05-02 12:11:19,056 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184279054, state=2, step=0, stability=31.32905740660403, difficulty=1.755117071311108, due=2025-06-01 11:11:19.054671+00:00, last_review=2025-05-02 11:11:19.054671+00:00), ReviewLog(card_id=1746184279054, rating=2, review_datetime=2025-05-02 11:11:19.054671+00:00, review_duration=None))
+2025-05-02 12:11:19,056 - root - DEBUG - Card object after review: {'card_id': 1746184279054, 'state': 2, 'step': 0, 'stability': 1.5, 'difficulty': 0.14999999999999997, 'due': datetime.datetime(2025, 5, 3, 11, 11, 19, 51543, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:11:19,056 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:11:19,056 - root - INFO - Applied manual fallback values: stability=1.7999999999999998, difficulty=0.19999999999999996, state=2
+2025-05-02 12:11:19,056 - root - INFO - After FSRS: stability=1.7999999999999998, difficulty=0.19999999999999996, state=2
+2025-05-02 12:11:19,056 - root - INFO - FSRS scheduled: due=2025-05-03 11:11:19.054671+00:00, interval=1 days
+2025-05-02 12:11:19,056 - root - DEBUG - Final result: {'stability': 1.7999999999999998, 'difficulty': 0.19999999999999996, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 11, 19, 54671), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:11:19,056 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:11:19.056117+00:00
+2025-05-02 12:11:19,057 - root - DEBUG - Input db_row: {'stability': 1.7999999999999998, 'difficulty': 0.19999999999999996, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 11, 19, 54671)}
+2025-05-02 12:11:19,058 - root - INFO - Initial card state: stability=1.7999999999999998, difficulty=0.19999999999999996, state=2
+2025-05-02 12:11:19,058 - root - INFO - Initial due date: 2025-05-03 11:11:19.054671+00:00
+2025-05-02 12:11:19,058 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:11:19,058 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184279057, state=2, step=0, stability=452.0643170467401, difficulty=1.0, due=2026-08-18 11:11:19.056117+00:00, last_review=2025-05-02 11:11:19.056117+00:00), ReviewLog(card_id=1746184279057, rating=4, review_datetime=2025-05-02 11:11:19.056117+00:00, review_duration=None))
+2025-05-02 12:11:19,058 - root - DEBUG - Card object after review: {'card_id': 1746184279057, 'state': 2, 'step': 0, 'stability': 1.7999999999999998, 'difficulty': 0.19999999999999996, 'due': datetime.datetime(2025, 5, 3, 11, 11, 19, 54671, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:11:19,058 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:11:19,058 - root - INFO - Applied manual fallback values: stability=5.3999999999999995, difficulty=0.1, state=2
+2025-05-02 12:11:19,058 - root - INFO - After FSRS: stability=5.3999999999999995, difficulty=0.1, state=2
+2025-05-02 12:11:19,058 - root - INFO - FSRS scheduled: due=2025-05-07 11:11:19.056117+00:00, interval=5 days
+2025-05-02 12:11:19,058 - root - DEBUG - Final result: {'stability': 5.3999999999999995, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 7, 11, 11, 19, 56117), 'interval': 5, 'is_lapse': False}
+2025-05-02 12:11:19,058 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:11:19.058644+00:00
+2025-05-02 12:11:19,059 - root - DEBUG - Input db_row: {'stability': 5.3999999999999995, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 7, 11, 11, 19, 56117)}
+2025-05-02 12:11:19,060 - root - INFO - Initial card state: stability=5.3999999999999995, difficulty=0.1, state=2
+2025-05-02 12:11:19,060 - root - INFO - Initial due date: 2025-05-07 11:11:19.056117+00:00
+2025-05-02 12:11:19,060 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:11:19,060 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184279059, state=2, step=0, stability=1201.3655628689328, difficulty=1.0, due=2028-07-06 11:11:19.058644+00:00, last_review=2025-05-02 11:11:19.058644+00:00), ReviewLog(card_id=1746184279059, rating=4, review_datetime=2025-05-02 11:11:19.058644+00:00, review_duration=None))
+2025-05-02 12:11:19,060 - root - DEBUG - Card object after review: {'card_id': 1746184279059, 'state': 2, 'step': 0, 'stability': 5.3999999999999995, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 7, 11, 11, 19, 56117, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:11:19,060 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:11:19,060 - root - INFO - Applied manual fallback values: stability=16.2, difficulty=0.1, state=2
+2025-05-02 12:11:19,060 - root - INFO - After FSRS: stability=16.2, difficulty=0.1, state=2
+2025-05-02 12:11:19,060 - root - INFO - FSRS scheduled: due=2025-05-18 11:11:19.058644+00:00, interval=16 days
+2025-05-02 12:11:19,060 - root - DEBUG - Final result: {'stability': 16.2, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 18, 11, 11, 19, 58644), 'interval': 16, 'is_lapse': False}
+2025-05-02 12:14:22,136 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:14:22,137 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:14:22,137 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:14:22,137 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:14:22.137248+00:00
+2025-05-02 12:14:22,137 - root - DEBUG - Input db_row: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': '2025-05-03'}
+2025-05-02 12:14:22,138 - root - INFO - Initial card state: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:15:06,478 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:15:06,479 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:15:06,479 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:15:06,479 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:15:06.479606+00:00
+2025-05-02 12:15:06,480 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:15:06,481 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:15:06,481 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:15:06,481 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:15:06,481 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184506480, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-04 11:15:06.479606+00:00, last_review=2025-05-02 11:15:06.479606+00:00), ReviewLog(card_id=1746184506480, rating=4, review_datetime=2025-05-02 11:15:06.479606+00:00, review_duration=None))
+2025-05-02 12:15:06,481 - root - DEBUG - Card object after review: {'card_id': 1746184506480, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:15:06,481 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:15:06,481 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:15:06,481 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:15:06,481 - root - INFO - FSRS scheduled: due=2025-05-03 11:15:06.479606+00:00, interval=1 days
+2025-05-02 12:15:06,481 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 15, 6, 479606), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:15:42,590 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:15:42,590 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:15:42,590 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:15:42,591 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:15:42.591737+00:00
+2025-05-02 12:15:42,591 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:15:42,593 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:15:42,593 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:15:42,593 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:15:42,593 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184542591, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-07 11:15:42.591737+00:00, last_review=2025-05-02 11:15:42.591737+00:00), ReviewLog(card_id=1746184542591, rating=4, review_datetime=2025-05-02 11:15:42.591737+00:00, review_duration=None))
+2025-05-02 12:15:42,593 - root - DEBUG - Card object after review: {'card_id': 1746184542591, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:15:42,593 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:15:42,593 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:15:42,593 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:15:42,594 - root - INFO - FSRS scheduled: due=2025-05-03 11:15:42.591737+00:00, interval=1 days
+2025-05-02 12:15:42,594 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 15, 42, 591737), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:17:33,832 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:17:33,832 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:17:33,832 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:17:33,833 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:17:33.833128+00:00
+2025-05-02 12:17:33,833 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:17:33,834 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:17:33,834 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:17:33,834 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:17:33,834 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184653833, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-05 11:17:33.833128+00:00, last_review=2025-05-02 11:17:33.833128+00:00), ReviewLog(card_id=1746184653833, rating=4, review_datetime=2025-05-02 11:17:33.833128+00:00, review_duration=None))
+2025-05-02 12:17:33,834 - root - DEBUG - Card object after review: {'card_id': 1746184653833, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:17:33,834 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:17:33,834 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:17:33,834 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:17:33,834 - root - INFO - FSRS scheduled: due=2025-05-03 11:17:33.833128+00:00, interval=1 days
+2025-05-02 12:17:33,834 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 17, 33, 833128), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:17:33,836 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:17:33,837 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:17:33,837 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:17:33,837 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:17:33.837497+00:00
+2025-05-02 12:17:33,837 - root - DEBUG - Input db_row: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 17, 33, 833128, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:17:33,838 - root - INFO - Initial card state: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:17:33,838 - root - INFO - Initial due date: 2025-05-03 11:17:33.833128+00:00
+2025-05-02 12:17:33,838 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:17:33,838 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184653837, state=2, step=0, stability=269.30175191538257, difficulty=1.0, due=2026-01-27 11:17:33.837497+00:00, last_review=2025-05-02 11:17:33.837497+00:00), ReviewLog(card_id=1746184653837, rating=4, review_datetime=2025-05-02 11:17:33.837497+00:00, review_duration=None))
+2025-05-02 12:17:33,838 - root - DEBUG - Card object after review: {'card_id': 1746184653837, 'state': 2, 'step': 0, 'stability': 1.0, 'difficulty': 0.19999999999999998, 'due': datetime.datetime(2025, 5, 3, 11, 17, 33, 833128, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:17:33,838 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:17:33,838 - root - INFO - Applied manual fallback values: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:17:33,838 - root - INFO - After FSRS: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:17:33,838 - root - INFO - FSRS scheduled: due=2025-05-05 11:17:33.837497+00:00, interval=3 days
+2025-05-02 12:17:33,838 - root - DEBUG - Final result: {'stability': 3.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 5, 11, 17, 33, 837497), 'interval': 3, 'is_lapse': False}
+2025-05-02 12:17:33,840 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:17:33,840 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:17:33,840 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:17:33,840 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:17:33.840862+00:00
+2025-05-02 12:17:33,840 - root - DEBUG - Input db_row: {'stability': 3.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 5, 11, 17, 33, 837497, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:17:33,842 - root - INFO - Initial card state: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:17:33,842 - root - INFO - Initial due date: 2025-05-05 11:17:33.837497+00:00
+2025-05-02 12:17:33,842 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:17:33,842 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184653840, state=2, step=0, stability=715.6473131444973, difficulty=1.0, due=2027-04-20 11:17:33.840862+00:00, last_review=2025-05-02 11:17:33.840862+00:00), ReviewLog(card_id=1746184653840, rating=4, review_datetime=2025-05-02 11:17:33.840862+00:00, review_duration=None))
+2025-05-02 12:17:33,842 - root - DEBUG - Card object after review: {'card_id': 1746184653840, 'state': 2, 'step': 0, 'stability': 3.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 5, 11, 17, 33, 837497, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:17:33,842 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:17:33,842 - root - INFO - Applied manual fallback values: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:17:33,842 - root - INFO - After FSRS: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:17:33,842 - root - INFO - FSRS scheduled: due=2025-05-11 11:17:33.840862+00:00, interval=9 days
+2025-05-02 12:17:33,842 - root - DEBUG - Final result: {'stability': 9.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 11, 11, 17, 33, 840862), 'interval': 9, 'is_lapse': False}
+2025-05-02 12:17:33,843 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:17:33,843 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:17:33,843 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:17:33,843 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:17:33.843081+00:00
+2025-05-02 12:17:33,843 - root - DEBUG - Input db_row: {'stability': 9.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 11, 11, 17, 33, 840862, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:17:33,845 - root - INFO - Initial card state: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:17:33,845 - root - INFO - Initial due date: 2025-05-11 11:17:33.840862+00:00
+2025-05-02 12:17:33,845 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:17:33,845 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184653843, state=2, step=0, stability=1884.5258453170181, difficulty=1.0, due=2030-05-10 11:17:33.843081+00:00, last_review=2025-05-02 11:17:33.843081+00:00), ReviewLog(card_id=1746184653843, rating=4, review_datetime=2025-05-02 11:17:33.843081+00:00, review_duration=None))
+2025-05-02 12:17:33,845 - root - DEBUG - Card object after review: {'card_id': 1746184653843, 'state': 2, 'step': 0, 'stability': 9.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 11, 11, 17, 33, 840862, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:17:33,845 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:17:33,845 - root - INFO - Applied manual fallback values: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:17:33,845 - root - INFO - After FSRS: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:17:33,845 - root - INFO - FSRS scheduled: due=2025-05-29 11:17:33.843081+00:00, interval=27 days
+2025-05-02 12:17:33,845 - root - DEBUG - Final result: {'stability': 27.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 29, 11, 17, 33, 843081), 'interval': 27, 'is_lapse': False}
+2025-05-02 12:17:33,846 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:17:33,846 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:17:33,846 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:17:33,846 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:17:33.846590+00:00
+2025-05-02 12:17:33,846 - root - DEBUG - Input db_row: {'stability': 27.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 29, 11, 17, 33, 843081, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:17:33,847 - root - INFO - Initial card state: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:17:33,847 - root - INFO - Initial due date: 2025-05-29 11:17:33.843081+00:00
+2025-05-02 12:17:33,847 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:17:33,847 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184653846, state=2, step=0, stability=4962.957985908919, difficulty=1.0, due=2039-01-18 11:17:33.846590+00:00, last_review=2025-05-02 11:17:33.846590+00:00), ReviewLog(card_id=1746184653846, rating=4, review_datetime=2025-05-02 11:17:33.846590+00:00, review_duration=None))
+2025-05-02 12:17:33,847 - root - DEBUG - Card object after review: {'card_id': 1746184653846, 'state': 2, 'step': 0, 'stability': 27.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 29, 11, 17, 33, 843081, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:17:33,847 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:17:33,847 - root - INFO - Applied manual fallback values: stability=81.0, difficulty=0.1, state=2
+2025-05-02 12:17:33,847 - root - INFO - After FSRS: stability=81.0, difficulty=0.1, state=2
+2025-05-02 12:17:33,847 - root - INFO - FSRS scheduled: due=2025-07-22 11:17:33.846590+00:00, interval=81 days
+2025-05-02 12:17:33,847 - root - DEBUG - Final result: {'stability': 81.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 7, 22, 11, 17, 33, 846590), 'interval': 81, 'is_lapse': False}
+2025-05-02 12:19:45,334 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:19:45,335 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:19:45,335 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:19:45,335 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:19:45.335651+00:00
+2025-05-02 12:19:45,335 - root - DEBUG - Input db_row: {'stability': 0.1, 'difficulty': 0.3, 'state': 1, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:19:45,337 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 12:19:45,337 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 12:19:45,337 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:19:45,337 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184785335, state=2, step=None, stability=35.07707841529949, difficulty=1.0, due=2025-06-11 11:19:45.335651+00:00, last_review=2025-05-02 11:19:45.335651+00:00), ReviewLog(card_id=1746184785335, rating=4, review_datetime=2025-05-02 11:19:45.335651+00:00, review_duration=None))
+2025-05-02 12:19:45,337 - root - DEBUG - Card object after review: {'card_id': 1746184785335, 'state': 1, 'step': 0, 'stability': 0.1, 'difficulty': 0.3, 'due': datetime.datetime(2025, 5, 2, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:19:45,337 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:19:45,337 - root - INFO - Applied manual fallback values: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:19:45,337 - root - INFO - After FSRS: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:19:45,337 - root - INFO - FSRS scheduled: due=2025-05-03 11:19:45.335651+00:00, interval=1 days
+2025-05-02 12:19:45,337 - root - DEBUG - Final result: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 11, 19, 45, 335651), 'interval': 1, 'is_lapse': False}
+2025-05-02 12:19:47,348 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:19:47,348 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:19:47,348 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:19:47,348 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:19:47.348587+00:00
+2025-05-02 12:19:47,348 - root - DEBUG - Input db_row: {'stability': 1.0, 'difficulty': 0.19999999999999998, 'state': 2, 'due': datetime.datetime(2025, 5, 3, 0, 0, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:19:47,349 - root - INFO - Initial card state: stability=1.0, difficulty=0.19999999999999998, state=2
+2025-05-02 12:19:47,349 - root - INFO - Initial due date: 2025-05-03 00:00:00+00:00
+2025-05-02 12:19:47,349 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:19:47,349 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184787348, state=2, step=0, stability=269.30175191538257, difficulty=1.0, due=2026-02-09 11:19:47.348587+00:00, last_review=2025-05-02 11:19:47.348587+00:00), ReviewLog(card_id=1746184787348, rating=4, review_datetime=2025-05-02 11:19:47.348587+00:00, review_duration=None))
+2025-05-02 12:19:47,349 - root - DEBUG - Card object after review: {'card_id': 1746184787348, 'state': 2, 'step': 0, 'stability': 1.0, 'difficulty': 0.19999999999999998, 'due': datetime.datetime(2025, 5, 3, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:19:47,349 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:19:47,349 - root - INFO - Applied manual fallback values: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:19:47,349 - root - INFO - After FSRS: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:19:47,349 - root - INFO - FSRS scheduled: due=2025-05-05 11:19:47.348587+00:00, interval=3 days
+2025-05-02 12:19:47,349 - root - DEBUG - Final result: {'stability': 3.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 5, 11, 19, 47, 348587), 'interval': 3, 'is_lapse': False}
+2025-05-02 12:19:49,354 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:19:49,354 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:19:49,354 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:19:49,354 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:19:49.354377+00:00
+2025-05-02 12:19:49,354 - root - DEBUG - Input db_row: {'stability': 3.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 5, 0, 0, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:19:49,355 - root - INFO - Initial card state: stability=3.0, difficulty=0.1, state=2
+2025-05-02 12:19:49,355 - root - INFO - Initial due date: 2025-05-05 00:00:00+00:00
+2025-05-02 12:19:49,355 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:19:49,355 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184789354, state=2, step=0, stability=715.6473131444973, difficulty=1.0, due=2027-04-23 11:19:49.354377+00:00, last_review=2025-05-02 11:19:49.354377+00:00), ReviewLog(card_id=1746184789354, rating=4, review_datetime=2025-05-02 11:19:49.354377+00:00, review_duration=None))
+2025-05-02 12:19:49,355 - root - DEBUG - Card object after review: {'card_id': 1746184789354, 'state': 2, 'step': 0, 'stability': 3.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 5, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:19:49,355 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:19:49,355 - root - INFO - Applied manual fallback values: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:19:49,355 - root - INFO - After FSRS: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:19:49,355 - root - INFO - FSRS scheduled: due=2025-05-11 11:19:49.354377+00:00, interval=9 days
+2025-05-02 12:19:49,355 - root - DEBUG - Final result: {'stability': 9.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 11, 11, 19, 49, 354377), 'interval': 9, 'is_lapse': False}
+2025-05-02 12:19:51,359 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:19:51,359 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:19:51,359 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:19:51,359 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:19:51.359984+00:00
+2025-05-02 12:19:51,359 - root - DEBUG - Input db_row: {'stability': 9.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 11, 0, 0, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:19:51,361 - root - INFO - Initial card state: stability=9.0, difficulty=0.1, state=2
+2025-05-02 12:19:51,361 - root - INFO - Initial due date: 2025-05-11 00:00:00+00:00
+2025-05-02 12:19:51,361 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:19:51,361 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184791359, state=2, step=0, stability=1884.5258453170181, difficulty=1.0, due=2030-06-20 11:19:51.359984+00:00, last_review=2025-05-02 11:19:51.359984+00:00), ReviewLog(card_id=1746184791359, rating=4, review_datetime=2025-05-02 11:19:51.359984+00:00, review_duration=None))
+2025-05-02 12:19:51,361 - root - DEBUG - Card object after review: {'card_id': 1746184791359, 'state': 2, 'step': 0, 'stability': 9.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 11, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:19:51,361 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:19:51,361 - root - INFO - Applied manual fallback values: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:19:51,361 - root - INFO - After FSRS: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:19:51,361 - root - INFO - FSRS scheduled: due=2025-05-29 11:19:51.359984+00:00, interval=27 days
+2025-05-02 12:19:51,361 - root - DEBUG - Final result: {'stability': 27.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 29, 11, 19, 51, 359984), 'interval': 27, 'is_lapse': False}
+2025-05-02 12:19:53,367 - root - DEBUG - DEFAULT_PARAMETERS: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:19:53,367 - root - INFO - Using FSRS parameters: (0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621)
+2025-05-02 12:19:53,367 - root - INFO - FSRS Scheduler initialized successfully
+2025-05-02 12:19:53,367 - root - INFO - Starting review for rating 4, current time: 2025-05-02 11:19:53.367147+00:00
+2025-05-02 12:19:53,367 - root - DEBUG - Input db_row: {'stability': 27.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 5, 29, 0, 0, tzinfo=datetime.timezone.utc)}
+2025-05-02 12:19:53,368 - root - INFO - Initial card state: stability=27.0, difficulty=0.1, state=2
+2025-05-02 12:19:53,368 - root - INFO - Initial due date: 2025-05-29 00:00:00+00:00
+2025-05-02 12:19:53,368 - root - DEBUG - Using rating: 4 (from rating_int: 4)
+2025-05-02 12:19:53,368 - root - DEBUG - FSRS review_card raw result: (Card(card_id=1746184793367, state=2, step=0, stability=4962.957985908919, difficulty=1.0, due=2039-06-21 11:19:53.367147+00:00, last_review=2025-05-02 11:19:53.367147+00:00), ReviewLog(card_id=1746184793367, rating=4, review_datetime=2025-05-02 11:19:53.367147+00:00, review_duration=None))
+2025-05-02 12:19:53,368 - root - DEBUG - Card object after review: {'card_id': 1746184793367, 'state': 2, 'step': 0, 'stability': 27.0, 'difficulty': 0.1, 'due': datetime.datetime(2025, 5, 29, 0, 0, tzinfo=datetime.timezone.utc), 'last_review': None}
+2025-05-02 12:19:53,368 - root - WARNING - WARNING: Card values didn't change after review! Using manual fallback values.
+2025-05-02 12:19:53,368 - root - INFO - Applied manual fallback values: stability=81.0, difficulty=0.1, state=2
+2025-05-02 12:19:53,368 - root - INFO - After FSRS: stability=81.0, difficulty=0.1, state=2
+2025-05-02 12:19:53,368 - root - INFO - FSRS scheduled: due=2025-07-22 11:19:53.367147+00:00, interval=81 days
+2025-05-02 12:19:53,368 - root - DEBUG - Final result: {'stability': 81.0, 'difficulty': 0.1, 'state': 2, 'due': datetime.datetime(2025, 7, 22, 11, 19, 53, 367147), 'interval': 81, 'is_lapse': False}
