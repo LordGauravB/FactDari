@@ -702,8 +702,16 @@ class FactDariApp:
             # Get the updated fields from FSRS
             fsrs_result = self.fsrs_engine.review(db_row, fsrs_rating)
             
-            # For UI display and legacy compatibility
-            mastery_value = min(1.0, fsrs_result["stability"] / 100.0)  # Approximate mastery from stability
+            # For UI display - use a simple linear calculation from stability
+            # Standard FSRS doesn't have a mastery concept, so we derive it
+            mastery_value = min(1.0, fsrs_result["stability"] / 100.0)
+            
+            # For debugging - print the values from FSRS that will be used to update the database
+            print(f"FSRS Result: stability={fsrs_result['stability']}, " +
+                  f"difficulty={fsrs_result['difficulty']}, " +
+                  f"state={fsrs_result['state']}, " +
+                  f"interval={fsrs_result['interval']}, " +
+                  f"is_lapse={fsrs_result['is_lapse']}")
             
             # 4. Update the database - FIXED to use a parameterized date that SQL Server can handle properly
             update_success = self.execute_update(

@@ -351,7 +351,7 @@ function setupRefreshIndicator(seconds) {
     window.refreshTimer.start();
 }
 
-// 1. Category Distribution Pie Chart - UPDATED
+// 1. Category Distribution Pie Chart
 function initializeCategoryDistributionChart(data) {
     const ctx = document.getElementById('categoryDistributionChart').getContext('2d');
     

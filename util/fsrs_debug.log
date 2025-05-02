@@ -22,3 +22,406 @@
 2025-05-02 10:55:12,902 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1, due=2025-04-30 00:00:00+00:00
 2025-05-02 10:55:12,902 - root - INFO - Calculated next review: interval=2 days, next date=2025-05-04 09:55:12.900473
 2025-05-02 10:55:12,902 - root - INFO - Final values: stability=3.0, interval=2, is_lapse=False
+2025-05-02 10:59:15,555 - root - INFO - Starting review for rating 4, current time: 2025-05-02 09:59:15.555440+00:00
+2025-05-02 10:59:15,557 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 10:59:15,557 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 10:59:15,557 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1, due=2025-05-02 00:00:00+00:00
+2025-05-02 10:59:15,557 - root - INFO - Calculated next review: interval=2 days, next date=2025-05-04 09:59:15.555440
+2025-05-02 10:59:15,557 - root - INFO - Final values: stability=3.0, interval=2, is_lapse=False
+2025-05-02 10:59:17,098 - root - INFO - Starting review for rating 3, current time: 2025-05-02 09:59:17.097093+00:00
+2025-05-02 10:59:17,099 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 10:59:17,099 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 10:59:17,099 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1, due=2025-05-02 00:00:00+00:00
+2025-05-02 10:59:17,099 - root - INFO - Calculated next review: interval=1 days, next date=2025-05-03 09:59:17.097093
+2025-05-02 10:59:17,099 - root - INFO - Final values: stability=2.5, interval=1, is_lapse=False
+2025-05-02 10:59:18,488 - root - INFO - Starting review for rating 2, current time: 2025-05-02 09:59:18.488107+00:00
+2025-05-02 10:59:18,489 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 10:59:18,489 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 10:59:18,489 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1, due=2025-05-02 00:00:00+00:00
+2025-05-02 10:59:18,489 - root - INFO - Calculated next review: interval=1 days, next date=2025-05-03 09:59:18.488107
+2025-05-02 10:59:18,489 - root - INFO - Final values: stability=2.0, interval=1, is_lapse=False
+2025-05-02 10:59:19,883 - root - INFO - Starting review for rating 1, current time: 2025-05-02 09:59:19.883134+00:00
+2025-05-02 10:59:19,885 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 10:59:19,885 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 10:59:19,885 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1, due=2025-05-02 00:00:00+00:00
+2025-05-02 10:59:19,885 - root - INFO - Calculated next review: interval=1 days, next date=2025-05-03 09:59:19.883134
+2025-05-02 10:59:19,885 - root - INFO - Final values: stability=0.1, interval=1, is_lapse=True
+2025-05-02 10:59:21,677 - root - INFO - Starting review for rating 4, current time: 2025-05-02 09:59:21.677990+00:00
+2025-05-02 10:59:21,679 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 10:59:21,679 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 10:59:21,679 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1, due=2025-05-02 00:00:00+00:00
+2025-05-02 10:59:21,679 - root - INFO - Calculated next review: interval=2 days, next date=2025-05-04 09:59:21.677990
+2025-05-02 10:59:21,679 - root - INFO - Final values: stability=3.0, interval=2, is_lapse=False
+2025-05-02 11:10:48,015 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:10:48.013602+00:00
+2025-05-02 11:10:48,016 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:10:48,016 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:11:58,903 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:11:58.903559+00:00
+2025-05-02 11:11:58,905 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:11:58,905 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:11:58,905 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:11:58,905 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:12:01,579 - root - INFO - Starting review for rating 3, current time: 2025-05-02 10:12:01.579300+00:00
+2025-05-02 11:12:01,580 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:12:01,580 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:12:01,580 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:12:01,580 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:12:32,149 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:12:32.149402+00:00
+2025-05-02 11:12:32,150 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:12:32,150 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:12:32,150 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:12:32,150 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:12:36,373 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:12:36.373068+00:00
+2025-05-02 11:12:36,375 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:12:36,375 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:12:36,375 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:12:36,375 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:12:38,671 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:12:38.671733+00:00
+2025-05-02 11:12:38,673 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:12:38,673 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:12:38,673 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:12:38,673 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:13:45,763 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:13:45.763298+00:00
+2025-05-02 11:13:45,765 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:13:45,765 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:13:45,765 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:13:45,765 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:13:47,174 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:13:47.174053+00:00
+2025-05-02 11:13:47,176 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:13:47,176 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:13:47,176 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:13:47,176 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:13:48,540 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:13:48.540472+00:00
+2025-05-02 11:13:48,542 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:13:48,542 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:13:48,542 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:13:48,542 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:13:49,906 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:13:49.906427+00:00
+2025-05-02 11:13:49,907 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:13:49,907 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:13:49,907 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:13:49,907 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:13:51,267 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:13:51.267345+00:00
+2025-05-02 11:13:51,269 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:13:51,269 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:13:51,269 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:13:51,269 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:16:14,042 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:16:14.042116+00:00
+2025-05-02 11:16:14,044 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:14,044 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:16:14,044 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:14,044 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:16:15,480 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:16:15.480040+00:00
+2025-05-02 11:16:15,482 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:15,482 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:16:15,482 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:15,482 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:16:30,965 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:16:30.965529+00:00
+2025-05-02 11:16:30,967 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:30,967 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:16:30,967 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:30,967 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:16:32,455 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:16:32.455495+00:00
+2025-05-02 11:16:32,456 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:32,456 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:16:32,456 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:32,456 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:16:33,933 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:16:33.933759+00:00
+2025-05-02 11:16:33,936 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:33,936 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:16:33,936 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:33,936 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:16:50,477 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:16:50.477507+00:00
+2025-05-02 11:16:50,478 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:50,478 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:16:50,478 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:50,478 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:16:52,497 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:16:52.496162+00:00
+2025-05-02 11:16:52,498 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:52,498 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:16:52,498 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:52,498 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:16:53,885 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:16:53.885376+00:00
+2025-05-02 11:16:53,887 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:53,887 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:16:53,887 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:53,887 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:16:55,240 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:16:55.240422+00:00
+2025-05-02 11:16:55,242 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:55,242 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:16:55,242 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:55,242 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:16:56,637 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:16:56.637020+00:00
+2025-05-02 11:16:56,638 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:56,638 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:16:56,638 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:16:56,638 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:20:03,523 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:20:03.523625+00:00
+2025-05-02 11:20:03,525 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:20:03,525 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:20:03,525 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:20:03,525 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:21:59,603 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:21:59.603378+00:00
+2025-05-02 11:21:59,605 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:21:59,605 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:21:59,605 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:21:59,605 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:22:02,182 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:22:02.182252+00:00
+2025-05-02 11:22:02,184 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:22:02,184 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:22:02,184 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:22:02,184 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:22:26,120 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:22:26.120284+00:00
+2025-05-02 11:22:26,122 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:22:26,122 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:22:26,122 - root - INFO - After FSRS: stability=5.0, difficulty=0.3, state=1
+2025-05-02 11:22:26,122 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:22:34,437 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:22:34.437160+00:00
+2025-05-02 11:22:34,438 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:22:34,438 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:22:34,438 - root - INFO - After FSRS: stability=5.0, difficulty=0.3, state=1
+2025-05-02 11:22:34,438 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:22:47,575 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:22:47.575359+00:00
+2025-05-02 11:22:47,576 - root - INFO - Initial card state: stability=5.0, difficulty=0.3, state=1
+2025-05-02 11:22:47,576 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:22:47,576 - root - INFO - After FSRS: stability=5.0, difficulty=0.3, state=1
+2025-05-02 11:22:47,576 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:22:49,214 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:22:49.214241+00:00
+2025-05-02 11:22:49,216 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:22:49,216 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:22:49,216 - root - INFO - After FSRS: stability=5.0, difficulty=0.3, state=1
+2025-05-02 11:22:49,216 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:22:50,819 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:22:50.819288+00:00
+2025-05-02 11:22:50,821 - root - INFO - Initial card state: stability=5.0, difficulty=0.3, state=1
+2025-05-02 11:22:50,821 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:22:50,821 - root - INFO - After FSRS: stability=5.0, difficulty=0.3, state=1
+2025-05-02 11:22:50,821 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:22:52,304 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:22:52.304188+00:00
+2025-05-02 11:22:52,306 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:22:52,306 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:22:52,306 - root - INFO - After FSRS: stability=5.0, difficulty=0.3, state=1
+2025-05-02 11:22:52,306 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:22:53,678 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:22:53.678111+00:00
+2025-05-02 11:22:53,679 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:22:53,679 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:22:53,679 - root - INFO - After FSRS: stability=5.0, difficulty=0.3, state=1
+2025-05-02 11:22:53,679 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:25:57,609 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:25:57.609826+00:00
+2025-05-02 11:25:57,611 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:25:57,611 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:25:57,611 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:25:57,612 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:28:41,066 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:28:41.066277+00:00
+2025-05-02 11:28:41,068 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:28:41,068 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:28:41,068 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:28:41,068 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:28:42,545 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:28:42.545476+00:00
+2025-05-02 11:28:42,547 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:28:42,547 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:28:42,547 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:28:42,547 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:28:43,925 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:28:43.925173+00:00
+2025-05-02 11:28:43,927 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:28:43,927 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:28:43,927 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:28:43,927 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:28:45,290 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:28:45.290770+00:00
+2025-05-02 11:28:45,292 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:28:45,292 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:28:45,292 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:28:45,292 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:28:46,677 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:28:46.677465+00:00
+2025-05-02 11:28:46,679 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:28:46,679 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:28:46,679 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:28:46,679 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:06,029 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:06.029241+00:00
+2025-05-02 11:29:06,031 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:06,031 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:06,031 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:06,031 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:07,458 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:07.457164+00:00
+2025-05-02 11:29:07,459 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:07,459 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:07,459 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:07,459 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:08,848 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:08.848675+00:00
+2025-05-02 11:29:08,850 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:08,850 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:08,850 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:08,850 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:10,202 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:10.202835+00:00
+2025-05-02 11:29:10,204 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:10,204 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:10,204 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:10,204 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:11,595 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:11.595404+00:00
+2025-05-02 11:29:11,596 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:11,596 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:11,596 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:11,596 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:27,829 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:27.829770+00:00
+2025-05-02 11:29:27,831 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:27,831 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:27,831 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:27,831 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:29,213 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:29.213314+00:00
+2025-05-02 11:29:29,214 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:29,214 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:29,214 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:29,214 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:30,635 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:30.635473+00:00
+2025-05-02 11:29:30,637 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:30,637 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:30,637 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:30,637 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:32,015 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:32.015173+00:00
+2025-05-02 11:29:32,017 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:32,017 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:32,017 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:32,017 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:33,866 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:33.866099+00:00
+2025-05-02 11:29:33,868 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:33,868 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:33,868 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:33,868 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:50,351 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:50.351026+00:00
+2025-05-02 11:29:50,353 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:50,353 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:50,353 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:50,353 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:51,600 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:51.600626+00:00
+2025-05-02 11:29:51,602 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:51,602 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:51,602 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:51,602 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:52,751 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:52.751553+00:00
+2025-05-02 11:29:52,752 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:52,752 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:52,752 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:52,752 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:53,902 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:53.902969+00:00
+2025-05-02 11:29:53,904 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:53,904 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:53,904 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:53,904 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:29:56,095 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:29:56.095100+00:00
+2025-05-02 11:29:56,097 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:56,097 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:29:56,097 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:29:56,097 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:32:10,949 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:32:10.948525+00:00
+2025-05-02 11:32:10,950 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:10,950 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:32:10,950 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:10,950 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:32:12,643 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:32:12.643090+00:00
+2025-05-02 11:32:12,645 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:12,645 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:32:12,645 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:12,645 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:32:14,054 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:32:14.054142+00:00
+2025-05-02 11:32:14,056 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:14,056 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:32:14,056 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:14,056 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:32:15,487 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:32:15.487200+00:00
+2025-05-02 11:32:15,489 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:15,489 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:32:15,489 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:15,489 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:32:16,911 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:32:16.911117+00:00
+2025-05-02 11:32:16,912 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:16,912 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:32:16,912 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:16,912 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:32:39,429 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:32:39.429860+00:00
+2025-05-02 11:32:39,431 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:39,431 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:32:39,431 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:32:39,431 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:33:01,553 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:33:01.553126+00:00
+2025-05-02 11:33:01,555 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:33:01,555 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:33:01,555 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:33:01,555 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:35:05,109 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:35:05.109508+00:00
+2025-05-02 11:35:05,111 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:05,111 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:35:05,111 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:05,111 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:35:06,449 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:35:06.449045+00:00
+2025-05-02 11:35:06,450 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:06,450 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:35:06,450 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:06,450 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:35:07,735 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:35:07.735374+00:00
+2025-05-02 11:35:07,736 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:07,736 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:35:07,736 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:07,736 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:35:09,062 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:35:09.062559+00:00
+2025-05-02 11:35:09,064 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:09,064 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:35:09,064 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:09,064 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:35:10,425 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:35:10.425394+00:00
+2025-05-02 11:35:10,426 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:10,426 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:35:10,426 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:10,426 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:35:49,081 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:35:49.081606+00:00
+2025-05-02 11:35:49,083 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:49,083 - root - INFO - Initial due date: 2025-03-13 00:00:00+00:00
+2025-05-02 11:35:49,083 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:35:49,083 - root - INFO - FSRS scheduled: due=2025-03-13 00:00:00+00:00, interval=1 days
+2025-05-02 11:36:30,005 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:36:30.005481+00:00
+2025-05-02 11:36:30,007 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:36:30,007 - root - INFO - Initial due date: 2025-03-23 00:00:00+00:00
+2025-05-02 11:36:30,007 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:36:30,007 - root - INFO - FSRS scheduled: due=2025-03-23 00:00:00+00:00, interval=1 days
+2025-05-02 11:39:09,207 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:39:09.207529+00:00
+2025-05-02 11:39:09,209 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:39:09,209 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:39:09,209 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:39:09,209 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:39:10,947 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:39:10.947173+00:00
+2025-05-02 11:39:10,949 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:39:10,949 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:39:10,949 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:39:10,949 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:39:12,551 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:39:12.551244+00:00
+2025-05-02 11:39:12,553 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:39:12,553 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:39:12,553 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:39:12,553 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:39:14,275 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:39:14.275340+00:00
+2025-05-02 11:39:14,277 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:39:14,277 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:39:14,277 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:39:14,277 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:39:16,230 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:39:16.230147+00:00
+2025-05-02 11:39:16,232 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:39:16,232 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:39:16,232 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:39:16,232 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:41:09,150 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:41:09.150821+00:00
+2025-05-02 11:41:09,153 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:41:09,153 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:41:09,153 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:41:09,153 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:49:07,305 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:49:07.305368+00:00
+2025-05-02 11:49:07,306 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:49:07,306 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:49:07,306 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:49:07,306 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:49:09,353 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:49:09.353945+00:00
+2025-05-02 11:49:09,356 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:49:09,356 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:49:09,356 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:49:09,356 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
+2025-05-02 11:49:10,970 - root - INFO - Starting review for rating 4, current time: 2025-05-02 10:49:10.970547+00:00
+2025-05-02 11:49:10,972 - root - INFO - Initial card state: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:49:10,972 - root - INFO - Initial due date: 2025-05-02 00:00:00+00:00
+2025-05-02 11:49:10,972 - root - INFO - After FSRS: stability=0.1, difficulty=0.3, state=1
+2025-05-02 11:49:10,972 - root - INFO - FSRS scheduled: due=2025-05-02 00:00:00+00:00, interval=1 days
