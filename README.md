@@ -1,6 +1,6 @@
 # MemoDari
 
-A feature-rich application for learning through flashcards, powered by the Free Spaced Repetition System (FSRS) algorithm.
+A feature-rich desktop widget application for learning through flashcards, powered by the Free Spaced Repetition System (FSRS) algorithm. MemoDari can be configured to launch at startup, making it seamlessly integrate into your daily routine.
 
 ## Features
 
@@ -10,6 +10,7 @@ A feature-rich application for learning through flashcards, powered by the Free 
 - **Customizable Interface**: Dark theme with persistent window positioning
 - **Text-to-Speech**: Audio support for better learning retention
 - **Difficulty Tracking**: Monitor stability and difficulty for each card
+- **Desktop Widget**: Runs as a desktop widget that can be configured to launch at startup
 
 ## Screenshots
 
@@ -30,6 +31,12 @@ A feature-rich application for learning through flashcards, powered by the Free 
 4. Run the application:
    ```
    python memodari.py
+   ```
+5. To set up automatic startup, use the VBS script in the util folder
+
+   For Windows users, you can use the included batch script:
+   ```
+   util/MemoDari.bat
    ```
 
 ## Usage
