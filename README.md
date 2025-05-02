@@ -1,6 +1,6 @@
 # MemoDari
 
-A feature-rich application for learning through flashcards, powered by the Forgetting Spaced Repetition System (FSRS) algorithm.
+A feature-rich application for learning through flashcards, powered by the Free Spaced Repetition System (FSRS) algorithm.
 
 ## Features
 
