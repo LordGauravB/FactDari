@@ -15,10 +15,16 @@ A feature-rich desktop widget application for learning through flashcards, power
 ## Screenshots
 *Insert screenshots here - recommended sections:*
 1. Main flashcard interface
+1.1 Home
+![alt text](image-1.png)
+1.2 Learning UI
+![alt text](image-2.png)
 2. Analytics dashboard
 ![alt text](image.png)
 3. Card management screen
-4. Settings panel
+3.1 Add Card
+3.2 Edit Card
+3.3 Delete Card
 
 ## Installation
 
