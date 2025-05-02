@@ -110,9 +110,35 @@ class FactDariApp:
                 font=(self.SMALL_FONT[0], self.SMALL_FONT[1])).pack(side="left", padx=5)
         
         self.category_var = tk.StringVar(self.root, value="All Categories")
-        self.category_dropdown = ttk.Combobox(self.category_frame, textvariable=self.category_var, state="readonly", width=15)
+        
+        # Apply custom styling to the combobox
+        style = ttk.Style()
+        style.theme_use('default')
+        style.configure('Custom.TCombobox', 
+                        background=self.BG_COLOR,
+                        fieldbackground='#333333',
+                        foreground=self.TEXT_COLOR,
+                        arrowcolor=self.TEXT_COLOR,
+                        bordercolor=self.GREEN_COLOR,
+                        lightcolor=self.GREEN_COLOR,
+                        darkcolor=self.GREEN_COLOR)
+        
+        # Create the combobox with custom styling
+        self.category_dropdown = ttk.Combobox(self.category_frame, 
+                                             textvariable=self.category_var, 
+                                             state="readonly", 
+                                             width=15,
+                                             style='Custom.TCombobox')
+        
         self.category_dropdown['values'] = self.load_categories()
+        
+        # Apply additional styling classes from CSS
         self.category_dropdown.pack(side="left")
+        
+        # Use option_add to style dropdown items
+        self.root.option_add('*TCombobox*Listbox*Background', '#333333')
+        self.root.option_add('*TCombobox*Listbox*Foreground', self.TEXT_COLOR)
+        self.root.option_add('*TCombobox*Listbox*selectBackground', self.GREEN_COLOR)
         
         # Main content area
         self.content_frame = tk.Frame(self.root, bg=self.BG_COLOR)
@@ -805,7 +831,14 @@ class FactDariApp:
         else:
             cat_var.set("No Categories")
         
-        cat_dropdown = ttk.Combobox(cat_frame, textvariable=cat_var, values=category_names, state="readonly", width=20)
+        # Create the combobox with custom styling
+        cat_dropdown = ttk.Combobox(cat_frame, 
+                                   textvariable=cat_var, 
+                                   values=category_names, 
+                                   state="readonly", 
+                                   width=20,
+                                   style='Custom.TCombobox')
+        
         cat_dropdown.pack(side="left", padx=5, fill="x", expand=True)
         
         # Question
@@ -924,7 +957,14 @@ class FactDariApp:
         cat_var = tk.StringVar(edit_window)
         cat_var.set(current_category)
         
-        cat_dropdown = ttk.Combobox(cat_frame, textvariable=cat_var, values=category_names, state="readonly", width=20)
+        # Create the combobox with custom styling
+        cat_dropdown = ttk.Combobox(cat_frame, 
+                                   textvariable=cat_var, 
+                                   values=category_names, 
+                                   state="readonly", 
+                                   width=20,
+                                   style='Custom.TCombobox')
+        
         cat_dropdown.pack(side="left", padx=5, fill="x", expand=True)
         
         # Question
