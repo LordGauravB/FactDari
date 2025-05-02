@@ -18,11 +18,11 @@ import json, os
 import logging
 
 # Configure logging
-import os
-log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "util")
+import config
+log_dir = config.LOG_DIR
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
-log_file = os.path.join(log_dir, "fsrs_debug.log")
+log_file = config.LOG_FILE
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     filename=log_file,

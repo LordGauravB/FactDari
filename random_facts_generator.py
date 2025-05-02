@@ -59,9 +59,8 @@ class FactDariApp:
         self.show_answer = False
         self.is_home_page = True
         
-        # Initialize FSRS Engine with weights file from config directory
-        weights_file = os.path.join(config.BASE_DIR, "weights.json")
-        self.fsrs_engine = FSRSEngine(weights_file)
+        # Initialize FSRS Engine with weights file from config 
+        self.fsrs_engine = FSRSEngine(config.WEIGHTS_FILE)
         
         # Create main window
         self.root = tk.Tk()
