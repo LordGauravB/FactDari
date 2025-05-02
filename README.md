@@ -33,11 +33,13 @@ A feature-rich desktop widget application for learning through flashcards, power
    <p align="center">
    <img src="image.png" alt="Analytics Dashboard">
    </p>
+   
 
 3. Card management screen
    
    3.1 Add Card
-   
+   <p align="center">
+   <img src="image-3.png" alt="Analytics Dashboard">
    3.2 Edit Card
    
    3.3 Delete Card
