@@ -377,6 +377,9 @@ class MemoDariApp:
     
     def speak_text(self):
         """Speak the current fact card text"""
+        # Disable the speaker button while speaking
+        self.speaker_button.config(state="disabled")
+        
         text = self.factcard_label.cget("text")
         # Remove "Question: " or "Answer: " prefix if present
         if text.startswith("Question: "):
@@ -386,6 +389,13 @@ class MemoDariApp:
         
         engine = pyttsx3.init()
         engine.say(text)
+        
+        # Define a callback to re-enable the button when speech is done
+        def on_speech_done():
+            self.speaker_button.config(state="normal")
+        
+        # Schedule the button to be re-enabled after speech is complete
+        engine.connect('finished-utterance', lambda name, completed: self.root.after(100, on_speech_done))
         engine.runAndWait()
     
     def show_analytics(self):

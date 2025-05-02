@@ -13,10 +13,10 @@ A feature-rich desktop widget application for learning through flashcards, power
 - **Desktop Widget**: Runs as a desktop widget that can be configured to launch at startup
 
 ## Screenshots
-
 *Insert screenshots here - recommended sections:*
 1. Main flashcard interface
 2. Analytics dashboard
+![alt text](image.png)
 3. Card management screen
 4. Settings panel
 
