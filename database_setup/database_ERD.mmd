@@ -1,0 +1,56 @@
+erDiagram
+    Categories {
+        int CategoryID PK
+        nvarchar(100) CategoryName
+        nvarchar(255) Description
+        bit IsActive
+        datetime CreatedDate
+    }
+    
+    Tags {
+        int TagID PK
+        nvarchar(100) TagName
+    }
+    
+    FactCards {
+        int FactCardID PK
+        int CategoryID FK
+        nvarchar(MAX) Question
+        nvarchar(MAX) Answer
+        date NextReviewDate
+        int CurrentInterval
+        float Mastery
+        date DateAdded
+        date LastReviewDate
+        float Stability
+        float Difficulty
+        int State
+        int Lapses
+        int ViewCount
+    }
+    
+    FactCardTags {
+        int FactCardTagID PK
+        int FactCardID FK
+        int TagID FK
+    }
+    
+    ReviewLogs {
+        int ReviewLogID PK
+        int FactCardID FK
+        datetime ReviewDate
+        int UserRating
+        int IntervalBeforeReview
+        int IntervalAfterReview
+        float StabilityBefore
+        float StabilityAfter
+        float DifficultyBefore
+        float DifficultyAfter
+        int Rating
+        int Interval
+    }
+    
+    Categories ||--o{ FactCards : "has"
+    FactCards ||--o{ FactCardTags : "has"
+    Tags ||--o{ FactCardTags : "has"
+    FactCards ||--o{ ReviewLogs : "has"

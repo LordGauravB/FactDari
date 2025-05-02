@@ -1,4 +1,4 @@
-#RandomFactsGenerator.py
+#MemoDari.py
 import os
 import sys
 import signal
@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from tkinter import ttk, simpledialog, messagebox
 from fsrs_engine import FSRSEngine
 
-class FactDariApp:
+class MemoDariApp:
     def __init__(self):
         # Get database connection string from config
         self.CONN_STR = config.get_connection_string()
@@ -101,7 +101,7 @@ class FactDariApp:
         self.title_bar = tk.Frame(self.root, bg=self.TITLE_BG_COLOR, height=30, relief='raised')
         self.title_bar.pack(side="top", fill="x")
         
-        tk.Label(self.title_bar, text="FactDari", fg=self.TEXT_COLOR, bg=self.TITLE_BG_COLOR, 
+        tk.Label(self.title_bar, text="MemoDari", fg=self.TEXT_COLOR, bg=self.TITLE_BG_COLOR, 
                 font=(self.NORMAL_FONT[0], 12, 'bold')).pack(side="left", padx=5, pady=5)
         
         # Category selection - create but don't pack yet
@@ -152,7 +152,7 @@ class FactDariApp:
         self.padding_frame = tk.Frame(self.factcard_frame, bg=self.BG_COLOR, height=30)
         self.padding_frame.pack(side="top", fill="x")
         
-        self.factcard_label = tk.Label(self.factcard_frame, text="Welcome to FactDari!", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
+        self.factcard_label = tk.Label(self.factcard_frame, text="Welcome to MemoDari!", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
                                   font=self.LARGE_FONT, wraplength=450, justify="center")
         self.factcard_label.pack(side="top", fill="both", expand=True, padx=10, pady=10)
         
@@ -722,10 +722,22 @@ class FactDariApp:
         db_row["due"] = due_date
         
         # 2. Log the review
+        # Use comprehensive field list compatible with both schema versions
         log_success = self.execute_update("""
-            INSERT INTO ReviewLogs (FactCardID, ReviewDate, Rating, Interval)
-            VALUES (?, GETDATE(), ?, ?)
-        """, (self.current_factcard_id, fsrs_rating, current_interval))
+            INSERT INTO ReviewLogs (
+                FactCardID, ReviewDate, 
+                UserRating, Rating, 
+                IntervalBeforeReview, Interval,
+                StabilityBefore, DifficultyBefore
+            )
+            VALUES (?, GETDATE(), ?, ?, ?, ?, ?, ?)
+        """, (
+            self.current_factcard_id, 
+            fsrs_rating, fsrs_rating,  # Store in both UserRating and Rating fields
+            current_interval, current_interval,  # Store in both IntervalBeforeReview and Interval fields
+            row[0] if row[0] is not None else 0.0,  # StabilityBefore from current card
+            row[1] if row[1] is not None else 0.3   # DifficultyBefore from current card
+        ))
         
         if not log_success:
             print(f"Warning: Failed to log review for card {self.current_factcard_id}")
@@ -1393,8 +1405,8 @@ class FactDariApp:
     
     def reset_to_welcome(self):
         """Reset to welcome screen"""
-        self.factcard_label.config(text="Welcome to FactDari!", 
-                              font=(self.NORMAL_FONT[0], self.adjust_font_size("Welcome to FactDari!")))
+        self.factcard_label.config(text="Welcome to MemoDari!", 
+                              font=(self.NORMAL_FONT[0], self.adjust_font_size("Welcome to MemoDari!")))
         self.status_label.config(text="")
         self.show_review_buttons(False)
         self.show_answer_button.config(state="disabled")
@@ -1414,7 +1426,7 @@ class FactDariApp:
         self.category_frame.pack_forget()
         
         # Update the welcome message
-        self.factcard_label.config(text="Welcome to FactDari!\n\nYour Personal Knowledge Companion", 
+        self.factcard_label.config(text="Welcome to MemoDari!\n\nYour Personal Knowledge Companion", 
                              font=self.LARGE_FONT,
                              wraplength=450, justify="center")
         
@@ -1458,5 +1470,5 @@ class FactDariApp:
 
 # Usage example
 if __name__ == "__main__":
-    app = FactDariApp()
+    app = MemoDariApp()
     app.run()

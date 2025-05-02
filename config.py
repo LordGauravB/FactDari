@@ -4,27 +4,27 @@ from pathlib import Path
 
 # Base directory where the application is installed
 # Use environment variable if provided, otherwise use relative path
-BASE_DIR = os.environ.get('FACTDARI_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.environ.get('MEMODARI_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
 
 # Resource paths - allow override via environment variables
-RESOURCES_DIR = os.environ.get('FACTDARI_RESOURCES_DIR', os.path.join(BASE_DIR, "Resources"))
-IMAGES_DIR = os.environ.get('FACTDARI_IMAGES_DIR', os.path.join(RESOURCES_DIR, "Images"))
+RESOURCES_DIR = os.environ.get('MEMODARI_RESOURCES_DIR', os.path.join(BASE_DIR, "Resources"))
+IMAGES_DIR = os.environ.get('MEMODARI_IMAGES_DIR', os.path.join(RESOURCES_DIR, "Images"))
 
 # Log directory
-LOG_DIR = os.environ.get('FACTDARI_LOG_DIR', os.path.join(BASE_DIR, "util"))
-LOG_FILE = os.environ.get('FACTDARI_LOG_FILE', os.path.join(LOG_DIR, "fsrs_debug.log"))
+LOG_DIR = os.environ.get('MEMODARI_LOG_DIR', os.path.join(BASE_DIR, "util"))
+LOG_FILE = os.environ.get('MEMODARI_LOG_FILE', os.path.join(LOG_DIR, "fsrs_debug.log"))
 
 # FSRS weights file
-WEIGHTS_FILE = os.environ.get('FACTDARI_WEIGHTS_FILE', os.path.join(BASE_DIR, "weights.json"))
+WEIGHTS_FILE = os.environ.get('MEMODARI_WEIGHTS_FILE', os.path.join(BASE_DIR, "weights.json"))
 
 # Analytics app path
-ANALYTICS_APP = os.environ.get('FACTDARI_ANALYTICS_APP', os.path.join(BASE_DIR, "analytics.py"))
+ANALYTICS_APP = os.environ.get('MEMODARI_ANALYTICS_APP', os.path.join(BASE_DIR, "analytics.py"))
 
 # Database configuration
 DB_CONFIG = {
-    'server': os.environ.get('FACTDARI_DB_SERVER', 'GAURAVS_DESKTOP\\SQLEXPRESS'),
-    'database': os.environ.get('FACTDARI_DB_NAME', 'FactDari'),
-    'trusted_connection': os.environ.get('FACTDARI_DB_TRUSTED', 'yes')
+    'server': os.environ.get('MEMODARI_DB_SERVER', 'GAURAVS_DESKTOP\\SQLEXPRESS'),
+    'database': os.environ.get('MEMODARI_DB_NAME', 'MemoDari'),
+    'trusted_connection': os.environ.get('MEMODARI_DB_TRUSTED', 'yes')
 }
 
 # UI Configuration
