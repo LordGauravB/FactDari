@@ -615,11 +615,18 @@ class FactDariApp:
             self.show_review_buttons(False)
             self.show_answer_button.config(state="disabled")
             
+            # Get the current category
+            category = self.category_var.get()
+            category_msg = f"for {category}" if category != "All Categories" else "for all Categories"
+            
             if next_date:
                 next_date_str = next_date.strftime('%Y-%m-%d') if isinstance(next_date, datetime) else next_date
-                return f"No fact cards due for review today.\n\nNext review date: {next_date_str}\nFact cards due on that day: {count}"
+                return f"No fact cards due for review today {category_msg}.\n\nNext review date: {next_date_str}\nFact cards due on that day: {count}"
             else:
-                return "No fact cards found. Add some fact cards first!"
+                if category != "All Categories":
+                    return f"No fact cards found {category_msg}. Add some fact cards first!"
+                else:
+                    return "No fact cards found. Add some fact cards first!"
     
     def load_next_factcard(self):
         """Load the next due fact card"""
