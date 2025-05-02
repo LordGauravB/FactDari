@@ -214,9 +214,14 @@ class FSRSEngine:
                     card.difficulty = max(0.1, before_state["difficulty"] - 0.1)
                     card.state = 2  # Review
                 
-                # Calculate new due date based on stability
-                interval_days = max(1, int(card.stability))
-                card.due = now + timedelta(days=interval_days)
+                # Calculate new due date based on rating and stability
+                if rating_int == 1:  # Again
+                    interval_days = 0  # Same day
+                    # Set to the same date but with a small time offset
+                    card.due = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=10)
+                else:
+                    interval_days = max(1, int(card.stability))
+                    card.due = now + timedelta(days=interval_days)
                 
                 logging.info(f"Applied manual fallback values: stability={card.stability}, difficulty={card.difficulty}, state={card.state}")
         
@@ -227,7 +232,8 @@ class FSRSEngine:
                 card.stability = 0.1
                 card.difficulty = min(1.0, card.difficulty + 0.2 if card.difficulty else 0.5)
                 card.state = 3  # Relearning
-                card.due = now + timedelta(days=1)
+                # Set to the same date but with a small time offset
+                card.due = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=10)
             else:
                 # Use a simple exponential backoff
                 interval_factor = {2: 1.5, 3: 2.0, 4: 3.0}.get(rating_int, 2.0)
@@ -238,9 +244,14 @@ class FSRSEngine:
                 
             logging.info(f"Applied emergency fallback values after error: stability={card.stability}, difficulty={card.difficulty}, state={card.state}")
         
-        # Set the next review interval based on the due date
-        # Make sure we use a minimum interval of 1 day
-        if card.due <= now:
+        # Set the next review interval based on the due date and rating
+        # For "Again" (rating 1), show same day
+        if rating_int == 1:  # "Again" rating
+            # For "Again" ratings, keep due date as today (same day review)
+            interval_days = 0  # 0 days interval for same-day review
+            # Set to the same date but with a small time offset to ensure it shows up in the queue
+            card.due = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=10)
+        elif card.due <= now:
             # If the card is currently overdue or due today, use at least 1 day
             interval_days = 1  # Minimum interval
             card.due = now + timedelta(days=1)  # Force at least one day ahead

@@ -763,26 +763,7 @@ class FactDariApp:
         
         # Customize feedback based on rating
         if rating == "Again":
-            feedback_text = f"Card reset. Next review in {interval} days. Stability: {stability_percent}%"
-        elif rating == "Hard":
-            feedback_text = f"Rated as {rating}. Next review in {interval} days. Stability: {stability_percent}%"
-        elif rating == "Medium":
-            feedback_text = f"Rated as Good. Next review in {interval} days. Stability: {stability_percent}%"
-        else:  # Easy
-            feedback_text = f"Rated as {rating}. Next review in {interval} days. Stability: {stability_percent}%"
-        
-        self.status_label.config(text=feedback_text, fg=self.STATUS_COLOR)
-        
-        # Schedule clearing the status after 3 seconds
-        self.clear_status_after_delay(3000)
-    
-    def _show_fsrs_schedule_feedback(self, rating, interval, stability):
-        """Show feedback to the user about FSRS scheduling"""
-        stability_percent = min(100, int(stability))
-        
-        # Customize feedback based on rating
-        if rating == "Again":
-            feedback_text = f"Card reset. Next review in {interval} days. Stability: {stability_percent}%"
+            feedback_text = f"Card reset. Next review today. Stability: {stability_percent}%"
         elif rating == "Hard":
             feedback_text = f"Rated as {rating}. Next review in {interval} days. Stability: {stability_percent}%"
         elif rating == "Medium":
