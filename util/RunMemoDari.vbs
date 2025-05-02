@@ -1,14 +1,15 @@
+Option Explicit
+
+' Declare and create WScript Shell object
+Dim WshShell
 Set WshShell = CreateObject("WScript.Shell")
 
-' Wait for 2 minutes (120,000 milliseconds)
+' Wait for 2 minutes (120 seconds = 120000 milliseconds)
 WScript.Sleep 120000
 
-' Get the script's folder path
-Set fso = CreateObject("Scripting.FileSystemObject")
-scriptFolder = fso.GetParentFolderName(WScript.ScriptFullName)
+' Run the Python script using the full path to Python and the script
+' Format: "PythonPath" "ScriptPath"
+WshShell.Run """C:\Program Files\Python312\python.exe"" ""Extact File Path\memodari.py""", 0, False
 
-' Run the batch file from the util folder
-WshShell.Run Chr(34) & scriptFolder & "\MemoDari.bat" & Chr(34), 0, False
-
+' Clean up
 Set WshShell = Nothing
-Set fso = Nothing
