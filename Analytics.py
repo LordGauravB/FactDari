@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import json
 import config  # Import the config module
 
-app = Flask(__name__)
+app = Flask(__name__) 
 
 # Get database connection string from config
 CONN_STR = config.get_connection_string()
