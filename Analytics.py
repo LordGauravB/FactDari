@@ -1,7 +1,8 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, send_from_directory
 import pyodbc
 from datetime import datetime, timedelta
 import json
+import os
 import config  # Import the config module
 
 app = Flask(__name__) 
@@ -23,8 +24,13 @@ def fetch_query(query, params=None):
 @app.route('/')
 def index():
     """Render the main analytics page"""
-    # Pass chart configuration to the template
-    return render_template('index.html', chart_config=config.get_chart_config_js())
+    # Use the new analytics template
+    return render_template('analytics.html')
+
+@app.route('/resources/<path:filename>')
+def serve_resources(filename):
+    """Serve files from the Resources directory"""
+    return send_from_directory(config.RESOURCES_DIR, filename)
 
 @app.route('/api/category-distribution')
 def category_distribution():
@@ -288,7 +294,125 @@ def chart_data():
             ORDER BY MIN(Stability)
         """)
     }
-    return jsonify(data)
+    
+    # Transform data for new frontend format
+    formatted_data = {
+        'category_distribution': {
+            'labels': [row['CategoryName'] for row in data['categoryDistribution']],
+            'data': [row['CardCount'] for row in data['categoryDistribution']]
+        },
+        'cards_per_category': format_cards_per_category(data['categoryDistribution']),
+        'review_schedule_timeline': format_review_schedule(data['reviewSchedule']),
+        'learning_curve': format_learning_curve(data['learningCurve']),
+        'cards_added_over_time': format_cards_over_time(data['cardsAddedOverTime']),
+        'view_mastery_correlation': format_scatter_data(data['viewMasteryCorrelation'], 'ViewCount', 'MasteryPercentage'),
+        'interval_growth_distribution': format_bar_chart(data['intervalGrowth'], 'CurrentInterval', 'CardCount', 'Interval (days)'),
+        'learning_efficiency': format_scatter_data(data['learningEfficiency'], 'ViewCount', 'EfficiencyScore'),
+        'fsrs_stability_distribution': format_bar_chart(data['stabilityDistribution'], 'StabilityRange', 'CardCount', 'Stability Range')
+    }
+    
+    return jsonify(formatted_data)
+
+def format_cards_per_category(category_data):
+    """Format data for stacked bar chart showing mastery levels"""
+    categories = [row['CategoryName'] for row in category_data]
+    
+    # For now, just show total cards (we'd need more data for mastery breakdown)
+    return {
+        'labels': categories,
+        'datasets': [{
+            'label': 'Total Cards',
+            'data': [row['CardCount'] for row in category_data],
+            'backgroundColor': '#4CAF50'
+        }]
+    }
+
+def format_review_schedule(schedule_data):
+    """Format review schedule for next 30 days"""
+    # Create labels for next 30 days
+    labels = []
+    data_values = []
+    schedule_dict = {row['ReviewDate']: row['CardCount'] for row in schedule_data}
+    
+    for i in range(30):
+        date = datetime.now() + timedelta(days=i)
+        date_str = date.strftime('%Y-%m-%d')
+        labels.append(f"Day {i+1}")
+        data_values.append(schedule_dict.get(date_str, 0))
+    
+    return {
+        'labels': labels,
+        'datasets': [{
+            'label': 'Cards Due',
+            'data': data_values,
+            'backgroundColor': '#2196F3'
+        }]
+    }
+
+def format_learning_curve(curve_data):
+    """Format learning curve data"""
+    return {
+        'labels': [row['Date'] for row in curve_data],
+        'datasets': [{
+            'label': 'Average Retention',
+            'data': [row['AverageMastery'] for row in curve_data],
+            'borderColor': '#4CAF50',
+            'backgroundColor': 'rgba(76, 175, 80, 0.1)',
+            'fill': True
+        }]
+    }
+
+def format_cards_over_time(time_data):
+    """Format cards added over time with cumulative total"""
+    labels = [row['Date'] for row in time_data]
+    new_cards = [row['CardsAdded'] for row in time_data]
+    
+    # Calculate cumulative
+    cumulative = []
+    total = 0
+    for count in new_cards:
+        total += count
+        cumulative.append(total)
+    
+    return {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'New Cards',
+                'data': new_cards,
+                'type': 'bar',
+                'backgroundColor': '#FFC107'
+            },
+            {
+                'label': 'Cumulative Total',
+                'data': cumulative,
+                'type': 'line',
+                'borderColor': '#4CAF50',
+                'backgroundColor': 'transparent',
+                'borderWidth': 2
+            }
+        ]
+    }
+
+def format_scatter_data(data, x_field, y_field):
+    """Format data for scatter plots"""
+    return {
+        'datasets': [{
+            'label': 'Data Points',
+            'data': [{'x': row[x_field], 'y': row[y_field]} for row in data]
+        }]
+    }
+
+def format_bar_chart(data, label_field, value_field, label_name):
+    """Format data for simple bar charts"""
+    return {
+        'labels': [str(row[label_field]) for row in data],
+        'datasets': [{
+            'label': label_name,
+            'data': [row[value_field] for row in data],
+            'backgroundColor': '#9C27B0'
+        }]
+    }
 
 if __name__ == '__main__':
     app.run(debug=True)

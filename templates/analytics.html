@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MemoDari Analytics Dashboard</title>
+    <link rel="icon" type="image/png" href="/resources/application_icons/Brain-Icon.png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/analytics.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-spinner"></div>
+        <p>Loading analytics data...</p>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <img src="/resources/application_icons/Brain-Icon.png" alt="MemoDari Logo" class="nav-logo">
+                <h1>MemoDari Analytics</h1>
+            </div>
+            <div class="nav-actions">
+                <button id="theme-toggle" class="btn-icon" title="Toggle theme">
+                    <svg id="theme-icon-dark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"/>
+                        <line x1="12" y1="1" x2="12" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="23"/>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                        <line x1="1" y1="12" x2="3" y2="12"/>
+                        <line x1="21" y1="12" x2="23" y2="12"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                    <svg id="theme-icon-light" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
+                <button id="refresh-btn" class="btn btn-secondary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 12c0-4.75 4-8.5 9-8.5s9 3.75 9 8.5-4 8.5-9 8.5c-1.5 0-3-.5-4-1"/>
+                    </svg>
+                    Refresh
+                </button>
+                <div class="auto-refresh-timer">
+                    Auto-refresh in <span id="countdown">2m 0s</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Key Metrics Section -->
+    <section class="metrics-section">
+        <div class="container">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <path d="M9 9h6M9 12h6M9 15h4"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <h3 class="metric-value" id="total-cards">0</h3>
+                        <p class="metric-label">Total Cards</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <h3 class="metric-value" id="due-today">0</h3>
+                        <p class="metric-label">Due Today</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <h3 class="metric-value" id="mastered-cards">0</h3>
+                        <p class="metric-label">Mastered Cards</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <h3 class="metric-value" id="active-categories">0</h3>
+                        <p class="metric-label">Categories</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Charts Section -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Tab Navigation -->
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="overview">Overview</button>
+                <button class="tab-btn" data-tab="performance">Performance</button>
+                <button class="tab-btn" data-tab="progress">Progress</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="tab-content active" id="overview-tab">
+                <div class="charts-grid">
+                    <div class="chart-card" data-chart="category-distribution">
+                        <div class="chart-header">
+                            <h3>Category Distribution</h3>
+                            <button class="btn-icon expand-btn" data-chart="category-distribution">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="category-distribution"></canvas>
+                        </div>
+                        <p class="chart-description">Distribution of fact cards across different categories</p>
+                    </div>
+
+                    <div class="chart-card" data-chart="cards-per-category">
+                        <div class="chart-header">
+                            <h3>Cards per Category</h3>
+                            <button class="btn-icon expand-btn" data-chart="cards-per-category">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="cards-per-category"></canvas>
+                        </div>
+                        <p class="chart-description">Number of cards in each category with mastery status</p>
+                    </div>
+
+                    <div class="chart-card" data-chart="review-schedule">
+                        <div class="chart-header">
+                            <h3>Review Schedule Timeline</h3>
+                            <button class="btn-icon expand-btn" data-chart="review-schedule">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="review-schedule"></canvas>
+                        </div>
+                        <p class="chart-description">Upcoming review schedule for the next 30 days</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="performance-tab">
+                <div class="charts-grid">
+                    <div class="chart-card span-2" data-chart="learning-curve">
+                        <div class="chart-header">
+                            <h3>Learning Curve</h3>
+                            <button class="btn-icon expand-btn" data-chart="learning-curve">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="learning-curve"></canvas>
+                        </div>
+                        <p class="chart-description">Average retention rate over time showing learning progress</p>
+                    </div>
+
+                    <div class="chart-card" data-chart="view-mastery-correlation">
+                        <div class="chart-header">
+                            <h3>View vs Mastery Correlation</h3>
+                            <button class="btn-icon expand-btn" data-chart="view-mastery-correlation">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="view-mastery-correlation"></canvas>
+                        </div>
+                        <p class="chart-description">Relationship between view count and mastery status</p>
+                    </div>
+
+                    <div class="chart-card" data-chart="learning-efficiency">
+                        <div class="chart-header">
+                            <h3>Learning Efficiency</h3>
+                            <button class="btn-icon expand-btn" data-chart="learning-efficiency">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="learning-efficiency"></canvas>
+                        </div>
+                        <p class="chart-description">Time to master cards based on review frequency</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="progress-tab">
+                <div class="charts-grid">
+                    <div class="chart-card span-2" data-chart="cards-added-over-time">
+                        <div class="chart-header">
+                            <h3>Cards Added Over Time</h3>
+                            <button class="btn-icon expand-btn" data-chart="cards-added-over-time">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="cards-added-over-time"></canvas>
+                        </div>
+                        <p class="chart-description">Daily new cards and cumulative total over time</p>
+                    </div>
+
+                    <div class="chart-card" data-chart="interval-growth">
+                        <div class="chart-header">
+                            <h3>Interval Growth Distribution</h3>
+                            <button class="btn-icon expand-btn" data-chart="interval-growth">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="interval-growth"></canvas>
+                        </div>
+                        <p class="chart-description">Distribution of review intervals showing memory strength</p>
+                    </div>
+
+                    <div class="chart-card" data-chart="fsrs-stability">
+                        <div class="chart-header">
+                            <h3>FSRS Stability Distribution</h3>
+                            <button class="btn-icon expand-btn" data-chart="fsrs-stability">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="fsrs-stability"></canvas>
+                        </div>
+                        <p class="chart-description">Memory stability values across all cards</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Chart Modal -->
+    <div id="chart-modal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div class="modal-chart-container">
+                <canvas id="modal-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+</body>
+</html>

@@ -417,11 +417,14 @@ class MemoDariApp:
         
         # Start Flask server
         if sys.platform.startswith('win'):
-            self.flask_process = subprocess.Popen(["python", flask_app_path], 
+            # Use the Python from the virtual environment if it exists
+            python_executable = sys.executable  # This will use the same Python that's running memodari.py
+            self.flask_process = subprocess.Popen([python_executable, flask_app_path], 
                                                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
         else:
             # Linux/Mac
-            self.flask_process = subprocess.Popen(["python3", flask_app_path], 
+            python_executable = sys.executable  # This will use the same Python that's running memodari.py
+            self.flask_process = subprocess.Popen([python_executable, flask_app_path], 
                                                preexec_fn=os.setsid)
         
         # Register exit handler to close Flask server when the main app exits
