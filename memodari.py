@@ -260,16 +260,23 @@ class MemoDariApp:
         
         # Stats labels
         self.factcard_count_label = self.create_label(self.stats_frame, "Total Fact Cards: 0", 
-                                            font=self.STATS_FONT, side='left')
+                                            font=self.STATS_FONT, side='left', fg=self.BLUE_COLOR)
         self.factcard_count_label.pack_configure(padx=10)
         
         self.due_count_label = self.create_label(self.stats_frame, "Due today: 0", 
-                                       font=self.STATS_FONT, side='left')
+                                       font=self.STATS_FONT, side='left', fg=self.BLUE_COLOR)
         self.due_count_label.pack_configure(padx=10)
         
         self.coordinate_label = self.create_label(self.stats_frame, "Coordinates: ", 
-                                        font=self.STATS_FONT, side='right')
+                                        font=self.STATS_FONT, side='left', fg=self.BLUE_COLOR)
         self.coordinate_label.pack_configure(padx=10)
+        
+        # Add GitHub link on the right side
+        github_label = tk.Label(self.stats_frame, text="GitHub: LordGauravB", 
+                              fg=self.BLUE_COLOR, bg=self.BG_COLOR, font=self.STATS_FONT,
+                              cursor="hand2")
+        github_label.pack(side='right', padx=10)
+        github_label.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/LordGauravB"))
         
         # Initially disable the review buttons
         self.show_review_buttons(False)
@@ -353,7 +360,7 @@ class MemoDariApp:
     def update_factcard_count(self):
         """Update the fact card count display"""
         num_factcards = self.count_factcards()
-        self.factcard_count_label.config(text=f"Total Fact Cards: {num_factcards}")
+        self.factcard_count_label.config(text=f"Total Cards: {num_factcards}")
     
     def on_press(self, event):
         """Handle mouse press on title bar for dragging"""
