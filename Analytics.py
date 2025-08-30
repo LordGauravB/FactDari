@@ -317,14 +317,44 @@ def format_cards_per_category(category_data):
     """Format data for stacked bar chart showing mastery levels"""
     categories = [row['CategoryName'] for row in category_data]
     
-    # For now, just show total cards (we'd need more data for mastery breakdown)
+    # Compute mastered (Mastery >= 0.9) per category
+    mastered_counts = []
+    total_counts = []
+    for cat in categories:
+        total_row = fetch_query("""
+            SELECT COUNT(*) AS cnt
+            FROM FactCards f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE c.CategoryName = ?
+        """, (cat,))
+        total = total_row[0]['cnt'] if total_row else 0
+        total_counts.append(total)
+        
+        mastered_row = fetch_query("""
+            SELECT COUNT(*) AS cnt
+            FROM FactCards f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE c.CategoryName = ? AND f.Mastery >= 0.9
+        """, (cat,))
+        mastered = mastered_row[0]['cnt'] if mastered_row else 0
+        mastered_counts.append(mastered)
+    
+    learning_counts = [max(0, t - m) for t, m in zip(total_counts, mastered_counts)]
+    
     return {
         'labels': categories,
-        'datasets': [{
-            'label': 'Total Cards',
-            'data': [row['CardCount'] for row in category_data],
-            'backgroundColor': '#4CAF50'
-        }]
+        'datasets': [
+            {
+                'label': 'Mastered',
+                'data': mastered_counts,
+                'backgroundColor': '#4CAF50'
+            },
+            {
+                'label': 'Learning',
+                'data': learning_counts,
+                'backgroundColor': '#FFC107'
+            }
+        ]
     }
 
 def format_review_schedule(schedule_data):

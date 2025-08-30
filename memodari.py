@@ -304,9 +304,14 @@ class MemoDariApp:
         if radius is None:
             radius = self.CORNER_RADIUS
             
-        hWnd = wintypes.HWND(int(self.root.frame(), 16))
-        hRgn = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, self.root.winfo_width(), self.root.winfo_height(), radius, radius)
-        ctypes.windll.user32.SetWindowRgn(hWnd, hRgn, True)
+        # Use the Tk window handle correctly
+        try:
+            hwnd = self.root.winfo_id()
+            hRgn = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, self.root.winfo_width(), self.root.winfo_height(), radius, radius)
+            ctypes.windll.user32.SetWindowRgn(wintypes.HWND(hwnd), hRgn, True)
+        except Exception:
+            # If applying rounded corners fails, continue without crashing
+            pass
     
     # Database Methods
     def fetch_query(self, query, params=None):
@@ -1146,7 +1151,8 @@ class MemoDariApp:
         
         # Ask for confirmation
         if tk.messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this fact card?"):
-            # Delete related review logs first
+            # Delete related tags and review logs first to satisfy FK constraints
+            self.execute_update("DELETE FROM FactCardTags WHERE FactCardID = ?", (self.current_factcard_id,))
             self.execute_update("DELETE FROM ReviewLogs WHERE FactCardID = ?", (self.current_factcard_id,))
             
             # Delete the fact card

@@ -20,8 +20,8 @@ CREATE TABLE Categories (
     CategoryID INT IDENTITY(1,1) PRIMARY KEY,
     CategoryName NVARCHAR(100) NOT NULL,
     Description NVARCHAR(255),
-    IsActive BIT NOT NULL,
-    CreatedDate DATETIME NOT NULL
+    IsActive BIT NOT NULL CONSTRAINT DF_Categories_IsActive DEFAULT 1,
+    CreatedDate DATETIME NOT NULL CONSTRAINT DF_Categories_CreatedDate DEFAULT GETDATE()
 );
 
 -- Step 5: Create Tags table
@@ -36,29 +36,33 @@ CREATE TABLE FactCards (
     CategoryID INT FOREIGN KEY REFERENCES Categories(CategoryID),
     Question NVARCHAR(MAX) NOT NULL,
     Answer NVARCHAR(MAX) NOT NULL,
-    NextReviewDate DATE,
-    CurrentInterval INT,
-    Mastery FLOAT,
-    DateAdded DATE,
+    NextReviewDate DATE NOT NULL CONSTRAINT DF_FactCards_NextReviewDate DEFAULT GETDATE(),
+    CurrentInterval INT NOT NULL CONSTRAINT DF_FactCards_CurrentInterval DEFAULT 1,
+    Mastery FLOAT NOT NULL CONSTRAINT DF_FactCards_Mastery DEFAULT 0.0,
+    DateAdded DATE NOT NULL CONSTRAINT DF_FactCards_DateAdded DEFAULT GETDATE(),
     LastReviewDate DATE,
-    Stability FLOAT,
-    Difficulty FLOAT,
-    State INT,
-    Lapses INT,
-    ViewCount INT
+    Stability FLOAT NOT NULL CONSTRAINT DF_FactCards_Stability DEFAULT 0.0,
+    Difficulty FLOAT NOT NULL CONSTRAINT DF_FactCards_Difficulty DEFAULT 0.3,
+    State INT NOT NULL CONSTRAINT DF_FactCards_State DEFAULT 1,
+    Lapses INT NOT NULL CONSTRAINT DF_FactCards_Lapses DEFAULT 0,
+    ViewCount INT NOT NULL CONSTRAINT DF_FactCards_ViewCount DEFAULT 0
 );
 
 -- Step 7: Create FactCardTags table
 CREATE TABLE FactCardTags (
     FactCardTagID INT IDENTITY(1,1) PRIMARY KEY,
-    FactCardID INT FOREIGN KEY REFERENCES FactCards(FactCardID),
-    TagID INT FOREIGN KEY REFERENCES Tags(TagID)
+    FactCardID INT NOT NULL,
+    TagID INT NOT NULL,
+    CONSTRAINT FK_FactCardTags_FactCards FOREIGN KEY (FactCardID)
+        REFERENCES FactCards(FactCardID) ON DELETE CASCADE,
+    CONSTRAINT FK_FactCardTags_Tags FOREIGN KEY (TagID)
+        REFERENCES Tags(TagID)
 );
 
 -- Step 8: Create ReviewLogs table (with Interval and Rating included)
 CREATE TABLE ReviewLogs (
     ReviewLogID INT IDENTITY(1,1) PRIMARY KEY,
-    FactCardID INT FOREIGN KEY REFERENCES FactCards(FactCardID),
+    FactCardID INT NOT NULL,
     ReviewDate DATETIME NOT NULL,
     UserRating INT,
     IntervalBeforeReview INT,
@@ -69,7 +73,15 @@ CREATE TABLE ReviewLogs (
     DifficultyAfter FLOAT,
     Rating INT,        -- <- Added
     Interval INT       -- <- Added
+    ,CONSTRAINT FK_ReviewLogs_FactCards FOREIGN KEY (FactCardID)
+        REFERENCES FactCards(FactCardID) ON DELETE CASCADE
 );
+
+-- Helpful indexes for app queries
+CREATE INDEX IX_FactCards_NextReviewDate ON FactCards(NextReviewDate);
+CREATE INDEX IX_FactCards_CategoryID ON FactCards(CategoryID);
+CREATE INDEX IX_ReviewLogs_FactCardID ON ReviewLogs(FactCardID);
+CREATE INDEX IX_FactCardTags_FactCardID ON FactCardTags(FactCardID);
 
 -- Step 9: Insert categories
 INSERT INTO Categories (CategoryName, Description, IsActive, CreatedDate)
