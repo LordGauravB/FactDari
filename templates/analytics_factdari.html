@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FactDari Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Trebuchet MS', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .chart-container {
+            background: rgba(30, 30, 30, 0.9);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+        
+        .chart-container h2 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        
+        .chart-container.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #4CAF50 0%, #2196F3 100%);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .stat-card h3 {
+            font-size: 1em;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        
+        .stat-card .value {
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        th {
+            background: rgba(76, 175, 80, 0.2);
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        
+        tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .heatmap-container {
+            margin-top: 15px;
+        }
+        
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: 40px repeat(24, 1fr);
+            gap: 2px;
+            font-size: 0.8em;
+        }
+        
+        .heatmap-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px;
+            min-width: 25px;
+        }
+        
+        .heatmap-label {
+            font-weight: bold;
+            color: #4CAF50;
+            display: flex;
+            align-items: center;
+            justify-content: right;
+            padding-right: 5px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.5em;
+            color: #4CAF50;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <h1>FactDari Analytics Dashboard</h1>
+    
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+            <h3>Total Facts</h3>
+            <div class="value" id="totalFacts">-</div>
+        </div>
+        <div class="stat-card">
+            <h3>Facts Viewed Today</h3>
+            <div class="value" id="factsViewedToday">-</div>
+        </div>
+        <div class="stat-card">
+            <h3>Current Streak</h3>
+            <div class="value" id="currentStreak">-</div>
+        </div>
+        <div class="stat-card">
+            <h3>Total Categories</h3>
+            <div class="value" id="totalCategories">-</div>
+        </div>
+    </div>
+    
+    <div class="dashboard">
+        <div class="chart-container">
+            <h2>Category Distribution</h2>
+            <canvas id="categoryChart"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <h2>Review Status</h2>
+            <canvas id="reviewStatusChart"></canvas>
+        </div>
+        
+        <div class="chart-container full-width">
+            <h2>Facts Viewed Per Day (Last 30 Days)</h2>
+            <canvas id="reviewsPerDayChart"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <h2>Most Reviewed Facts</h2>
+            <div class="table-container">
+                <table id="mostReviewedTable">
+                    <thead>
+                        <tr>
+                            <th>Fact</th>
+                            <th>Category</th>
+                            <th>Reviews</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h2>Least Reviewed Facts</h2>
+            <div class="table-container">
+                <table id="leastReviewedTable">
+                    <thead>
+                        <tr>
+                            <th>Fact</th>
+                            <th>Category</th>
+                            <th>Reviews</th>
+                            <th>Days Since</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="chart-container full-width">
+            <h2>Facts Added Over Time</h2>
+            <canvas id="factsTimelineChart"></canvas>
+        </div>
+        
+        <div class="chart-container full-width">
+            <h2>Review Activity Heatmap (Last 7 Days)</h2>
+            <div class="heatmap-container" id="heatmapContainer"></div>
+        </div>
+        
+        <div class="chart-container full-width">
+            <h2>Category Review Distribution</h2>
+            <canvas id="categoryReviewsChart"></canvas>
+        </div>
+    </div>
+    
+    <script>
+        // Chart.js default configuration
+        Chart.defaults.color = 'white';
+        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+        Chart.defaults.font.family = 'Trebuchet MS';
+        
+        // Fetch and display data
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/chart-data');
+                const data = await response.json();
+                
+                // Update stats
+                updateStats(data);
+                
+                // Create charts
+                createCategoryChart(data.category_distribution);
+                createReviewStatusChart(data.review_status);
+                createReviewsPerDayChart(data.reviews_per_day);
+                createFactsTimelineChart(data.facts_added_timeline);
+                createCategoryReviewsChart(data.category_reviews);
+                createHeatmap(data.review_heatmap);
+                
+                // Populate tables
+                populateMostReviewedTable(data.most_reviewed_facts);
+                populateLeastReviewedTable(data.least_reviewed_facts);
+                
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+        
+        function updateStats(data) {
+            // Calculate totals from the data
+            const totalFacts = data.category_distribution.data.reduce((a, b) => a + b, 0);
+            const totalCategories = data.category_distribution.labels.length;
+            
+            document.getElementById('totalFacts').textContent = totalFacts;
+            document.getElementById('totalCategories').textContent = totalCategories;
+            
+            // Get today's facts viewed
+            if (data.reviews_per_day && data.reviews_per_day.labels.length > 0) {
+                const todayData = data.reviews_per_day.datasets[0].data;
+                const todayViewed = todayData[todayData.length - 1] || 0;
+                document.getElementById('factsViewedToday').textContent = todayViewed;
+            }
+            
+            // Update streak
+            if (data.review_streak) {
+                document.getElementById('currentStreak').textContent = 
+                    data.review_streak.current_streak + ' days';
+            }
+        }
+        
+        function createCategoryChart(data) {
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.data,
+                        backgroundColor: [
+                            '#4CAF50', '#2196F3', '#FFC107', '#F44336', '#9C27B0',
+                            '#00BCD4', '#FF9800', '#795548', '#607D8B', '#E91E63'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createReviewStatusChart(data) {
+            const ctx = document.getElementById('reviewStatusChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.data,
+                        backgroundColor: [
+                            '#F44336', '#FFC107', '#4CAF50', '#2196F3', '#9C27B0'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createReviewsPerDayChart(data) {
+            const ctx = document.getElementById('reviewsPerDayChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createFactsTimelineChart(data) {
+            const ctx = document.getElementById('factsTimelineChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createCategoryReviewsChart(data) {
+            const ctx = document.getElementById('categoryReviewsChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createHeatmap(data) {
+            const container = document.getElementById('heatmapContainer');
+            const grid = document.createElement('div');
+            grid.className = 'heatmap-grid';
+            
+            // Add empty cell for top-left corner
+            grid.innerHTML = '<div></div>';
+            
+            // Add hour labels
+            for (let hour = 0; hour < 24; hour++) {
+                const label = document.createElement('div');
+                label.className = 'heatmap-label';
+                label.textContent = hour;
+                grid.appendChild(label);
+            }
+            
+            // Add data rows
+            data.days.forEach((day, dayIndex) => {
+                // Add day label
+                const dayLabel = document.createElement('div');
+                dayLabel.className = 'heatmap-label';
+                dayLabel.textContent = day.substr(0, 3);
+                grid.appendChild(dayLabel);
+                
+                // Add hour cells
+                for (let hour = 0; hour < 24; hour++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'heatmap-cell';
+                    const value = data.data[dayIndex][hour] || 0;
+                    const intensity = Math.min(value / 10, 1); // Normalize to 0-1
+                    cell.style.background = `rgba(76, 175, 80, ${intensity})`;
+                    cell.title = `${day} ${hour}:00 - ${value} reviews`;
+                    if (value > 0) {
+                        cell.textContent = value;
+                    }
+                    grid.appendChild(cell);
+                }
+            });
+            
+            container.appendChild(grid);
+        }
+        
+        function populateMostReviewedTable(facts) {
+            const tbody = document.querySelector('#mostReviewedTable tbody');
+            facts.forEach(fact => {
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = fact.Content.substring(0, 50) + '...';
+                row.insertCell(1).textContent = fact.CategoryName;
+                row.insertCell(2).textContent = fact.ReviewCount;
+            });
+        }
+        
+        function populateLeastReviewedTable(facts) {
+            const tbody = document.querySelector('#leastReviewedTable tbody');
+            facts.forEach(fact => {
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = fact.Content.substring(0, 40) + '...';
+                row.insertCell(1).textContent = fact.CategoryName;
+                row.insertCell(2).textContent = fact.ReviewCount;
+                row.insertCell(3).textContent = fact.DaysSinceReview || 'N/A';
+            });
+        }
+        
+        // Load dashboard on page load
+        window.addEventListener('DOMContentLoaded', loadDashboard);
+    </script>
+</body>
+</html>

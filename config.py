@@ -4,40 +4,36 @@ from pathlib import Path
 
 # Base directory where the application is installed
 # Use environment variable if provided, otherwise use relative path
-BASE_DIR = os.environ.get('MEMODARI_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.environ.get('FACTDARI_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
 
 # Resource paths - allow override via environment variables
-RESOURCES_DIR = os.environ.get('MEMODARI_RESOURCES_DIR', os.path.join(BASE_DIR, "Resources"))
-ICONS_DIR = os.environ.get('MEMODARI_ICONS_DIR', os.path.join(RESOURCES_DIR, "application_icons"))
-APPLICATION_IMAGES_DIR = os.environ.get('MEMODARI_APPLICATION_IMAGES_DIR', os.path.join(RESOURCES_DIR, "application_images"))
-
-# Log directory
-LOG_DIR = os.environ.get('MEMODARI_LOG_DIR', os.path.join(BASE_DIR, "util"))
-LOG_FILE = os.environ.get('MEMODARI_LOG_FILE', os.path.join(LOG_DIR, "fsrs_debug.log"))
-
-# FSRS weights file
-WEIGHTS_FILE = os.environ.get('MEMODARI_WEIGHTS_FILE', os.path.join(BASE_DIR, "weights.json"))
+RESOURCES_DIR = os.environ.get('FACTDARI_RESOURCES_DIR', os.path.join(BASE_DIR, "Resources"))
+ICONS_DIR = os.environ.get('FACTDARI_ICONS_DIR', os.path.join(RESOURCES_DIR, "application_icons"))
+APPLICATION_IMAGES_DIR = os.environ.get('FACTDARI_APPLICATION_IMAGES_DIR', os.path.join(RESOURCES_DIR, "application_images"))
 
 # Analytics app path
-ANALYTICS_APP = os.environ.get('MEMODARI_ANALYTICS_APP', os.path.join(BASE_DIR, "analytics.py"))
+ANALYTICS_APP = os.environ.get('FACTDARI_ANALYTICS_APP', os.path.join(BASE_DIR, "analytics_factdari.py"))
 
 # Database configuration
 DB_CONFIG = {
-    'server': os.environ.get('MEMODARI_DB_SERVER', 'GAURAVS_DESKTOP\\SQLEXPRESS'),
-    'database': os.environ.get('MEMODARI_DB_NAME', 'MemoDari'),
-    'trusted_connection': os.environ.get('MEMODARI_DB_TRUSTED', 'yes')
+    'server': os.environ.get('FACTDARI_DB_SERVER', 'GAURAVS_DESKTOP\\SQLEXPRESS'),
+    'database': os.environ.get('FACTDARI_DB_NAME', 'FactDari'),
+    'trusted_connection': os.environ.get('FACTDARI_DB_TRUSTED', 'yes')
 }
 
 # UI Configuration
 UI_CONFIG = {
     # Window dimensions
-    'window_width': 500,
+    'window_width': 510,
     'window_height': 380,
     'window_static_pos': "-1927+7",
     'popup_position': "-1923+400",
     'popup_add_card_size': "496x400",
     'popup_edit_card_size': "496x520",
-    'popup_categories_size': "400x500",
+    'popup_categories_size': "400x510",
+    'popup_info_size': "420x480",
+    'popup_confirm_size': "360x180",
+    'popup_rename_size': "420x200",
     'corner_radius': 15,
     
     # Colors

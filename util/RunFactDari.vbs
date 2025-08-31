@@ -9,7 +9,7 @@ WScript.Sleep 120000
 
 ' Run the Python script using the full path to Python and the script
 ' Format: "PythonPath" "ScriptPath"
-WshShell.Run """C:\Program Files\Python312\python.exe"" ""Extact File Path\memodari.py""", 0, False
+WshShell.Run """C:\Program Files\Python312\python.exe"" ""Exact File Path\factdari.py""", 0, False
 
 ' Clean up
 Set WshShell = Nothing

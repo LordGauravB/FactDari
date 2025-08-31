@@ -1,0 +1,19 @@
+# FactDari Requirements
+# Simple fact viewer application
+
+# Core dependencies
+pyodbc==5.1.0          # Database connectivity
+Pillow==10.3.0         # Image processing for icons
+pyttsx3==2.90          # Text-to-speech functionality
+
+# Web framework for analytics
+Flask==3.0.3
+Werkzeug==3.0.3
+Jinja2==3.1.4
+MarkupSafe==2.1.5
+itsdangerous==2.2.0
+click==8.1.7
+blinker==1.8.2
+
+# Windows-specific
+pywin32==306           # Windows system integration (optional, for Windows users)
