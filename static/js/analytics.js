@@ -586,7 +586,7 @@
       // Render charts with slight delay for smooth transition
       setTimeout(() => {
         pieChart('category_distribution', 'category-distribution', data.category_distribution);
-        doughnutChart('review_status', 'review-status', data.review_status);
+        doughnutChart('favorite_categories', 'favorite-categories', data.favorite_category_distribution);
         lineChart('reviews_per_day', 'reviews-per-day', data.reviews_per_day);
         barChart('facts_timeline', 'facts-timeline', data.facts_added_timeline);
         barChart('category_reviews', 'category-reviews', data.category_reviews, true);
@@ -786,7 +786,7 @@
           // Handle regular charts
           const idMap = {
             'category-distribution': 'category_distribution',
-            'review-status': 'review_status',
+            'favorite-categories': 'favorite_categories',
             'reviews-per-day': 'reviews_per_day',
             'facts-timeline': 'facts_timeline',
             'category-reviews': 'category_reviews',

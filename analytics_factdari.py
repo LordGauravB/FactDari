@@ -121,25 +121,14 @@ def chart_data():
             ORDER BY DATEPART(weekday, ReviewDate), DATEPART(hour, ReviewDate)
         """, (seven_days_ago,)),
         
-        # Facts by review status
-        'reviewStatus': fetch_query("""
-            SELECT 
-                CASE 
-                    WHEN ReviewCount = 0 THEN 'Never Reviewed'
-                    WHEN DATEDIFF(day, LastViewedDate, GETDATE()) <= 1 THEN 'Reviewed Today/Yesterday'
-                    WHEN DATEDIFF(day, LastViewedDate, GETDATE()) <= 7 THEN 'Reviewed This Week'
-                    WHEN DATEDIFF(day, LastViewedDate, GETDATE()) <= 30 THEN 'Reviewed This Month'
-                    ELSE 'Not Recently Reviewed'
-                END as Status,
-                COUNT(*) as FactCount
-            FROM Facts
-            GROUP BY CASE 
-                    WHEN ReviewCount = 0 THEN 'Never Reviewed'
-                    WHEN DATEDIFF(day, LastViewedDate, GETDATE()) <= 1 THEN 'Reviewed Today/Yesterday'
-                    WHEN DATEDIFF(day, LastViewedDate, GETDATE()) <= 7 THEN 'Reviewed This Week'
-                    WHEN DATEDIFF(day, LastViewedDate, GETDATE()) <= 30 THEN 'Reviewed This Month'
-                    ELSE 'Not Recently Reviewed'
-                END
+        # Category distribution for favorite cards
+        'favoriteCategoryDistribution': fetch_query("""
+            SELECT c.CategoryName, COUNT(f.FactID) as FavoriteCount
+            FROM Categories c
+            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID AND f.IsFavorite = 1
+            GROUP BY c.CategoryName
+            HAVING COUNT(f.FactID) > 0
+            ORDER BY COUNT(f.FactID) DESC
         """),
         
         # Review streak data
@@ -173,7 +162,7 @@ def chart_data():
         'least_reviewed_facts': format_table_data(data['leastReviewedFacts']),
         'facts_added_timeline': format_timeline(data['factsAddedOverTime']),
         'review_heatmap': format_heatmap(data['reviewHeatmap']),
-        'review_status': format_pie_chart(data['reviewStatus'], 'Status', 'FactCount'),
+        'favorite_category_distribution': format_pie_chart(data['favoriteCategoryDistribution'], 'CategoryName', 'FavoriteCount'),
         'review_streak': data['reviewStreak'],
         'category_reviews': format_bar_chart(data['categoryReviews'], 'CategoryName', 'TotalReviews'),
         'favorites_count': data['favoritesCount'][0]['FavoriteCount'] if data['favoritesCount'] else 0
