@@ -74,7 +74,9 @@ def chart_data():
             SELECT TOP 10
                 f.Content,
                 f.ReviewCount,
-                c.CategoryName
+                c.CategoryName,
+                f.IsFavorite,
+                f.IsEasy
             FROM Facts f
             JOIN Categories c ON f.CategoryID = c.CategoryID
             WHERE f.ReviewCount > 0
@@ -90,7 +92,9 @@ def chart_data():
                 CASE 
                     WHEN f.LastViewedDate IS NULL THEN NULL
                     ELSE DATEDIFF(day, f.LastViewedDate, GETDATE())
-                END as DaysSinceReview
+                END as DaysSinceReview,
+                f.IsFavorite,
+                f.IsEasy
             FROM Facts f
             JOIN Categories c ON f.CategoryID = c.CategoryID
             ORDER BY 
@@ -131,6 +135,27 @@ def chart_data():
             ORDER BY COUNT(f.FactID) DESC
         """),
         
+        # Category distribution for known/easy cards
+        'knownCategoryDistribution': fetch_query("""
+            SELECT c.CategoryName, COUNT(f.FactID) as KnownCount
+            FROM Categories c
+            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID AND f.IsEasy = 1
+            GROUP BY c.CategoryName
+            HAVING COUNT(f.FactID) > 0
+            ORDER BY COUNT(f.FactID) DESC
+        """),
+        
+        # Categories viewed today
+        'categoriesViewedToday': fetch_query("""
+            SELECT c.CategoryName, COUNT(DISTINCT rl.FactID) as ViewedCount
+            FROM Categories c
+            INNER JOIN Facts f ON c.CategoryID = f.CategoryID
+            INNER JOIN ReviewLogs rl ON f.FactID = rl.FactID
+            WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE())
+            GROUP BY c.CategoryName
+            ORDER BY COUNT(DISTINCT rl.FactID) DESC
+        """),
+        
         # Review streak data
         'reviewStreak': calculate_review_streak(),
         
@@ -151,6 +176,13 @@ def chart_data():
             SELECT COUNT(*) as FavoriteCount
             FROM Facts
             WHERE IsFavorite = 1
+        """),
+        
+        # Count of known facts (marked as easy)
+        'knownFactsCount': fetch_query("""
+            SELECT COUNT(*) as KnownCount
+            FROM Facts
+            WHERE IsEasy = 1
         """)
     }
     
@@ -163,9 +195,12 @@ def chart_data():
         'facts_added_timeline': format_timeline(data['factsAddedOverTime']),
         'review_heatmap': format_heatmap(data['reviewHeatmap']),
         'favorite_category_distribution': format_pie_chart(data['favoriteCategoryDistribution'], 'CategoryName', 'FavoriteCount'),
+        'known_category_distribution': format_pie_chart(data['knownCategoryDistribution'], 'CategoryName', 'KnownCount'),
+        'categories_viewed_today': format_pie_chart(data['categoriesViewedToday'], 'CategoryName', 'ViewedCount'),
         'review_streak': data['reviewStreak'],
         'category_reviews': format_bar_chart(data['categoryReviews'], 'CategoryName', 'TotalReviews'),
-        'favorites_count': data['favoritesCount'][0]['FavoriteCount'] if data['favoritesCount'] else 0
+        'favorites_count': data['favoritesCount'][0]['FavoriteCount'] if data['favoritesCount'] else 0,
+        'known_facts_count': data['knownFactsCount'][0]['KnownCount'] if data['knownFactsCount'] else 0
     }
     
     # If all=true, also include ALL facts (including those with 0 reviews)
@@ -175,7 +210,9 @@ def chart_data():
             SELECT 
                 f.Content,
                 f.ReviewCount,
-                c.CategoryName
+                c.CategoryName,
+                f.IsFavorite,
+                f.IsEasy
             FROM Facts f
             JOIN Categories c ON f.CategoryID = c.CategoryID
             ORDER BY f.ReviewCount DESC, f.Content
@@ -190,7 +227,9 @@ def chart_data():
                 CASE 
                     WHEN f.LastViewedDate IS NULL THEN NULL
                     ELSE DATEDIFF(day, f.LastViewedDate, GETDATE())
-                END as DaysSinceReview
+                END as DaysSinceReview,
+                f.IsFavorite,
+                f.IsEasy
             FROM Facts f
             JOIN Categories c ON f.CategoryID = c.CategoryID
             ORDER BY 

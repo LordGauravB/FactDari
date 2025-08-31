@@ -116,12 +116,14 @@
     })();
     const streak = data.review_streak?.current_streak || 0;
     const favoritesCount = data.favorites_count || 0;
+    const knownFactsCount = data.known_facts_count || 0;
 
     setText('#total-cards', totalFacts);
     setText('#due-today', today);
     setText('#mastered-cards', `${streak}d`);
     setText('#active-categories', totalCategories);
     setText('#favorites-count', favoritesCount);
+    setText('#known-facts-count', knownFactsCount);
   }
 
   function destroyChart(key) { if (charts[key]) { charts[key].destroy(); charts[key] = null; } }
@@ -587,6 +589,8 @@
       setTimeout(() => {
         pieChart('category_distribution', 'category-distribution', data.category_distribution);
         doughnutChart('favorite_categories', 'favorite-categories', data.favorite_category_distribution);
+        doughnutChart('known_categories', 'known-categories', data.known_category_distribution);
+        doughnutChart('categories_viewed_today', 'categories-viewed-today', data.categories_viewed_today);
         lineChart('reviews_per_day', 'reviews-per-day', data.reviews_per_day);
         barChart('facts_timeline', 'facts-timeline', data.facts_added_timeline);
         barChart('category_reviews', 'category-reviews', data.category_reviews, true);
@@ -787,6 +791,8 @@
           const idMap = {
             'category-distribution': 'category_distribution',
             'favorite-categories': 'favorite_categories',
+            'known-categories': 'known_categories',
+            'categories-viewed-today': 'categories_viewed_today',
             'reviews-per-day': 'reviews_per_day',
             'facts-timeline': 'facts_timeline',
             'category-reviews': 'category_reviews',

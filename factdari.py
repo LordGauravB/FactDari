@@ -144,17 +144,18 @@ class FactDariApp:
         """Load categories for the dropdown"""
         query = "SELECT DISTINCT CategoryName FROM Categories WHERE IsActive = 1 ORDER BY CategoryName"
         categories = self.fetch_query(query)
-        category_names = [category[0] for category in categories] if categories else []
-        category_names.insert(0, "All Categories")  # Add All Categories option
-        category_names.insert(1, "Favorites")  # Add Favorites option
-        # Add Known filter if DB supports IsEasy
+        base_categories = [category[0] for category in categories] if categories else []
+
+        # Build header filters deterministically
+        header = ["All Categories", "Favorites"]
         try:
-            if self.column_exists('Facts', 'IsEasy'):
-                # Insert after Favorites
-                category_names.insert(2, "Known")
+            has_is_easy = self.column_exists('Facts', 'IsEasy')
         except Exception:
-            pass
-        return category_names
+            has_is_easy = False
+        if has_is_easy:
+            header += ["Known", "Not Known"]
+        header += ["Not Favorite"]
+        return header + base_categories
 
     def setup_ui(self):
         """Set up all UI elements"""
@@ -752,6 +753,33 @@ class FactDariApp:
                 facts = self.fetch_query(query)
             else:
                 facts = []
+        elif category == "Not Known":
+            if has_is_easy:
+                query = """
+                    SELECT FactID, Content, IsFavorite, IsEasy
+                    FROM Facts
+                    WHERE IsEasy = 0
+                    ORDER BY NEWID()
+                """
+                facts = self.fetch_query(query)
+            else:
+                facts = []
+        elif category == "Not Favorite":
+            if has_is_easy:
+                query = """
+                    SELECT FactID, Content, IsFavorite, IsEasy
+                    FROM Facts
+                    WHERE IsFavorite = 0
+                    ORDER BY NEWID()
+                """
+            else:
+                query = """
+                    SELECT FactID, Content, IsFavorite
+                    FROM Facts
+                    WHERE IsFavorite = 0
+                    ORDER BY NEWID()
+                """
+            facts = self.fetch_query(query)
         else:
             if has_is_easy:
                 query = """

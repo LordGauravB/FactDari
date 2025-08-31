@@ -116,6 +116,14 @@
                             <div class="metric-label">Favorites</div>
                         </div>
                     </article>
+                    
+                    <article class="metric-card" title="Number of facts marked as known">
+                        <div class="metric-icon">✅</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="known-facts-count">0</div>
+                            <div class="metric-label">Known Facts</div>
+                        </div>
+                    </article>
                 </div>
             </section>
 
@@ -190,24 +198,45 @@
                             </div>
                         </article>
 
-                        <article class="chart-card span-2">
+                        <article class="chart-card">
                             <header class="chart-header">
-                                <h3>Reviews Per Day</h3>
+                                <h3>Known Categories</h3>
                                 <div class="chart-actions">
-                                    <button class="btn-icon expand-btn" data-chart="reviews-per-day" aria-label="Expand chart">
+                                    <button class="btn-icon expand-btn" data-chart="known-categories" aria-label="Expand chart">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
                                         </svg>
                                     </button>
                                 </div>
                             </header>
-                            <div class="chart-container full-width">
-                                <canvas id="reviews-per-day"></canvas>
+                            <div class="chart-container">
+                                <canvas id="known-categories"></canvas>
                             </div>
                             <div class="chart-description">
-                                Daily review activity over the last 30 days
+                                Distribution of known facts by category
                             </div>
                         </article>
+
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Categories Viewed Today</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="categories-viewed-today" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="categories-viewed-today"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Categories of facts reviewed today
+                            </div>
+                        </article>
+
+                        
                     </div>
                 </section>
 
@@ -337,6 +366,26 @@
                             </div>
                             <div class="chart-description">
                                 Your review patterns over the last 7 days
+                            </div>
+                        </article>
+
+                        <!-- Move Reviews Per Day to the end and span full width -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Reviews Per Day</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="reviews-per-day" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container full-width">
+                                <canvas id="reviews-per-day"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Daily review activity over the last 30 days
                             </div>
                         </article>
                     </div>
