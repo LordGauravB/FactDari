@@ -1,6 +1,6 @@
 from flask import Flask, render_template, jsonify, Response, request
 import pyodbc
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import config  # Import the config module
 
 app = Flask(__name__) 
@@ -81,17 +81,22 @@ def chart_data():
             ORDER BY f.ReviewCount DESC
         """),
         
-        # Least reviewed facts (bottom 10 for display)
+        # Least reviewed facts (include 0 reviews; show zeros first, then oldest last viewed)
         'leastReviewedFacts': fetch_query("""
             SELECT TOP 10
                 f.Content,
                 f.ReviewCount,
                 c.CategoryName,
-                DATEDIFF(day, f.LastViewedDate, GETDATE()) as DaysSinceReview
+                CASE 
+                    WHEN f.LastViewedDate IS NULL THEN NULL
+                    ELSE DATEDIFF(day, f.LastViewedDate, GETDATE())
+                END as DaysSinceReview
             FROM Facts f
             JOIN Categories c ON f.CategoryID = c.CategoryID
-            WHERE f.ReviewCount > 0
-            ORDER BY f.ReviewCount ASC, DaysSinceReview DESC
+            ORDER BY 
+                f.ReviewCount ASC,
+                CASE WHEN f.LastViewedDate IS NULL THEN 0 ELSE 1 END ASC,
+                f.LastViewedDate ASC
         """),
         
         # Facts added over time
@@ -191,9 +196,10 @@ def chart_data():
                 END as DaysSinceReview
             FROM Facts f
             JOIN Categories c ON f.CategoryID = c.CategoryID
-            ORDER BY f.ReviewCount ASC, 
-                     CASE WHEN f.LastViewedDate IS NULL THEN 1 ELSE 0 END,
-                     f.LastViewedDate ASC
+            ORDER BY 
+                f.ReviewCount ASC,
+                CASE WHEN f.LastViewedDate IS NULL THEN 0 ELSE 1 END ASC,
+                f.LastViewedDate ASC
         """))
     
     return jsonify(formatted_data)
@@ -211,33 +217,38 @@ def calculate_review_streak():
     if not review_dates:
         return {'current_streak': 0, 'longest_streak': 0, 'last_review': None}
     
-    # Calculate current streak
-    current_streak = 0
+    # Coerce DB values to date objects
+    def to_date(val):
+        if isinstance(val, datetime):
+            return val.date()
+        if isinstance(val, date):
+            return val
+        # Fallback: assume ISO-like string
+        return datetime.strptime(str(val), '%Y-%m-%d').date()
+
+    ordered_dates = [to_date(row['ReviewDate']) for row in review_dates]
+
     today = datetime.now().date()
     yesterday = today - timedelta(days=1)
-    
-    for i, row in enumerate(review_dates):
-        review_date = datetime.strptime(row['ReviewDate'], '%Y-%m-%d').date()
-        expected_date = today - timedelta(days=i)
-        
-        # Allow for today or yesterday as starting point
-        if i == 0:
-            if review_date == today or review_date == yesterday:
-                current_streak = 1
-                if review_date == yesterday:
-                    expected_date = yesterday - timedelta(days=i)
-            else:
-                break
+
+    # Determine starting day for streak (today or yesterday)
+    start = ordered_dates[0]
+    if start not in (today, yesterday):
+        return {'current_streak': 0, 'longest_streak': 0, 'last_review': start.isoformat()}
+
+    # Count consecutive days backward from the start day
+    current_streak = 1
+    base = start
+    for next_date in ordered_dates[1:]:
+        if next_date == base - timedelta(days=current_streak):
+            current_streak += 1
         else:
-            if review_date == expected_date:
-                current_streak += 1
-            else:
-                break
+            break
     
     # Calculate longest streak (simplified)
     longest_streak = current_streak  # For now, just use current
     
-    last_review = review_dates[0]['ReviewDate'] if review_dates else None
+    last_review = ordered_dates[0].isoformat() if ordered_dates else None
     
     return {
         'current_streak': current_streak,

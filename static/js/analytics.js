@@ -6,6 +6,15 @@
   let refreshInterval = null;
   let countdownInterval = null;
   let isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  // Store full data globally for modal expansion
+  let fullMostReviewedData = [];
+  let fullLeastReviewedData = [];
+  // Current datasets and sort state for main tables
+  let currentMostData = [];
+  let currentLeastData = [];
+  let mostSortState = { index: 2, dir: 'desc' }; // Reviews desc
+  let leastSortState = { index: 2, dir: 'asc' }; // Reviews asc
+  let sortHandlersAttached = false;
 
   function qs(sel) { return document.querySelector(sel); }
   function qsa(sel) { return Array.from(document.querySelectorAll(sel)); }
@@ -40,6 +49,60 @@
     }
     
     return data;
+  }
+
+  // Enable sorting for dynamically created modal tables
+  function makeModalTableSortable(table, data, tableType) {
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    if (!thead || !tbody) return;
+    let state = { index: 2, dir: tableType === 'most' ? 'desc' : 'asc' };
+    const ths = Array.from(thead.querySelectorAll('th'));
+    ths.forEach((th, idx) => {
+      th.classList.add('sortable');
+      th.addEventListener('click', () => {
+        const newDir = (state.index === idx && state.dir === 'asc') ? 'desc' : 'asc';
+        state = { index: idx, dir: newDir };
+        const sorted = sortData(data, idx, newDir, tableType);
+        // Re-render rows
+        tbody.innerHTML = '';
+        sorted.forEach((row, index) => {
+          const tr = document.createElement('tr');
+          const factContent = row.Content || '';
+          let html = '';
+          if (tableType === 'most') {
+            let medalClass = '';
+            if (state.index === 2 && state.dir === 'desc') {
+              if (index === 0) medalClass = 'medal-gold';
+              else if (index === 1) medalClass = 'medal-silver';
+              else if (index === 2) medalClass = 'medal-bronze';
+            }
+            html = `
+              <td><span class="fact-text">${factContent}</span></td>
+              <td>${row.CategoryName || ''}</td>
+              <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
+            `;
+          } else {
+            let medalClass = '';
+            if (state.index === 2 && state.dir === 'asc') {
+              if (index === 0) medalClass = 'medal-gold';
+              else if (index === 1) medalClass = 'medal-silver';
+              else if (index === 2) medalClass = 'medal-bronze';
+            }
+            html = `
+              <td><span class="fact-text">${factContent}</span></td>
+              <td>${row.CategoryName || ''}</td>
+              <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
+              <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
+            `;
+          }
+          tr.innerHTML = html;
+          tbody.appendChild(tr);
+        });
+        applySortIndicator(table, idx, newDir);
+      });
+    });
+    applySortIndicator(table, state.index, state.dir);
   }
 
   function setText(id, text) { const el = qs(id); if (el) el.textContent = text; }
@@ -321,58 +384,152 @@
     });
   }
 
-  function populateTables(most, least) {
+  // Sorting helpers
+  function normalizeValue(val, numeric = false, nullHigh = true) {
+    if (val == null) return nullHigh ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+    if (numeric) {
+      const n = Number(val);
+      return Number.isNaN(n) ? 0 : n;
+    }
+    return String(val).toLowerCase();
+  }
+
+  function sortData(data, colIdx, dir, tableType) {
+    const numericColsMost = { 2: true };
+    const numericColsLeast = { 2: true, 3: true };
+    const isNumeric = tableType === 'most' ? !!numericColsMost[colIdx] : !!numericColsLeast[colIdx];
+    const getVal = (row) => {
+      switch (colIdx) {
+        case 0: return normalizeValue(row.Content, false);
+        case 1: return normalizeValue(row.CategoryName, false);
+        case 2: return normalizeValue(row.ReviewCount, true);
+        case 3: return normalizeValue(row.DaysSinceReview, true);
+        default: return 0;
+      }
+    };
+    return [...(data || [])].sort((a, b) => {
+      const va = getVal(a), vb = getVal(b);
+      if (va < vb) return dir === 'asc' ? -1 : 1;
+      if (va > vb) return dir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  function applySortIndicator(table, colIdx, dir) {
+    const ths = Array.from(table.querySelectorAll('thead th'));
+    ths.forEach((th, i) => {
+      th.removeAttribute('aria-sort');
+      th.classList.add('sortable');
+      if (i === colIdx) th.setAttribute('aria-sort', dir === 'asc' ? 'ascending' : 'descending');
+    });
+  }
+
+  function renderMostTable(data) {
     const mostTbody = qs('#most-reviewed-table tbody');
-    const leastTbody = qs('#least-reviewed-table tbody');
-    if (mostTbody) mostTbody.innerHTML = '';
-    if (leastTbody) leastTbody.innerHTML = '';
-    
-    // Show only top 10 in the main view
-    const mostToShow = (most || []).slice(0, 10);
-    const leastToShow = (least || []).slice(0, 10);
-    
+    if (!mostTbody) return;
+    mostTbody.innerHTML = '';
+    const mostToShow = (data || []).slice(0, 10);
+    const showMedals = mostSortState.index === 2 && mostSortState.dir === 'desc';
     mostToShow.forEach((row, index) => {
       const tr = document.createElement('tr');
       const factContent = row.Content || '';
-      const displayText = factContent.length > 150 ? 
-        `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 150)}...</span>` : 
+      const displayText = factContent.length > 150 ?
+        `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 150)}...</span>` :
         `<span class="fact-text">${factContent}</span>`;
-      
-      // Add medal class for top 3
       let medalClass = '';
-      if (index === 0) medalClass = 'medal-gold';
-      else if (index === 1) medalClass = 'medal-silver';
-      else if (index === 2) medalClass = 'medal-bronze';
-      
+      if (showMedals) {
+        if (index === 0) medalClass = 'medal-gold';
+        else if (index === 1) medalClass = 'medal-silver';
+        else if (index === 2) medalClass = 'medal-bronze';
+      }
       tr.innerHTML = `
         <td>${displayText}</td>
         <td>${row.CategoryName || ''}</td>
         <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
       `;
-      mostTbody && mostTbody.appendChild(tr);
+      mostTbody.appendChild(tr);
     });
-    
+  }
+
+  function renderLeastTable(data) {
+    const leastTbody = qs('#least-reviewed-table tbody');
+    if (!leastTbody) return;
+    leastTbody.innerHTML = '';
+    const leastToShow = (data || []).slice(0, 10);
+    const showMedals = leastSortState.index === 2 && leastSortState.dir === 'asc';
     leastToShow.forEach((row, index) => {
       const tr = document.createElement('tr');
       const factContent = row.Content || '';
-      const displayText = factContent.length > 150 ? 
-        `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 150)}...</span>` : 
+      const displayText = factContent.length > 150 ?
+        `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 150)}...</span>` :
         `<span class="fact-text">${factContent}</span>`;
-      
-      // Add medal class for top 3
       let medalClass = '';
-      if (index === 0) medalClass = 'medal-gold';
-      else if (index === 1) medalClass = 'medal-silver';
-      else if (index === 2) medalClass = 'medal-bronze';
-      
+      if (showMedals) {
+        if (index === 0) medalClass = 'medal-gold';
+        else if (index === 1) medalClass = 'medal-silver';
+        else if (index === 2) medalClass = 'medal-bronze';
+      }
       tr.innerHTML = `
         <td>${displayText}</td>
         <td>${row.CategoryName || ''}</td>
         <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
         <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
       `;
-      leastTbody && leastTbody.appendChild(tr);
+      leastTbody.appendChild(tr);
     });
+  }
+
+  function attachTableSortHandlers() {
+    const mostTable = qs('#most-reviewed-table');
+    const leastTable = qs('#least-reviewed-table');
+    if (mostTable && !mostTable.dataset.sortAttached) {
+      const ths = Array.from(mostTable.querySelectorAll('thead th'));
+      ths.forEach((th, idx) => {
+        th.classList.add('sortable');
+        th.addEventListener('click', () => {
+          const newDir = (mostSortState.index === idx && mostSortState.dir === 'asc') ? 'desc' : 'asc';
+          mostSortState = { index: idx, dir: newDir };
+          const sorted = sortData(currentMostData, idx, newDir, 'most');
+          renderMostTable(sorted);
+          applySortIndicator(mostTable, idx, newDir);
+        });
+      });
+      mostTable.dataset.sortAttached = '1';
+      applySortIndicator(mostTable, mostSortState.index, mostSortState.dir);
+    }
+    if (leastTable && !leastTable.dataset.sortAttached) {
+      const ths = Array.from(leastTable.querySelectorAll('thead th'));
+      ths.forEach((th, idx) => {
+        th.classList.add('sortable');
+        th.addEventListener('click', () => {
+          const newDir = (leastSortState.index === idx && leastSortState.dir === 'asc') ? 'desc' : 'asc';
+          leastSortState = { index: idx, dir: newDir };
+          const sorted = sortData(currentLeastData, idx, newDir, 'least');
+          renderLeastTable(sorted);
+          applySortIndicator(leastTable, idx, newDir);
+        });
+      });
+      leastTable.dataset.sortAttached = '1';
+      applySortIndicator(leastTable, leastSortState.index, leastSortState.dir);
+    }
+  }
+
+  function populateTables(most, least) {
+    currentMostData = most || [];
+    currentLeastData = least || [];
+    const sortedMost = sortData(currentMostData, mostSortState.index, mostSortState.dir, 'most');
+    const sortedLeast = sortData(currentLeastData, leastSortState.index, leastSortState.dir, 'least');
+    renderMostTable(sortedMost);
+    renderLeastTable(sortedLeast);
+    if (!sortHandlersAttached) {
+      attachTableSortHandlers();
+      sortHandlersAttached = true;
+    } else {
+      const mostTable = qs('#most-reviewed-table');
+      const leastTable = qs('#least-reviewed-table');
+      if (mostTable) applySortIndicator(mostTable, mostSortState.index, mostSortState.dir);
+      if (leastTable) applySortIndicator(leastTable, leastSortState.index, leastSortState.dir);
+    }
   }
 
   function renderHeatmap(hm) {
@@ -511,9 +668,6 @@
     });
   }
 
-  // Store full data globally for modal expansion
-  let fullMostReviewedData = [];
-  let fullLeastReviewedData = [];
   
   function setupExpandModal() {
     const modal = qs('#chart-modal');
@@ -569,6 +723,8 @@
               tbody.appendChild(tr);
             });
             table.appendChild(tbody);
+            // Enable sorting in modal for Most Reviewed
+            makeModalTableSortable(table, fullMostReviewedData, 'most');
             
           } else {
             headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th><th>Days Since</th>';
@@ -596,6 +752,8 @@
               tbody.appendChild(tr);
             });
             table.appendChild(tbody);
+            // Enable sorting in modal for Least Reviewed
+            makeModalTableSortable(table, fullLeastReviewedData, 'least');
           }
           
           tableContainer.appendChild(table);
@@ -837,4 +995,3 @@
     load().then(() => startCountdown(120));
   });
 })();
-
