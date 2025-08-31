@@ -1,0 +1,15 @@
+{
+  "theme": "light",
+  "window_position": {
+    "x": -722,
+    "y": 58
+  },
+  "category_filter": "All Categories",
+  "sound_enabled": true,
+  "notifications_enabled": true,
+  "auto_backup": true,
+  "backup_interval": 7,
+  "review_time_limit": 0,
+  "show_timer": true,
+  "keyboard_shortcuts": true
+}
