@@ -9,11 +9,17 @@
   // Store full data globally for modal expansion
   let fullMostReviewedData = [];
   let fullLeastReviewedData = [];
+  let fullFavoriteData = [];
+  let fullKnownData = [];
   // Current datasets and sort state for main tables
   let currentMostData = [];
   let currentLeastData = [];
+  let currentFavoriteData = [];
+  let currentKnownData = [];
   let mostSortState = { index: 2, dir: 'desc' }; // Reviews desc
   let leastSortState = { index: 2, dir: 'asc' }; // Reviews asc
+  let favoriteSortState = { index: 2, dir: 'desc' }; // Reviews desc
+  let knownSortState = { index: 2, dir: 'desc' }; // Reviews desc
   let sortHandlersAttached = false;
 
   function qs(sel) { return document.querySelector(sel); }
@@ -33,19 +39,27 @@
           const allFactsData = await allFactsRes.json();
           fullMostReviewedData = allFactsData.all_most_reviewed_facts || [];
           fullLeastReviewedData = allFactsData.all_least_reviewed_facts || [];
+          fullFavoriteData = allFactsData.allFavoriteFacts || [];
+          fullKnownData = allFactsData.allKnownFacts || [];
         } else {
           // Fallback to limited data
           fullMostReviewedData = data.most_reviewed_facts || [];
           fullLeastReviewedData = data.least_reviewed_facts || [];
+          fullFavoriteData = data.allFavoriteFacts || [];
+          fullKnownData = data.allKnownFacts || [];
         }
       } catch (e) {
         // If the endpoint doesn't support all=true, use what we have
         fullMostReviewedData = data.most_reviewed_facts || [];
         fullLeastReviewedData = data.least_reviewed_facts || [];
+        fullFavoriteData = data.allFavoriteFacts || [];
+        fullKnownData = data.allKnownFacts || [];
       }
     } else {
       fullMostReviewedData = data.all_most_reviewed_facts || [];
       fullLeastReviewedData = data.all_least_reviewed_facts || [];
+      fullFavoriteData = data.allFavoriteFacts || [];
+      fullKnownData = data.allKnownFacts || [];
     }
     
     return data;
@@ -483,6 +497,54 @@
     });
   }
 
+  function renderFavoriteTable(data) {
+    const favTbody = qs('#favorite-facts-table tbody');
+    if (!favTbody) return;
+    favTbody.innerHTML = '';
+    data.forEach((row, index) => {
+      const tr = document.createElement('tr');
+      // Show full fact content and allow wrapping
+      const factContent = row.Content || '';
+      let medalClass = '';
+      if (favoriteSortState.index === 2 && favoriteSortState.dir === 'desc') {
+        if (index === 0) medalClass = 'medal-gold';
+        else if (index === 1) medalClass = 'medal-silver';
+        else if (index === 2) medalClass = 'medal-bronze';
+      }
+      tr.innerHTML = `
+        <td><span class="fact-text">${factContent}</span></td>
+        <td>${row.CategoryName || ''}</td>
+        <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
+        <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
+      `;
+      favTbody.appendChild(tr);
+    });
+  }
+
+  function renderKnownTable(data) {
+    const knownTbody = qs('#known-facts-table tbody');
+    if (!knownTbody) return;
+    knownTbody.innerHTML = '';
+    data.forEach((row, index) => {
+      const tr = document.createElement('tr');
+      // Show full fact content and allow wrapping
+      const factContent = row.Content || '';
+      let medalClass = '';
+      if (knownSortState.index === 2 && knownSortState.dir === 'desc') {
+        if (index === 0) medalClass = 'medal-gold';
+        else if (index === 1) medalClass = 'medal-silver';
+        else if (index === 2) medalClass = 'medal-bronze';
+      }
+      tr.innerHTML = `
+        <td><span class="fact-text">${factContent}</span></td>
+        <td>${row.CategoryName || ''}</td>
+        <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
+        <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
+      `;
+      knownTbody.appendChild(tr);
+    });
+  }
+
   function attachTableSortHandlers() {
     const mostTable = qs('#most-reviewed-table');
     const leastTable = qs('#least-reviewed-table');
@@ -516,23 +578,72 @@
       leastTable.dataset.sortAttached = '1';
       applySortIndicator(leastTable, leastSortState.index, leastSortState.dir);
     }
+    
+    // Add sort handlers for favorite facts table
+    const favoriteTable = qs('#favorite-facts-table');
+    if (favoriteTable && !favoriteTable.dataset.sortAttached) {
+      const ths = Array.from(favoriteTable.querySelectorAll('thead th'));
+      ths.forEach((th, idx) => {
+        th.classList.add('sortable');
+        th.addEventListener('click', () => {
+          const newDir = (favoriteSortState.index === idx && favoriteSortState.dir === 'asc') ? 'desc' : 'asc';
+          favoriteSortState = { index: idx, dir: newDir };
+          const sorted = sortData(currentFavoriteData, idx, newDir, 'favorite');
+          renderFavoriteTable(sorted);
+          applySortIndicator(favoriteTable, idx, newDir);
+        });
+      });
+      favoriteTable.dataset.sortAttached = '1';
+      applySortIndicator(favoriteTable, favoriteSortState.index, favoriteSortState.dir);
+    }
+    
+    // Add sort handlers for known facts table
+    const knownTable = qs('#known-facts-table');
+    if (knownTable && !knownTable.dataset.sortAttached) {
+      const ths = Array.from(knownTable.querySelectorAll('thead th'));
+      ths.forEach((th, idx) => {
+        th.classList.add('sortable');
+        th.addEventListener('click', () => {
+          const newDir = (knownSortState.index === idx && knownSortState.dir === 'asc') ? 'desc' : 'asc';
+          knownSortState = { index: idx, dir: newDir };
+          const sorted = sortData(currentKnownData, idx, newDir, 'known');
+          renderKnownTable(sorted);
+          applySortIndicator(knownTable, idx, newDir);
+        });
+      });
+      knownTable.dataset.sortAttached = '1';
+      applySortIndicator(knownTable, knownSortState.index, knownSortState.dir);
+    }
   }
 
-  function populateTables(most, least) {
+  function populateTables(most, least, favorite, known) {
     currentMostData = most || [];
     currentLeastData = least || [];
+    currentFavoriteData = favorite || [];
+    currentKnownData = known || [];
+    
     const sortedMost = sortData(currentMostData, mostSortState.index, mostSortState.dir, 'most');
     const sortedLeast = sortData(currentLeastData, leastSortState.index, leastSortState.dir, 'least');
+    const sortedFavorite = sortData(currentFavoriteData, favoriteSortState.index, favoriteSortState.dir, 'favorite');
+    const sortedKnown = sortData(currentKnownData, knownSortState.index, knownSortState.dir, 'known');
+    
     renderMostTable(sortedMost);
     renderLeastTable(sortedLeast);
+    renderFavoriteTable(sortedFavorite);
+    renderKnownTable(sortedKnown);
+    
     if (!sortHandlersAttached) {
       attachTableSortHandlers();
       sortHandlersAttached = true;
     } else {
       const mostTable = qs('#most-reviewed-table');
       const leastTable = qs('#least-reviewed-table');
+      const favoriteTable = qs('#favorite-facts-table');
+      const knownTable = qs('#known-facts-table');
       if (mostTable) applySortIndicator(mostTable, mostSortState.index, mostSortState.dir);
       if (leastTable) applySortIndicator(leastTable, leastSortState.index, leastSortState.dir);
+      if (favoriteTable) applySortIndicator(favoriteTable, favoriteSortState.index, favoriteSortState.dir);
+      if (knownTable) applySortIndicator(knownTable, knownSortState.index, knownSortState.dir);
     }
   }
 
@@ -594,7 +705,7 @@
         lineChart('reviews_per_day', 'reviews-per-day', data.reviews_per_day);
         barChart('facts_timeline', 'facts-timeline', data.facts_added_timeline);
         barChart('category_reviews', 'category-reviews', data.category_reviews, true);
-        populateTables(data.most_reviewed_facts, data.least_reviewed_facts);
+        populateTables(data.most_reviewed_facts, data.least_reviewed_facts, data.allFavoriteFacts, data.allKnownFacts);
         renderHeatmap(data.review_heatmap);
       }, 100);
       
@@ -679,7 +790,8 @@
         const key = btn.getAttribute('data-chart');
         
         // Handle tables and heatmap differently
-        if (key === 'most-reviewed-table' || key === 'least-reviewed-table') {
+        if (key === 'most-reviewed-table' || key === 'least-reviewed-table' || 
+            key === 'favorite-facts-table' || key === 'known-facts-table') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
           
@@ -725,7 +837,7 @@
             // Enable sorting in modal for Most Reviewed
             makeModalTableSortable(table, fullMostReviewedData, 'most');
             
-          } else {
+          } else if (key === 'least-reviewed-table') {
             headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th><th>Days Since</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
@@ -753,6 +865,64 @@
             table.appendChild(tbody);
             // Enable sorting in modal for Least Reviewed
             makeModalTableSortable(table, fullLeastReviewedData, 'least');
+            
+          } else if (key === 'favorite-facts-table') {
+            headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th><th>Days Since</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            // Create body with ALL favorite facts
+            const tbody = document.createElement('tbody');
+            fullFavoriteData.forEach((row, index) => {
+              const tr = document.createElement('tr');
+              const factContent = row.Content || '';
+              
+              // Add medal class for top 3
+              let medalClass = '';
+              if (index === 0) medalClass = 'medal-gold';
+              else if (index === 1) medalClass = 'medal-silver';
+              else if (index === 2) medalClass = 'medal-bronze';
+              
+              tr.innerHTML = `
+                <td><span class="fact-text">${factContent}</span></td>
+                <td>${row.CategoryName || ''}</td>
+                <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
+                <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            // Enable sorting in modal for Favorite Facts
+            makeModalTableSortable(table, fullFavoriteData, 'favorite');
+            
+          } else if (key === 'known-facts-table') {
+            headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th><th>Days Since</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            // Create body with ALL known facts
+            const tbody = document.createElement('tbody');
+            fullKnownData.forEach((row, index) => {
+              const tr = document.createElement('tr');
+              const factContent = row.Content || '';
+              
+              // Add medal class for top 3
+              let medalClass = '';
+              if (index === 0) medalClass = 'medal-gold';
+              else if (index === 1) medalClass = 'medal-silver';
+              else if (index === 2) medalClass = 'medal-bronze';
+              
+              tr.innerHTML = `
+                <td><span class="fact-text">${factContent}</span></td>
+                <td>${row.CategoryName || ''}</td>
+                <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
+                <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            // Enable sorting in modal for Known Facts
+            makeModalTableSortable(table, fullKnownData, 'known');
           }
           
           tableContainer.appendChild(table);
@@ -765,9 +935,15 @@
           const title = document.createElement('h3');
           title.style.marginBottom = '16px';
           title.style.color = 'var(--text)';
-          title.textContent = key === 'most-reviewed-table' 
-            ? `All Most Reviewed Facts (${fullMostReviewedData.length} total)` 
-            : `All Least Reviewed Facts (${fullLeastReviewedData.length} total)`;
+          if (key === 'most-reviewed-table') {
+            title.textContent = `All Most Reviewed Facts (${fullMostReviewedData.length} total)`;
+          } else if (key === 'least-reviewed-table') {
+            title.textContent = `All Least Reviewed Facts (${fullLeastReviewedData.length} total)`;
+          } else if (key === 'favorite-facts-table') {
+            title.textContent = `All Favorite Facts (${fullFavoriteData.length} total)`;
+          } else if (key === 'known-facts-table') {
+            title.textContent = `All Known Facts (${fullKnownData.length} total)`;
+          }
           modalChartContainer.insertBefore(title, tableContainer);
           
         } else if (key === 'review-heatmap-chart') {

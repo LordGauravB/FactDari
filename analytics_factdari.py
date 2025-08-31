@@ -145,6 +145,72 @@ def chart_data():
             ORDER BY COUNT(f.FactID) DESC
         """),
         
+        # All favorite facts
+        'allFavoriteFacts': fetch_query("""
+            SELECT TOP 10
+                f.Content,
+                f.ReviewCount,
+                c.CategoryName,
+                f.IsFavorite,
+                f.IsEasy,
+                CASE 
+                    WHEN f.LastViewedDate IS NULL THEN NULL
+                    ELSE DATEDIFF(day, f.LastViewedDate, GETDATE())
+                END as DaysSinceReview
+            FROM Facts f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE f.IsFavorite = 1
+            ORDER BY NEWID()
+        """ if not return_all else """
+            SELECT
+                f.Content,
+                f.ReviewCount,
+                c.CategoryName,
+                f.IsFavorite,
+                f.IsEasy,
+                CASE 
+                    WHEN f.LastViewedDate IS NULL THEN NULL
+                    ELSE DATEDIFF(day, f.LastViewedDate, GETDATE())
+                END as DaysSinceReview
+            FROM Facts f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE f.IsFavorite = 1
+            ORDER BY f.ReviewCount DESC
+        """),
+        
+        # All known facts
+        'allKnownFacts': fetch_query("""
+            SELECT TOP 10
+                f.Content,
+                f.ReviewCount,
+                c.CategoryName,
+                f.IsFavorite,
+                f.IsEasy,
+                CASE 
+                    WHEN f.LastViewedDate IS NULL THEN NULL
+                    ELSE DATEDIFF(day, f.LastViewedDate, GETDATE())
+                END as DaysSinceReview
+            FROM Facts f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE f.IsEasy = 1
+            ORDER BY NEWID()
+        """ if not return_all else """
+            SELECT
+                f.Content,
+                f.ReviewCount,
+                c.CategoryName,
+                f.IsFavorite,
+                f.IsEasy,
+                CASE 
+                    WHEN f.LastViewedDate IS NULL THEN NULL
+                    ELSE DATEDIFF(day, f.LastViewedDate, GETDATE())
+                END as DaysSinceReview
+            FROM Facts f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE f.IsEasy = 1
+            ORDER BY f.ReviewCount DESC
+        """),
+        
         # Categories viewed today
         'categoriesViewedToday': fetch_query("""
             SELECT c.CategoryName, COUNT(DISTINCT rl.FactID) as ViewedCount
@@ -200,7 +266,10 @@ def chart_data():
         'review_streak': data['reviewStreak'],
         'category_reviews': format_bar_chart(data['categoryReviews'], 'CategoryName', 'TotalReviews'),
         'favorites_count': data['favoritesCount'][0]['FavoriteCount'] if data['favoritesCount'] else 0,
-        'known_facts_count': data['knownFactsCount'][0]['KnownCount'] if data['knownFactsCount'] else 0
+        'known_facts_count': data['knownFactsCount'][0]['KnownCount'] if data['knownFactsCount'] else 0,
+        # Include favorite/known fact tables for the frontend
+        'allFavoriteFacts': format_table_data(data['allFavoriteFacts']),
+        'allKnownFacts': format_table_data(data['allKnownFacts'])
     }
     
     # If all=true, also include ALL facts (including those with 0 reviews)
