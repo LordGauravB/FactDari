@@ -36,7 +36,9 @@ CREATE TABLE Facts (
     LastViewedDate DATETIME NULL,
     ReviewCount INT NOT NULL CONSTRAINT DF_Facts_ReviewCount DEFAULT 0,
     TotalViews INT NOT NULL CONSTRAINT DF_Facts_TotalViews DEFAULT 0,
-    IsFavorite BIT NOT NULL CONSTRAINT DF_Facts_IsFavorite DEFAULT 0
+    IsFavorite BIT NOT NULL CONSTRAINT DF_Facts_IsFavorite DEFAULT 0,
+    -- Mark facts you already know (easy)
+    IsEasy BIT NOT NULL CONSTRAINT DF_Facts_IsEasy DEFAULT 0
 );
 
 -- Step 6: Create simplified ReviewLogs table
@@ -54,6 +56,32 @@ CREATE INDEX IX_Facts_CategoryID ON Facts(CategoryID);
 CREATE INDEX IX_Facts_LastViewedDate ON Facts(LastViewedDate);
 CREATE INDEX IX_ReviewLogs_FactID ON ReviewLogs(FactID);
 CREATE INDEX IX_ReviewLogs_ReviewDate ON ReviewLogs(ReviewDate);
+GO
+
+/* Add a normalized, persisted computed column for duplicate prevention */
+IF COL_LENGTH('dbo.Facts', 'ContentKey') IS NULL
+BEGIN
+  ALTER TABLE dbo.Facts
+  ADD ContentKey AS CAST(
+    LOWER(
+      LTRIM(RTRIM(
+        REPLACE(REPLACE(REPLACE(Content, CHAR(13), ' '), CHAR(10), ' '), CHAR(9), ' ')
+      ))
+    ) AS NVARCHAR(450)
+  ) PERSISTED;
+END
+
+/* Create the unique index on the normalized key */
+IF NOT EXISTS (
+  SELECT 1
+  FROM sys.indexes
+  WHERE object_id = OBJECT_ID('dbo.Facts')
+    AND name = 'UX_Facts_ContentKey'
+)
+BEGIN
+  CREATE UNIQUE INDEX UX_Facts_ContentKey
+  ON dbo.Facts(ContentKey);
+END
 GO
 
 -- Step 7: Insert expanded categories
@@ -299,7 +327,108 @@ VALUES
 (@Cat_History, N'The Silk Road was a network of trade routes connecting East and West for centuries.', GETDATE(), NULL, 0, 0),
 (@Cat_History, N'The Rosetta Stone helped scholars decipher Egyptian hieroglyphs.', GETDATE(), NULL, 0, 0),
 (@Cat_Geography, N'Mauna Kea in Hawaii is taller than Mount Everest when measured from its base on the ocean floor.', GETDATE(), NULL, 0, 0),
-(@Cat_Space, N'Most comets originate from the Oort Cloud and Kuiper Belt, distant reservoirs of icy bodies.', GETDATE(), NULL, 0, 0);
+(@Cat_Space, N'Most comets originate from the Oort Cloud and Kuiper Belt, distant reservoirs of icy bodies.', GETDATE(), NULL, 0, 0),
+(@Cat_Space, N'Neptune has some of the fastest winds in the solar system, reaching over 2,000 kilometers per hour.', GETDATE(), NULL, 0, 0),
+(@Cat_Space, N'Uranus rotates on its side with an axial tilt of about 98 degrees.', GETDATE(), NULL, 0, 0),
+(@Cat_Space, N'A light-year is the distance light travels in one year, about 9.46 trillion kilometers.', GETDATE(), NULL, 0, 0),
+(@Cat_Space, N'Mars has a canyon system called Valles Marineris that stretches over 4,000 kilometers.', GETDATE(), NULL, 0, 0),
+(@Cat_Space, N'Earth’s seasons are caused by its axial tilt of roughly 23.5 degrees, not by distance from the Sun.', GETDATE(), NULL, 0, 0),
+(@Cat_Space, N'Auroras are produced when charged particles from the Sun interact with Earth’s magnetic field and atmosphere.', GETDATE(), NULL, 0, 0),
+(@Cat_Space, N'Many exoplanets have been discovered using the transit method, which detects tiny dips in a star’s brightness.', GETDATE(), NULL, 0, 0),
+(@Cat_Space, N'Halley’s Comet has an orbital period of about 76 years.', GETDATE(), NULL, 0, 0),
+(@Cat_Space, N'Mercury has an extremely thin exosphere rather than a substantial atmosphere.', GETDATE(), NULL, 0, 0),
+(@Cat_Space, N'The Moon is tidally locked to Earth, always showing the same face.', GETDATE(), NULL, 0, 0),
+(@Cat_Science, N'DNA molecules typically form a double-helix structure.', GETDATE(), NULL, 0, 0),
+(@Cat_Science, N'Enzymes are biological catalysts that speed up chemical reactions in cells.', GETDATE(), NULL, 0, 0),
+(@Cat_Science, N'The pH scale ranges from 0 to 14, with 7 being neutral.', GETDATE(), NULL, 0, 0),
+(@Cat_Science, N'Most of Earth’s freshwater is stored in glaciers and ice sheets.', GETDATE(), NULL, 0, 0),
+(@Cat_Science, N'The speed of sound in air at about 20°C is roughly 343 meters per second.', GETDATE(), NULL, 0, 0),
+(@Cat_Science, N'Plasma is an ionized state of matter distinct from solid, liquid, and gas.', GETDATE(), NULL, 0, 0),
+(@Cat_Science, N'In an isolated system, entropy tends to increase over time (the Second Law of Thermodynamics).', GETDATE(), NULL, 0, 0),
+(@Cat_Science, N'Viruses require host cells to replicate and are not considered living by many definitions.', GETDATE(), NULL, 0, 0),
+(@Cat_Science, N'Catalysts lower the activation energy of reactions without being consumed.', GETDATE(), NULL, 0, 0),
+(@Cat_Science, N'Visible light spans wavelengths of about 400 to 700 nanometers.', GETDATE(), NULL, 0, 0),
+(@Cat_EarthScience, N'The Coriolis effect influences large-scale wind and ocean current patterns.', GETDATE(), NULL, 0, 0),
+(@Cat_EarthScience, N'The ozone layer absorbs most of the Sun’s harmful ultraviolet-B radiation.', GETDATE(), NULL, 0, 0),
+(@Cat_EarthScience, N'El Niño is a periodic warming of the central and eastern tropical Pacific that alters global weather.', GETDATE(), NULL, 0, 0),
+(@Cat_EarthScience, N'The water cycle circulates water through evaporation, condensation, and precipitation.', GETDATE(), NULL, 0, 0),
+(@Cat_EarthScience, N'Earth is about 4.54 billion years old based on radiometric dating.', GETDATE(), NULL, 0, 0),
+(@Cat_EarthScience, N'Fossils are most commonly preserved in sedimentary rocks.', GETDATE(), NULL, 0, 0),
+(@Cat_EarthScience, N'The moment magnitude scale is widely used to measure earthquake size.', GETDATE(), NULL, 0, 0),
+(@Cat_EarthScience, N'Hurricanes, typhoons, and cyclones are the same kind of storm in different ocean basins.', GETDATE(), NULL, 0, 0),
+(@Cat_EarthScience, N'Plate boundaries can be divergent, convergent, or transform.', GETDATE(), NULL, 0, 0),
+(@Cat_EarthScience, N'A rain shadow occurs when mountains block moist air, creating drier conditions on the leeward side.', GETDATE(), NULL, 0, 0),
+(@Cat_Geography, N'Russia spans eleven time zones across its territory.', GETDATE(), NULL, 0, 0),
+(@Cat_Geography, N'The Nile River flows northward and empties into the Mediterranean Sea.', GETDATE(), NULL, 0, 0),
+(@Cat_Geography, N'Mount Everest’s summit is about 8,849 meters above sea level.', GETDATE(), NULL, 0, 0),
+(@Cat_Geography, N'Greenland is the world’s largest island that is not a continent.', GETDATE(), NULL, 0, 0),
+(@Cat_Geography, N'Australia is both a country and a continent.', GETDATE(), NULL, 0, 0),
+(@Cat_Geography, N'The Danube River flows through more countries than any other river in Europe.', GETDATE(), NULL, 0, 0),
+(@Cat_Geography, N'Lake Superior is the largest freshwater lake by surface area.', GETDATE(), NULL, 0, 0),
+(@Cat_Geography, N'The Mediterranean Sea connects to the Atlantic Ocean through the Strait of Gibraltar.', GETDATE(), NULL, 0, 0),
+(@Cat_Geography, N'Monaco is one of the most densely populated countries in the world.', GETDATE(), NULL, 0, 0),
+(@Cat_Geography, N'The Himalayas form where the Indian Plate collides with the Eurasian Plate.', GETDATE(), NULL, 0, 0),
+(@Cat_History, N'The Wright brothers achieved the first sustained, powered flight in 1903 at Kitty Hawk.', GETDATE(), NULL, 0, 0),
+(@Cat_History, N'The Roman Empire used volcanic ash in concrete, contributing to its durability.', GETDATE(), NULL, 0, 0),
+(@Cat_History, N'Magna Carta, sealed in 1215, limited the power of the English monarch.', GETDATE(), NULL, 0, 0),
+(@Cat_History, N'The first modern Olympic Games were held in Athens in 1896.', GETDATE(), NULL, 0, 0),
+(@Cat_History, N'The Black Death in the 14th century drastically reduced Europe’s population.', GETDATE(), NULL, 0, 0),
+(@Cat_History, N'The Berlin Wall fell in 1989, symbolizing the end of the Cold War era.', GETDATE(), NULL, 0, 0),
+(@Cat_History, N'Yuri Gagarin became the first human in space in 1961.', GETDATE(), NULL, 0, 0),
+(@Cat_History, N'Apollo 11 astronauts first landed on the Moon in 1969.', GETDATE(), NULL, 0, 0),
+(@Cat_History, N'Ancient Egyptians built pyramids as monumental royal tombs.', GETDATE(), NULL, 0, 0),
+(@Cat_History, N'The Code of Hammurabi is one of the earliest known law codes.', GETDATE(), NULL, 0, 0),
+(@Cat_Tech, N'Transistors replaced vacuum tubes and enabled modern microelectronics.', GETDATE(), NULL, 0, 0),
+(@Cat_Tech, N'HTTP is the protocol that web browsers use to request and fetch web pages.', GETDATE(), NULL, 0, 0),
+(@Cat_Tech, N'Open-source software allows anyone to inspect and modify the source code.', GETDATE(), NULL, 0, 0),
+(@Cat_Tech, N'Machine learning systems learn patterns from data rather than explicit rules.', GETDATE(), NULL, 0, 0),
+(@Cat_Tech, N'Binary numbers use only two digits: 0 and 1.', GETDATE(), NULL, 0, 0),
+(@Cat_Tech, N'A byte is a group of eight bits.', GETDATE(), NULL, 0, 0),
+(@Cat_Tech, N'GPS positioning uses trilateration from multiple satellite signals.', GETDATE(), NULL, 0, 0),
+(@Cat_Tech, N'QR codes store data in a two-dimensional matrix of modules.', GETDATE(), NULL, 0, 0),
+(@Cat_Tech, N'Cloud computing provides on-demand computing resources over the internet.', GETDATE(), NULL, 0, 0),
+(@Cat_Tech, N'A compiler translates source code into machine code, while an interpreter executes it directly.', GETDATE(), NULL, 0, 0),
+(@Cat_Health, N'Red blood cells carry oxygen using the protein hemoglobin.', GETDATE(), NULL, 0, 0),
+(@Cat_Health, N'Vaccines train the immune system to recognize specific pathogens.', GETDATE(), NULL, 0, 0),
+(@Cat_Health, N'Insulin is a hormone that helps regulate blood glucose levels.', GETDATE(), NULL, 0, 0),
+(@Cat_Health, N'Antibiotics target bacteria and do not work against viruses.', GETDATE(), NULL, 0, 0),
+(@Cat_Animals, N'Bees can see ultraviolet patterns on flowers that guide them to nectar.', GETDATE(), NULL, 0, 0),
+(@Cat_Animals, N'Cats have a righting reflex that helps them land on their feet.', GETDATE(), NULL, 0, 0),
+(@Cat_Animals, N'Peregrine falcons can exceed 300 km/h in a hunting dive.', GETDATE(), NULL, 0, 0),
+(@Cat_Animals, N'Chameleons change color for communication and thermoregulation as well as camouflage.', GETDATE(), NULL, 0, 0),
+(@Cat_Animals, N'Dolphins and bats use echolocation to navigate and hunt.', GETDATE(), NULL, 0, 0),
+(@Cat_Animals, N'Giant pandas have a modified wrist bone that functions like a thumb.', GETDATE(), NULL, 0, 0),
+(@Cat_Animals, N'Elephants have the largest brains of any land animal.', GETDATE(), NULL, 0, 0),
+(@Cat_Animals, N'Octopuses are highly intelligent and can solve simple problems and puzzles.', GETDATE(), NULL, 0, 0),
+(@Cat_Animals, N'Arctic foxes have seasonal coats that change from brown to white.', GETDATE(), NULL, 0, 0),
+(@Cat_Animals, N'Sea stars can regenerate lost arms in many species.', GETDATE(), NULL, 0, 0),
+(@Cat_Plants, N'Chlorophyll absorbs red and blue light and reflects green, giving plants their color.', GETDATE(), NULL, 0, 0),
+(@Cat_Plants, N'Legumes often host nitrogen-fixing bacteria in root nodules.', GETDATE(), NULL, 0, 0),
+(@Cat_Plants, N'Many plants form mycorrhizal partnerships with fungi to enhance nutrient uptake.', GETDATE(), NULL, 0, 0),
+(@Cat_Plants, N'Apples can float in water because a significant portion of their volume is air.', GETDATE(), NULL, 0, 0),
+(@Cat_Plants, N'Deciduous trees shed their leaves to conserve resources during unfavorable seasons.', GETDATE(), NULL, 0, 0),
+(@Cat_Plants, N'Conifers bear seeds in cones and typically keep needle-like leaves year-round.', GETDATE(), NULL, 0, 0),
+(@Cat_FoodDrink, N'Dark chocolate contains flavonoids found in cocoa solids.', GETDATE(), NULL, 0, 0),
+(@Cat_FoodDrink, N'Baker’s yeast is a single-celled fungus used to leaven bread.', GETDATE(), NULL, 0, 0),
+(@Cat_FoodDrink, N'Olive oil is rich in the monounsaturated fatty acid oleic acid.', GETDATE(), NULL, 0, 0),
+(@Cat_FoodDrink, N'Lactose is the natural sugar in milk; many adults have reduced lactase enzyme levels.', GETDATE(), NULL, 0, 0),
+(@Cat_FoodDrink, N'Sourdough bread uses wild yeast and lactic acid bacteria for fermentation.', GETDATE(), NULL, 0, 0),
+(@Cat_FoodDrink, N'Fermentation can preserve foods by producing acids or alcohol that inhibit microbes.', GETDATE(), NULL, 0, 0),
+(@Cat_Language, N'The ampersand symbol (&) originated as a ligature of the Latin word ''et''.', GETDATE(), NULL, 0, 0),
+(@Cat_Language, N'Writing systems include alphabets, abjads, abugidas, and logographies.', GETDATE(), NULL, 0, 0),
+(@Cat_Language, N'Loanwords enter a language through contact with other cultures.', GETDATE(), NULL, 0, 0),
+(@Cat_Language, N'In English, word order helps indicate grammatical relationships (subject–verb–object).', GETDATE(), NULL, 0, 0),
+(@Cat_Math, N'Euler’s number e is approximately 2.718281828 and arises in growth and decay models.', GETDATE(), NULL, 0, 0),
+(@Cat_Math, N'The Pythagorean theorem states a² + b² = c² in right triangles.', GETDATE(), NULL, 0, 0),
+(@Cat_Math, N'In Euclidean geometry, the interior angles of a triangle sum to 180 degrees.', GETDATE(), NULL, 0, 0),
+(@Cat_Math, N'Probability values range from 0 to 1, representing impossibility to certainty.', GETDATE(), NULL, 0, 0),
+(@Cat_Math, N'Factorials, denoted n!, grow very rapidly with n.', GETDATE(), NULL, 0, 0),
+(@Cat_Math, N'The Fibonacci sequence begins 0, 1, 1, 2, 3, and so on.', GETDATE(), NULL, 0, 0),
+(@Cat_ArtsCulture, N'The Mona Lisa is displayed at the Louvre Museum in Paris.', GETDATE(), NULL, 0, 0),
+(@Cat_ArtsCulture, N'A standard modern piano has 88 keys.', GETDATE(), NULL, 0, 0),
+(@Cat_ArtsCulture, N'William Shakespeare wrote plays and poetry in Early Modern English.', GETDATE(), NULL, 0, 0),
+(@Cat_ArtsCulture, N'Primary colors for additive light mixing are red, green, and blue.', GETDATE(), NULL, 0, 0);
+GO
 
 -- Step 11: Verify the setup
 SELECT 'Categories' AS TableName, COUNT(*) AS RecordCount FROM Categories

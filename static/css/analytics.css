@@ -1026,3 +1026,42 @@ body {
     break-inside: avoid;
   }
 }
+
+/* --- Overrides to ensure icons render correctly regardless of encoding --- */
+/* Hide any inline text in metric icons and render the proper emoji via ::before */
+.metric-icon { color: transparent; }
+
+/* Total Facts */
+article[title="Total number of facts in your collection"] .metric-icon::before {
+  content: "\01F4DA"; /* 📚 */
+  color: var(--text);
+}
+
+/* Viewed Today */
+article[title="Number of facts viewed today"] .metric-icon::before {
+  content: "\01F441"; /* 👁 */
+  color: var(--text);
+}
+
+/* Review Streak */
+article[title="Current consecutive days of reviewing facts"] .metric-icon::before {
+  content: "\01F525"; /* 🔥 */
+  color: var(--text);
+}
+
+/* Categories */
+article[title="Number of active fact categories"] .metric-icon::before {
+  content: "\01F4CA"; /* 📊 */
+  color: var(--text);
+}
+
+/* Favorites */
+article[title="Number of facts added to favorites"] .metric-icon::before {
+  content: "\2B50"; /* ⭐ */
+  color: var(--text);
+}
+
+/* Fix medal icons for top 3 review counts */
+.medal-gold::before { content: "\01F947 "; }
+.medal-silver::before { content: "\01F948 "; }
+.medal-bronze::before { content: "\01F949 "; }

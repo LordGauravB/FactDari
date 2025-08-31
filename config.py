@@ -20,13 +20,13 @@ DB_CONFIG = {
 # UI Configuration
 UI_CONFIG = {
     # Window dimensions
-    'window_width': 510,
+    'window_width': 520,
     'window_height': 380,
     'window_static_pos': "-1927+7",
     'popup_position': "-1923+400",
     'popup_add_card_size': "496x400",
     'popup_edit_card_size': "496x520",
-    'popup_categories_size': "400x510",
+    'popup_categories_size': "400x520",
     'popup_info_size': "420x480",
     'popup_confirm_size': "360x180",
     'popup_rename_size': "420x200",

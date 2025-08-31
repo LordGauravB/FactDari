@@ -110,6 +110,7 @@ class FactDariApp:
         self.all_facts = []  # Store all facts for navigation
         self.current_fact_index = 0
         self.current_fact_is_favorite = False  # Track if current fact is a favorite
+        self.current_fact_is_easy = False  # Track if current fact is known/easy
         # Speech state
         self.speech_engine = pyttsx3.init()
         self.speaking_thread = None
@@ -146,6 +147,13 @@ class FactDariApp:
         category_names = [category[0] for category in categories] if categories else []
         category_names.insert(0, "All Categories")  # Add All Categories option
         category_names.insert(1, "Favorites")  # Add Favorites option
+        # Add Known filter if DB supports IsEasy
+        try:
+            if self.column_exists('Facts', 'IsEasy'):
+                # Insert after Favorites
+                category_names.insert(2, "Known")
+        except Exception:
+            pass
         return category_names
 
     def setup_ui(self):
@@ -284,7 +292,14 @@ class FactDariApp:
         self.graph_button = tk.Button(self.fact_frame, image=self.graph_icon, bg=self.BG_COLOR, command=self.show_analytics, 
                                 cursor="hand2", borderwidth=0, highlightthickness=0)
         self.graph_button.place(relx=1.0, rely=0, anchor="ne", x=-30, y=5)
-        
+
+        # Add easy/known button (left of the star)
+        self.easy_button = tk.Button(self.fact_frame, image=self.easy_icon, bg=self.BG_COLOR, command=self.toggle_easy,
+                                cursor="hand2", borderwidth=0, highlightthickness=0)
+        # Temporarily assign icon after loading icons
+        # Will be placed/hidden depending on current screen
+        self.easy_button.place(relx=1.0, rely=0, anchor="ne", x=-80, y=5)
+
         # Add star/favorite button (leftmost of the top-right icons)
         self.star_button = tk.Button(self.fact_frame, image=self.white_star_icon, bg=self.BG_COLOR, command=self.toggle_favorite, 
                                 cursor="hand2", borderwidth=0, highlightthickness=0)
@@ -332,6 +347,12 @@ class FactDariApp:
         self.white_star_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("White-Star.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.gold_star_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("Gold-Star.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.info_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("info.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        # Easy/known icons
+        self.easy_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("easy.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.easy_gold_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("easy-gold.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        # Apply default to button if it exists
+        if hasattr(self, 'easy_button') and self.easy_button:
+            self.easy_button.config(image=self.easy_icon)
     
     def bind_events(self):
         """Bind all event handlers"""
@@ -355,6 +376,7 @@ class FactDariApp:
         self.root.bind("g", lambda e: self.show_analytics())
         self.root.bind("c", lambda e: self.manage_categories())
         self.root.bind("f", lambda e: self.toggle_favorite())  # Shortcut for favorite
+        self.root.bind("k", lambda e: self.toggle_easy())  # Shortcut for known/easy
     
     def apply_rounded_corners(self, radius=None):
         """Apply rounded corners to the window"""
@@ -374,6 +396,7 @@ class FactDariApp:
             ToolTip(self.home_button, "Home (h)")
             ToolTip(self.speaker_button, "Speak text")
             ToolTip(self.star_button, "Toggle favorite (f)")
+            ToolTip(self.easy_button, "Mark as known (k)")
             ToolTip(self.graph_button, "Analytics (g)")
             ToolTip(self.info_button, "Show shortcuts")
             ToolTip(self.add_icon_button, "Add fact (a)")
@@ -515,6 +538,21 @@ class FactDariApp:
         except Exception as e:
             print(f"Database error in fetch_query: {e}")
             return []
+
+    def column_exists(self, table_name, column_name):
+        """Check if a column exists in the given table (SQL Server)."""
+        try:
+            rows = self.fetch_query(
+                """
+                SELECT 1
+                FROM sys.columns
+                WHERE Name = ? AND Object_ID = OBJECT_ID(?)
+                """,
+                (column_name, f"dbo.{table_name}")
+            )
+            return bool(rows)
+        except Exception:
+            return False
     
     def execute_update(self, query, params=None):
         """Execute an UPDATE/INSERT/DELETE query with no return value"""
@@ -672,29 +710,65 @@ class FactDariApp:
         """Load all facts for the current category"""
         category = self.category_var.get()
         
+        has_is_easy = self.column_exists('Facts', 'IsEasy')
         if category == "All Categories":
-            query = """
-                SELECT FactID, Content, IsFavorite
-                FROM Facts
-                ORDER BY NEWID()
-            """
+            if has_is_easy:
+                query = """
+                    SELECT FactID, Content, IsFavorite, IsEasy
+                    FROM Facts
+                    ORDER BY NEWID()
+                """
+            else:
+                query = """
+                    SELECT FactID, Content, IsFavorite
+                    FROM Facts
+                    ORDER BY NEWID()
+                """
             facts = self.fetch_query(query)
         elif category == "Favorites":
-            query = """
-                SELECT FactID, Content, IsFavorite
-                FROM Facts
-                WHERE IsFavorite = 1
-                ORDER BY NEWID()
-            """
+            if has_is_easy:
+                query = """
+                    SELECT FactID, Content, IsFavorite, IsEasy
+                    FROM Facts
+                    WHERE IsFavorite = 1
+                    ORDER BY NEWID()
+                """
+            else:
+                query = """
+                    SELECT FactID, Content, IsFavorite
+                    FROM Facts
+                    WHERE IsFavorite = 1
+                    ORDER BY NEWID()
+                """
             facts = self.fetch_query(query)
+        elif category == "Known":
+            if has_is_easy:
+                query = """
+                    SELECT FactID, Content, IsFavorite, IsEasy
+                    FROM Facts
+                    WHERE IsEasy = 1
+                    ORDER BY NEWID()
+                """
+                facts = self.fetch_query(query)
+            else:
+                facts = []
         else:
-            query = """
-                SELECT f.FactID, f.Content, f.IsFavorite
-                FROM Facts f
-                JOIN Categories c ON f.CategoryID = c.CategoryID
-                WHERE c.CategoryName = ?
-                ORDER BY NEWID()
-            """
+            if has_is_easy:
+                query = """
+                    SELECT f.FactID, f.Content, f.IsFavorite, f.IsEasy
+                    FROM Facts f
+                    JOIN Categories c ON f.CategoryID = c.CategoryID
+                    WHERE c.CategoryName = ?
+                    ORDER BY NEWID()
+                """
+            else:
+                query = """
+                    SELECT f.FactID, f.Content, f.IsFavorite
+                    FROM Facts f
+                    JOIN Categories c ON f.CategoryID = c.CategoryID
+                    WHERE c.CategoryName = ?
+                    ORDER BY NEWID()
+                """
             facts = self.fetch_query(query, (category,))
         
         self.all_facts = facts if facts else []
@@ -746,6 +820,8 @@ class FactDariApp:
                                   font=(self.NORMAL_FONT[0], 12))
             self.current_fact_id = None
             self.star_button.config(image=self.white_star_icon)
+            if hasattr(self, 'easy_button'):
+                self.easy_button.config(image=self.easy_icon)
             # Disable navigation buttons when no facts
             self.prev_button.config(state="disabled", bg=self.GRAY_COLOR)
             self.next_button.config(state="disabled", bg=self.GRAY_COLOR)
@@ -768,12 +844,18 @@ class FactDariApp:
         self.current_fact_id = fact[0]
         content = fact[1]
         self.current_fact_is_favorite = fact[2] if len(fact) > 2 else False
+        self.current_fact_is_easy = fact[3] if len(fact) > 3 else False
         
         # Update star icon based on favorite status
         if self.current_fact_is_favorite:
             self.star_button.config(image=self.gold_star_icon)
         else:
             self.star_button.config(image=self.white_star_icon)
+        # Update easy icon
+        if self.current_fact_is_easy:
+            self.easy_button.config(image=self.easy_gold_icon)
+        else:
+            self.easy_button.config(image=self.easy_icon)
         
         # Display the fact
         self.fact_label.config(text=content, font=(self.NORMAL_FONT[0], self.adjust_font_size(content)))
@@ -841,6 +923,38 @@ class FactDariApp:
                     fact.append(new_status)
                 self.all_facts[self.current_fact_index] = tuple(fact)
             
+            self.clear_status_after_delay(2000)
+
+    def toggle_easy(self):
+        """Toggle the 'known/easy' status of the current fact"""
+        if not self.current_fact_id:
+            return
+        if not self.column_exists('Facts', 'IsEasy'):
+            self.status_label.config(text="Please update DB to latest (IsEasy column)", fg=self.STATUS_COLOR)
+            self.clear_status_after_delay(3000)
+            return
+        new_status = not self.current_fact_is_easy
+        success = self.execute_update("""
+            UPDATE Facts
+            SET IsEasy = ?
+            WHERE FactID = ?
+        """, (1 if new_status else 0, self.current_fact_id))
+        if success:
+            self.current_fact_is_easy = new_status
+            if new_status:
+                self.easy_button.config(image=self.easy_gold_icon)
+                self.status_label.config(text="Marked as known!", fg=self.GREEN_COLOR)
+            else:
+                self.easy_button.config(image=self.easy_icon)
+                self.status_label.config(text="Marked as not known", fg=self.STATUS_COLOR)
+            # Update in-memory list
+            if self.all_facts and self.current_fact_index < len(self.all_facts):
+                fact = list(self.all_facts[self.current_fact_index])
+                # Ensure list length
+                while len(fact) < 4:
+                    fact.append(False)
+                fact[3] = new_status
+                self.all_facts[self.current_fact_index] = tuple(fact)
             self.clear_status_after_delay(2000)
     
     def add_new_fact(self):
@@ -1362,6 +1476,11 @@ class FactDariApp:
             # Stop any ongoing speech and hide speaker on home
             self.stop_speaking()
             self.star_button.place_forget()
+            # Hide easy button on home page
+            try:
+                self.easy_button.place_forget()
+            except Exception:
+                pass
             self.info_button.place(relx=1.0, rely=0, anchor="ne", x=-55, y=5)
             # Hide speaker on home page
             self.speaker_button.place_forget()
@@ -1404,6 +1523,8 @@ class FactDariApp:
         # Swap back: hide info, show star icon
         try:
             self.info_button.place_forget()
+            # Show easy button before star
+            self.easy_button.place(relx=1.0, rely=0, anchor="ne", x=-80, y=5)
             self.star_button.place(relx=1.0, rely=0, anchor="ne", x=-55, y=5)
             # Show speaker on reviewing page
             self.speaker_button.place(relx=1.0, rely=0, anchor="ne", x=-5, y=5)
