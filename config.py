@@ -1,6 +1,5 @@
 # config.py
 import os
-from pathlib import Path
 
 # Base directory where the application is installed
 # Use environment variable if provided, otherwise use relative path
@@ -9,10 +8,7 @@ BASE_DIR = os.environ.get('FACTDARI_BASE_DIR', os.path.dirname(os.path.abspath(_
 # Resource paths - allow override via environment variables
 RESOURCES_DIR = os.environ.get('FACTDARI_RESOURCES_DIR', os.path.join(BASE_DIR, "Resources"))
 ICONS_DIR = os.environ.get('FACTDARI_ICONS_DIR', os.path.join(RESOURCES_DIR, "application_icons"))
-APPLICATION_IMAGES_DIR = os.environ.get('FACTDARI_APPLICATION_IMAGES_DIR', os.path.join(RESOURCES_DIR, "application_images"))
 
-# Analytics app path
-ANALYTICS_APP = os.environ.get('FACTDARI_ANALYTICS_APP', os.path.join(BASE_DIR, "analytics_factdari.py"))
 
 # Database configuration
 DB_CONFIG = {
@@ -57,35 +53,8 @@ UI_CONFIG = {
     'stats_font_size': 9
 }
 
-# Chart.js Configuration - NEW SECTION
-CHART_CONFIG = {
-    # Chart colors
-    'colors': [
-        '#4CAF50', '#2196F3', '#FFC107', '#F44336', '#9C27B0', 
-        '#00BCD4', '#FF9800', '#795548', '#607D8B', '#E91E63'
-    ],
-    
-    # Font settings
-    'font_family': "Trebuchet MS",
-    'axis_title_size': 16,      # Larger font for axis titles
-    'axis_tick_size': 14,       # Larger font for axis tick labels
-    'legend_font_size': 14,     # Font size for chart legends
-    'tooltip_title_size': 14,   # Font size for tooltip titles
-    'tooltip_body_size': 13,    # Font size for tooltip content
-    
-    # Other chart settings
-    'point_radius': 5,
-    'hover_point_radius': 7,
-    'line_thickness': 2,
-    'grid_color': 'rgba(255, 255, 255, 0.1)',
-    'text_color': 'white'
-}
 
 # Helper functions
-def get_image_path(image_name):
-    """Get path to application images"""
-    return os.path.join(APPLICATION_IMAGES_DIR, image_name)
-
 def get_icon_path(icon_name):
     """Get path to application icons"""
     return os.path.join(ICONS_DIR, icon_name)
@@ -113,37 +82,4 @@ def get_font(font_type):
     else:
         return (UI_CONFIG['font_family'], UI_CONFIG['normal_font_size'])
 
-# NEW: Get chart configuration as JSON for JavaScript
-def get_chart_config_js():
-    """Return chart configuration as JavaScript code"""
-    js_code = """
-// Chart configuration from Python config
-const CHART_CONFIG = {
-    colors: %s,
-    fontFamily: "%s",
-    axisTitleSize: %d,
-    axisTickSize: %d,
-    legendFontSize: %d,
-    tooltipTitleSize: %d,
-    tooltipBodySize: %d,
-    pointRadius: %d,
-    hoverPointRadius: %d,
-    lineThickness: %d,
-    gridColor: '%s',
-    textColor: '%s'
-};
-""" % (
-        CHART_CONFIG['colors'],
-        CHART_CONFIG['font_family'],
-        CHART_CONFIG['axis_title_size'],
-        CHART_CONFIG['axis_tick_size'],
-        CHART_CONFIG['legend_font_size'],
-        CHART_CONFIG['tooltip_title_size'],
-        CHART_CONFIG['tooltip_body_size'],
-        CHART_CONFIG['point_radius'],
-        CHART_CONFIG['hover_point_radius'],
-        CHART_CONFIG['line_thickness'],
-        CHART_CONFIG['grid_color'],
-        CHART_CONFIG['text_color']
-    )
-    return js_code
+# (no chart config helpers are needed; Chart.js is configured in the template)

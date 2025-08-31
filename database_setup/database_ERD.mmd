@@ -6,51 +6,24 @@ erDiagram
         bit IsActive
         datetime CreatedDate
     }
-    
-    Tags {
-        int TagID PK
-        nvarchar(100) TagName
-    }
-    
-    FactCards {
-        int FactCardID PK
+
+    Facts {
+        int FactID PK
         int CategoryID FK
-        nvarchar(MAX) Question
-        nvarchar(MAX) Answer
-        date NextReviewDate
-        int CurrentInterval
-        float Mastery
+        nvarchar(MAX) Content
         date DateAdded
-        date LastReviewDate
-        float Stability
-        float Difficulty
-        int State
-        int Lapses
-        int ViewCount
+        datetime LastViewedDate
+        int ReviewCount
+        int TotalViews
+        bit IsFavorite
     }
-    
-    FactCardTags {
-        int FactCardTagID PK
-        int FactCardID FK
-        int TagID FK
-    }
-    
+
     ReviewLogs {
         int ReviewLogID PK
-        int FactCardID FK
+        int FactID FK
         datetime ReviewDate
-        int UserRating
-        int IntervalBeforeReview
-        int IntervalAfterReview
-        float StabilityBefore
-        float StabilityAfter
-        float DifficultyBefore
-        float DifficultyAfter
-        int Rating
-        int Interval
+        int SessionDuration
     }
-    
-    Categories ||--o{ FactCards : "has"
-    FactCards ||--o{ FactCardTags : "has"
-    Tags ||--o{ FactCardTags : "has"
-    FactCards ||--o{ ReviewLogs : "has"
+
+    Categories ||--o{ Facts : "has"
+    Facts ||--o{ ReviewLogs : "has"

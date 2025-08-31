@@ -10,12 +10,11 @@ import pyttsx3
 import webbrowser
 import subprocess
 import tkinter as tk
-import json
 import random
 import threading
 from ctypes import wintypes
 from PIL import Image, ImageTk
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from tkinter import ttk, simpledialog, messagebox
 
 class ToolTip:
@@ -1064,10 +1063,6 @@ class FactDariApp:
         
         # Ask for confirmation
         if self.confirm_dialog("Confirm Delete", "Are you sure you want to delete this fact?"):
-            # Delete related tags and review logs first to satisfy FK constraints
-            self.execute_update("DELETE FROM FactTags WHERE FactID = ?", (self.current_fact_id,))
-            self.execute_update("DELETE FROM ReviewLogs WHERE FactID = ?", (self.current_fact_id,))
-            
             # Delete the fact
             success = self.execute_update("DELETE FROM Facts WHERE FactID = ?", (self.current_fact_id,))
             if success:
@@ -1094,8 +1089,8 @@ class FactDariApp:
         cat_window = self._create_category_window()
         
         # Create the UI components
-        add_frame, new_cat_entry = self._create_add_category_ui(cat_window)
-        list_frame, cat_listbox, refresh_category_list = self._create_category_list_ui(cat_window)
+        self._create_add_category_ui(cat_window)
+        _, cat_listbox, refresh_category_list = self._create_category_list_ui(cat_window)
         self._create_category_action_buttons(cat_window, cat_listbox, refresh_category_list)
         
         # Initialize the category list
@@ -1134,7 +1129,7 @@ class FactDariApp:
                             cursor="hand2", borderwidth=0, highlightthickness=0, padx=10)
         add_button.pack(side="left", padx=5)
         
-        return add_frame, new_cat_entry
+        # No return needed; widgets are attached to the parent and remain alive
     
     def _add_category(self, entry_widget):
         """Handle adding a new category"""
@@ -1227,7 +1222,7 @@ class FactDariApp:
         
         # Extract category ID from selection text
         cat_text = cat_listbox.get(selection[0])
-        cat_id = int(cat_text.split("ID: ")[1].strip(")"))
+        cat_id = int(cat_text.split("ID: ")[1].rstrip(")"))
         
         # Get current name
         cat_result = self.fetch_query("SELECT CategoryName FROM Categories WHERE CategoryID = ?", (cat_id,))
@@ -1272,7 +1267,7 @@ class FactDariApp:
         
         # Extract category ID from selection text
         cat_text = cat_listbox.get(selection[0])
-        cat_id = int(cat_text.split("ID: ")[1].strip(")"))
+        cat_id = int(cat_text.split("ID: ")[1].rstrip(")"))
         cat_name = cat_text.split(" (ID:")[0]
         
         # Check if category has facts
@@ -1300,13 +1295,11 @@ class FactDariApp:
         success = self.execute_update("""
             BEGIN TRANSACTION;
             
-            DELETE FROM FactTags WHERE FactID IN (SELECT FactID FROM Facts WHERE CategoryID = ?);
-            DELETE FROM ReviewLogs WHERE FactID IN (SELECT FactID FROM Facts WHERE CategoryID = ?);
             DELETE FROM Facts WHERE CategoryID = ?;
             DELETE FROM Categories WHERE CategoryID = ?;
             
             COMMIT TRANSACTION;
-        """, (cat_id, cat_id, cat_id, cat_id))
+        """, (cat_id, cat_id))
         
         if success:
             refresh_callback()
@@ -1387,10 +1380,7 @@ class FactDariApp:
         # Show the start reviewing button
         self.start_button.pack(pady=20)
         
-        # Update status to shortcut hint (ASCII)
-        self.status_label.config(text="Shortcuts: Prev = Left/p, Next = Right/n/Space", fg=self.STATUS_COLOR)
-
-        # Normalize ASCII shortcuts hint
+        # Update status to shortcut hint
         self.status_label.config(text="Shortcuts: Prev = Left/p, Next = Right/n/Space", fg=self.STATUS_COLOR)
 
         # Apply rounded corners again after UI changes

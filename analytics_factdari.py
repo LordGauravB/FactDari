@@ -1,8 +1,6 @@
-from flask import Flask, render_template, jsonify, send_from_directory
+from flask import Flask, render_template, jsonify, Response, request
 import pyodbc
 from datetime import datetime, timedelta
-import json
-import os
 import config  # Import the config module
 
 app = Flask(__name__) 
@@ -26,17 +24,28 @@ def index():
     """Render the main analytics page"""
     return render_template('analytics_factdari.html')
 
-@app.route('/resources/<path:filename>')
-def serve_resources(filename):
-    """Serve files from the Resources directory"""
-    return send_from_directory(config.RESOURCES_DIR, filename)
+# No static resource route is needed; template uses CDN-only assets
+
+@app.route('/favicon.ico')
+def favicon():
+    """Serve a small SVG favicon to avoid 404s"""
+    svg = (
+        "<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'>"
+        "<rect width='64' height='64' fill='#2563eb'/>"
+        "<text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle'"
+        " font-size='42' fill='white'>F</text>"
+        "</svg>"
+    )
+    return Response(svg, mimetype='image/svg+xml')
 
 @app.route('/api/chart-data')
 def chart_data():
     """Get all chart data for FactDari analytics"""
-    today = datetime.now().strftime('%Y-%m-%d')
     seven_days_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
     thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    
+    # Check if we need to return all facts
+    return_all = request.args.get('all', 'false').lower() == 'true'
     
     data = {
         # Category distribution
@@ -60,7 +69,7 @@ def chart_data():
             ORDER BY CONVERT(varchar, ReviewDate, 23)
         """, (thirty_days_ago,)),
         
-        # Most reviewed facts (top 10)
+        # Most reviewed facts (top 10 for display)
         'mostReviewedFacts': fetch_query("""
             SELECT TOP 10
                 f.Content,
@@ -72,7 +81,7 @@ def chart_data():
             ORDER BY f.ReviewCount DESC
         """),
         
-        # Least reviewed facts (bottom 10, excluding never reviewed)
+        # Least reviewed facts (bottom 10 for display)
         'leastReviewedFacts': fetch_query("""
             SELECT TOP 10
                 f.Content,
@@ -156,6 +165,36 @@ def chart_data():
         'review_streak': data['reviewStreak'],
         'category_reviews': format_bar_chart(data['categoryReviews'], 'CategoryName', 'TotalReviews')
     }
+    
+    # If all=true, also include ALL facts (including those with 0 reviews)
+    if return_all:
+        # Get ALL facts sorted by review count (including 0 reviews)
+        formatted_data['all_most_reviewed_facts'] = format_table_data(fetch_query("""
+            SELECT 
+                f.Content,
+                f.ReviewCount,
+                c.CategoryName
+            FROM Facts f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            ORDER BY f.ReviewCount DESC, f.Content
+        """))
+        
+        # Get ALL facts sorted by least reviewed (including 0 reviews)
+        formatted_data['all_least_reviewed_facts'] = format_table_data(fetch_query("""
+            SELECT 
+                f.Content,
+                f.ReviewCount,
+                c.CategoryName,
+                CASE 
+                    WHEN f.LastViewedDate IS NULL THEN NULL
+                    ELSE DATEDIFF(day, f.LastViewedDate, GETDATE())
+                END as DaysSinceReview
+            FROM Facts f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            ORDER BY f.ReviewCount ASC, 
+                     CASE WHEN f.LastViewedDate IS NULL THEN 1 ELSE 0 END,
+                     f.LastViewedDate ASC
+        """))
     
     return jsonify(formatted_data)
 
