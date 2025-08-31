@@ -115,11 +115,13 @@
       return arr.length ? arr[arr.length-1] : 0;
     })();
     const streak = data.review_streak?.current_streak || 0;
+    const favoritesCount = data.favorites_count || 0;
 
     setText('#total-cards', totalFacts);
     setText('#due-today', today);
     setText('#mastered-cards', `${streak}d`);
     setText('#active-categories', totalCategories);
+    setText('#favorites-count', favoritesCount);
   }
 
   function destroyChart(key) { if (charts[key]) { charts[key].destroy(); charts[key] = null; } }
@@ -543,7 +545,8 @@
       for (let h = 0; h < 24; h++) {
         const v = (hm.data?.[dIdx]?.[h]) || 0;
         const intensity = Math.min(v/10, 1);
-        const cell = el('div', { className: 'heatmap-cell' });
+        const cellClass = v === 0 ? 'heatmap-cell empty' : 'heatmap-cell';
+        const cell = el('div', { className: cellClass });
         
         // Enhanced color gradient
         if (v === 0) {
@@ -558,14 +561,6 @@
           cell.textContent = v;
           cell.style.color = intensity > 0.5 ? '#ffffff' : (isDarkMode ? '#cbd5e1' : '#475569');
         }
-        
-        // Add ripple effect on click
-        cell.addEventListener('click', function(e) {
-          const ripple = document.createElement('span');
-          ripple.classList.add('ripple');
-          this.appendChild(ripple);
-          setTimeout(() => ripple.remove(), 600);
-        });
         
         container.appendChild(cell);
       }
@@ -880,18 +875,18 @@
   function showLoadingState() { qs('#loading-screen')?.classList.remove('hidden'); }
   function hideLoadingState() { qs('#loading-screen')?.classList.add('hidden'); }
 
-  function startCountdown(seconds = 120) {
+  function startCountdown(seconds = 300) {
     const el = qs('#countdown');
     if (countdownInterval) clearInterval(countdownInterval);
     if (refreshInterval) clearInterval(refreshInterval);
     const update = () => {
       const m = Math.floor(seconds/60); const s = seconds%60;
       if (el) el.textContent = `${m}m ${s}s`;
-      if (seconds-- <= 0) { load(); seconds = 120; }
+      if (seconds-- <= 0) { load(); seconds = 300; }
     };
     update();
     countdownInterval = setInterval(update, 1000);
-    refreshInterval = setInterval(load, 120000);
+    refreshInterval = setInterval(load, 300000);
   }
 
   // Add theme detection and update
@@ -926,7 +921,7 @@
           case 'r':
             e.preventDefault();
             load();
-            startCountdown(120);
+            startCountdown(300);
             break;
           case '1':
           case '2':
@@ -988,10 +983,10 @@
       refreshBtn.style.animation = 'spin 0.5s ease';
       setTimeout(() => refreshBtn.style.animation = '', 500);
       load();
-      startCountdown(120);
+      startCountdown(300);
     });
     
     // Initial load
-    load().then(() => startCountdown(120));
+    load().then(() => startCountdown(300));
   });
 })();

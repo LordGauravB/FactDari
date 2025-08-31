@@ -155,6 +155,13 @@ def chart_data():
             LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
             GROUP BY c.CategoryName
             ORDER BY SUM(f.ReviewCount) DESC
+        """),
+        
+        # Count of favorite facts
+        'favoritesCount': fetch_query("""
+            SELECT COUNT(*) as FavoriteCount
+            FROM Facts
+            WHERE IsFavorite = 1
         """)
     }
     
@@ -168,7 +175,8 @@ def chart_data():
         'review_heatmap': format_heatmap(data['reviewHeatmap']),
         'review_status': format_pie_chart(data['reviewStatus'], 'Status', 'FactCount'),
         'review_streak': data['reviewStreak'],
-        'category_reviews': format_bar_chart(data['categoryReviews'], 'CategoryName', 'TotalReviews')
+        'category_reviews': format_bar_chart(data['categoryReviews'], 'CategoryName', 'TotalReviews'),
+        'favorites_count': data['favoritesCount'][0]['FavoriteCount'] if data['favoritesCount'] else 0
     }
     
     # If all=true, also include ALL facts (including those with 0 reviews)

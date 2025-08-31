@@ -55,12 +55,12 @@
                     <h1>FactDari Analytics</h1>
                 </div>
                 <div class="nav-actions">
-                    <div class="auto-refresh-timer" title="Data automatically refreshes every 2 minutes">
+                    <div class="auto-refresh-timer" title="Data automatically refreshes every 5 minutes">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
                             <circle cx="12" cy="12" r="10"/>
                             <polyline points="12 6 12 12 16 14"/>
                         </svg>
-                        Auto-refresh in <span id="countdown">2m 0s</span>
+                        Auto-refresh in <span id="countdown">5m 0s</span>
                     </div>
                     <button id="refresh-btn" class="btn btn-secondary" aria-label="Refresh data" title="Refresh data (Ctrl+R)">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -106,6 +106,14 @@
                         <div class="metric-content">
                             <div class="metric-value" id="active-categories">0</div>
                             <div class="metric-label">Categories</div>
+                        </div>
+                    </article>
+                    
+                    <article class="metric-card" title="Number of facts added to favorites">
+                        <div class="metric-icon">⭐</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="favorites-count">0</div>
+                            <div class="metric-label">Favorites</div>
                         </div>
                     </article>
                 </div>
