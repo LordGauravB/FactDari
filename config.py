@@ -12,7 +12,7 @@ ICONS_DIR = os.environ.get('FACTDARI_ICONS_DIR', os.path.join(RESOURCES_DIR, "ap
 
 # Database configuration
 DB_CONFIG = {
-    'server': os.environ.get('FACTDARI_DB_SERVER', 'GAURAVS_DESKTOP\\SQLEXPRESS'),
+    'server': os.environ.get('FACTDARI_DB_SERVER', 'localhost\\SQLEXPRESS'),
     'database': os.environ.get('FACTDARI_DB_NAME', 'FactDari'),
     'trusted_connection': os.environ.get('FACTDARI_DB_TRUSTED', 'yes')
 }

@@ -103,6 +103,23 @@ Edit `config.py` to customize:
 - `FACTDARI_IDLE_TIMEOUT_SECONDS` (default: `300`): seconds of no input before the app considers you idle.
 - `FACTDARI_IDLE_END_SESSION` (default: `true`): when idle, end the active session as timed out. If set to `false`, only the current fact view is finalized as timed out and the session remains open.
 
+## Making This Repo Public
+
+Before making the repository public:
+
+- Hide local environment folders:
+  - A `.gitignore` has been added to exclude `.venv/`, `__pycache__/`, editor folders, etc. If `.venv/` was already committed, untrack it with:
+    - `git rm -r --cached .venv`
+    - `git commit -m "chore: stop tracking .venv"`
+- Database host defaults:
+  - Default DB server changed to `localhost\SQLEXPRESS`. Set environment variables to point to your own SQL Server if different.
+- Email privacy:
+  - Your past commits may include your email in Git metadata. Consider enabling GitHub email privacy and using your noreply address for future commits.
+- Assets and licenses:
+  - Ensure all images in `Resources/` are yours or properly licensed.
+- Debug mode:
+  - `analytics_factdari.py` runs the Flask app in debug for local use. Do not expose this publicly.
+
 ## Requirements
 
 - Python 3.7+

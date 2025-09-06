@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+.claude/
+
+# Temporary
+*.tmp
+*.swp
+*.swo
+
+# Flask instance/config
+.env
+.env.*
+instance/
+
+# Node/Frontend (if any in future)
+node_modules/
+dist/
+build/
+
+# Database dumps/backups
+*.bak
+*.sql*~
