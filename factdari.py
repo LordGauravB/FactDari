@@ -343,6 +343,16 @@ class FactDariApp:
         self.info_button = tk.Button(self.fact_frame, image=self.info_icon, bg=self.BG_COLOR, command=self.show_shortcuts_window,
                                 cursor="hand2", borderwidth=0, highlightthickness=0)
         # Initially not placed; placed when showing home page
+
+        # Level label: show next to Home icon (top-left), clickable for Achievements
+        self.level_label = tk.Label(self.fact_frame, text="Level 1 • 0 XP", fg=self.GREEN_COLOR, bg=self.BG_COLOR,
+                                    font=self.STATS_FONT, cursor="hand2")
+        # Place to the right of the Home icon (20px wide) with padding
+        self.level_label.place(x=32, y=7)
+        try:
+            self.level_label.bind("<Button-1>", lambda e: self.show_achievements_window())
+        except Exception:
+            pass
         
         # Bottom stats frame
         self.stats_frame = tk.Frame(self.root, bg=self.BG_COLOR)
@@ -355,15 +365,6 @@ class FactDariApp:
         self.review_stats_label = self.create_label(self.stats_frame, "Seen Today: 0", 
                                        font=self.STATS_FONT, side='left', fg=self.BLUE_COLOR)
         self.review_stats_label.pack_configure(padx=10)
-        
-        # Gamification progress (clickable to open Achievements)
-        self.level_label = self.create_label(self.stats_frame, "Level 1 • 0 XP", 
-                                        font=self.STATS_FONT, side='left', fg=self.GREEN_COLOR)
-        self.level_label.pack_configure(padx=10)
-        try:
-            self.level_label.bind("<Button-1>", lambda e: self.show_achievements_window())
-        except Exception:
-            pass
         
         self.coordinate_label = self.create_label(self.stats_frame, "Coordinates: ", 
                                         font=self.STATS_FONT, side='left', fg=self.BLUE_COLOR)
@@ -960,7 +961,11 @@ class FactDariApp:
             if level >= 100:
                 self.level_label.config(text=f"Level {level} • {xp} XP (MAX)")
             else:
-                self.level_label.config(text=f"Level {level} • {xp} XP ({to_next} to next)")
+                # If progress shows no XP to next but level < 100, it's gated by achievements
+                if int(to_next or 0) <= 0:
+                    self.level_label.config(text=f"Level {level} • {xp} XP (achievements required)")
+                else:
+                    self.level_label.config(text=f"Level {level} • {xp} XP ({to_next} to next)")
         except Exception:
             pass
     
@@ -1506,11 +1511,18 @@ class FactDariApp:
                 self.all_facts[self.current_fact_index] = tuple(fact)
             
             self.clear_status_after_delay(2000)
-            # Gamification: first-time favorite action grants small XP and counts
+            # Gamification: award on favorite and unlock using current favorites count
             try:
                 if new_status and getattr(self, 'gamify', None):
-                    total = self.gamify.increment_counter('TotalFavorites', 1)
-                    unlocked = self.gamify.unlock_achievements_if_needed('favorites', total)
+                    # Increment lifetime counter
+                    _ = self.gamify.increment_counter('TotalFavorites', 1)
+                    # Compute current number of favorites from Facts
+                    try:
+                        rows = self.fetch_query("SELECT COUNT(*) FROM Facts WHERE IsFavorite = 1")
+                        current_fav_count = int(rows[0][0]) if rows else 0
+                    except Exception:
+                        current_fav_count = 0
+                    unlocked = self.gamify.unlock_achievements_if_needed('favorites', current_fav_count)
                     # XP for favoriting
                     fav_xp = int(config.XP_CONFIG.get('xp_favorite', 1))
                     if fav_xp:
@@ -1557,11 +1569,18 @@ class FactDariApp:
                 fact[3] = new_status
                 self.all_facts[self.current_fact_index] = tuple(fact)
             self.clear_status_after_delay(2000)
-            # Gamification: award when marking known
+            # Gamification: award when marking known, unlock using current known count
             try:
                 if new_status and getattr(self, 'gamify', None):
-                    total = self.gamify.increment_counter('TotalKnown', 1)
-                    unlocked = self.gamify.unlock_achievements_if_needed('known', total)
+                    # Increment lifetime counter
+                    _ = self.gamify.increment_counter('TotalKnown', 1)
+                    # Compute current known facts from Facts
+                    try:
+                        rows = self.fetch_query("SELECT COUNT(*) FROM Facts WHERE IsEasy = 1")
+                        current_known_count = int(rows[0][0]) if rows else 0
+                    except Exception:
+                        current_known_count = 0
+                    unlocked = self.gamify.unlock_achievements_if_needed('known', current_known_count)
                     known_xp = int(config.XP_CONFIG.get('xp_known', 10))
                     if known_xp:
                         self.gamify.award_xp(known_xp)
@@ -2188,6 +2207,11 @@ class FactDariApp:
                 self.easy_button.place_forget()
             except Exception:
                 pass
+            # Hide level label on home page
+            try:
+                self.level_label.place_forget()
+            except Exception:
+                pass
             self.info_button.place(relx=1.0, rely=0, anchor="ne", x=-55, y=5)
             # Hide speaker on home page
             self.speaker_button.place_forget()
@@ -2242,6 +2266,8 @@ class FactDariApp:
             self.star_button.place(relx=1.0, rely=0, anchor="ne", x=-55, y=5)
             # Show speaker on reviewing page
             self.speaker_button.place(relx=1.0, rely=0, anchor="ne", x=-5, y=5)
+            # Show level label next to Home icon while reviewing
+            self.level_label.place(x=32, y=7)
         except Exception:
             pass
         

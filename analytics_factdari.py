@@ -115,6 +115,7 @@ def chart_data():
         
         # Review frequency heatmap data (last 7 days, by hour)
         'reviewHeatmap': fetch_query("""
+            SET DATEFIRST 7; -- Ensure Sunday=1 for consistent weekday mapping
             SELECT 
                 DATEPART(hour, ReviewDate) as Hour,
                 DATEPART(weekday, ReviewDate) as DayOfWeek,
@@ -249,6 +250,212 @@ def chart_data():
             SELECT COUNT(*) as KnownCount
             FROM Facts
             WHERE IsEasy = 1
+        """),
+        
+        # Duration-based analytics
+        'sessionDurationStats': fetch_query("""
+            SELECT 
+                AVG(DurationSeconds) as AvgDuration,
+                MIN(DurationSeconds) as MinDuration,
+                MAX(DurationSeconds) as MaxDuration,
+                SUM(DurationSeconds) as TotalDuration,
+                COUNT(*) as SessionCount
+            FROM ReviewSessions
+            WHERE DurationSeconds IS NOT NULL AND DurationSeconds > 0
+        """),
+        
+        # Additional session metrics
+        'avgFactsPerSession': fetch_query("""
+            SELECT 
+                AVG(CAST(FactCount as FLOAT)) as AvgFactsPerSession
+            FROM (
+                SELECT 
+                    s.SessionID,
+                    COUNT(DISTINCT rl.FactID) as FactCount
+                FROM ReviewSessions s
+                LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID
+                WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
+                GROUP BY s.SessionID
+            ) as SessionFacts
+        """),
+        
+        'bestEfficiency': fetch_query("""
+            SELECT TOP 1
+                CASE 
+                    WHEN s.DurationSeconds > 0 
+                    THEN CAST(COUNT(DISTINCT rl.FactID) * 60.0 / s.DurationSeconds as DECIMAL(10,2))
+                    ELSE 0 
+                END as BestFactsPerMinute
+            FROM ReviewSessions s
+            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID
+            WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
+            GROUP BY s.SessionID, s.DurationSeconds
+            ORDER BY BestFactsPerMinute DESC
+        """),
+        
+        'sessionDurationDistribution': fetch_query("""
+            SELECT 
+                CASE 
+                    WHEN DurationSeconds < 60 THEN '< 1 min'
+                    WHEN DurationSeconds < 300 THEN '1-5 min'
+                    WHEN DurationSeconds < 600 THEN '5-10 min'
+                    WHEN DurationSeconds < 1800 THEN '10-30 min'
+                    WHEN DurationSeconds < 3600 THEN '30-60 min'
+                    ELSE '> 1 hour'
+                END as DurationRange,
+                COUNT(*) as SessionCount
+            FROM ReviewSessions
+            WHERE DurationSeconds IS NOT NULL AND DurationSeconds > 0
+            GROUP BY 
+                CASE 
+                    WHEN DurationSeconds < 60 THEN '< 1 min'
+                    WHEN DurationSeconds < 300 THEN '1-5 min'
+                    WHEN DurationSeconds < 600 THEN '5-10 min'
+                    WHEN DurationSeconds < 1800 THEN '10-30 min'
+                    WHEN DurationSeconds < 3600 THEN '30-60 min'
+                    ELSE '> 1 hour'
+                END
+            ORDER BY 
+                MIN(DurationSeconds)
+        """),
+        
+        'avgReviewTimePerFact': fetch_query("""
+            SELECT 
+                AVG(SessionDuration) as AvgTimePerReview,
+                MIN(SessionDuration) as MinTimePerReview,
+                MAX(SessionDuration) as MaxTimePerReview,
+                COUNT(*) as TotalReviews
+            FROM ReviewLogs
+            WHERE SessionDuration IS NOT NULL AND SessionDuration > 0
+        """),
+        
+        'categoryReviewTime': fetch_query("""
+            SELECT 
+                c.CategoryName,
+                AVG(rl.SessionDuration) as AvgReviewTime,
+                SUM(rl.SessionDuration) as TotalReviewTime,
+                COUNT(rl.ReviewLogID) as ReviewCount
+            FROM Categories c
+            JOIN Facts f ON c.CategoryID = f.CategoryID
+            JOIN ReviewLogs rl ON f.FactID = rl.FactID
+            WHERE rl.SessionDuration IS NOT NULL AND rl.SessionDuration > 0
+            GROUP BY c.CategoryName
+            ORDER BY AVG(rl.SessionDuration) DESC
+        """),
+        
+        'dailySessionDuration': fetch_query("""
+            SELECT 
+                CONVERT(varchar, StartTime, 23) as Date,
+                AVG(DurationSeconds) as AvgDuration,
+                SUM(DurationSeconds) as TotalDuration,
+                COUNT(*) as SessionCount
+            FROM ReviewSessions
+            WHERE DurationSeconds IS NOT NULL AND DurationSeconds > 0
+                AND StartTime >= ?
+            GROUP BY CONVERT(varchar, StartTime, 23)
+            ORDER BY CONVERT(varchar, StartTime, 23)
+        """, (thirty_days_ago,)),
+        
+        'sessionEfficiency': fetch_query("""
+            SELECT TOP 20
+                s.SessionID,
+                s.StartTime,
+                s.DurationSeconds,
+                COUNT(DISTINCT rl.FactID) as UniqueFactsReviewed,
+                COUNT(rl.ReviewLogID) as TotalReviews,
+                CASE 
+                    WHEN s.DurationSeconds > 0 
+                    THEN CAST(COUNT(DISTINCT rl.FactID) * 60.0 / s.DurationSeconds as DECIMAL(10,2))
+                    ELSE 0 
+                END as FactsPerMinute,
+                CASE 
+                    WHEN s.DurationSeconds > 0 
+                    THEN CAST(COUNT(rl.ReviewLogID) * 60.0 / s.DurationSeconds as DECIMAL(10,2))
+                    ELSE 0 
+                END as ReviewsPerMinute
+            FROM ReviewSessions s
+            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID
+            WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
+            GROUP BY s.SessionID, s.StartTime, s.DurationSeconds
+            ORDER BY s.SessionID DESC
+        """),
+        
+        'timeoutAnalysis': fetch_query("""
+            SELECT 
+                CONVERT(varchar, ReviewDate, 23) as Date,
+                COUNT(CASE WHEN TimedOut = 1 THEN 1 END) as TimeoutCount,
+                COUNT(*) as TotalReviews,
+                CAST(COUNT(CASE WHEN TimedOut = 1 THEN 1 END) * 100.0 / COUNT(*) as DECIMAL(5,2)) as TimeoutPercentage
+            FROM ReviewLogs
+            WHERE ReviewDate >= ?
+            GROUP BY CONVERT(varchar, ReviewDate, 23)
+            ORDER BY CONVERT(varchar, ReviewDate, 23)
+        """, (thirty_days_ago,)),
+        
+        # New analytics for Overview tab
+        'knownVsUnknownRatio': fetch_query("""
+            SELECT 
+                SUM(CASE WHEN IsEasy = 1 THEN 1 ELSE 0 END) as KnownFacts,
+                SUM(CASE WHEN IsEasy = 0 THEN 1 ELSE 0 END) as UnknownFacts,
+                COUNT(*) as TotalFacts
+            FROM Facts
+        """),
+        
+        'weeklyReviewPattern': fetch_query("""
+            SET DATEFIRST 7;
+            SELECT 
+                CASE DATEPART(weekday, ReviewDate)
+                    WHEN 1 THEN 'Sunday'
+                    WHEN 2 THEN 'Monday'
+                    WHEN 3 THEN 'Tuesday'
+                    WHEN 4 THEN 'Wednesday'
+                    WHEN 5 THEN 'Thursday'
+                    WHEN 6 THEN 'Friday'
+                    WHEN 7 THEN 'Saturday'
+                END as DayName,
+                COUNT(*) as ReviewCount,
+                COUNT(DISTINCT FactID) as UniqueFactsCount
+            FROM ReviewLogs
+            WHERE ReviewDate >= ?
+            GROUP BY DATEPART(weekday, ReviewDate)
+            ORDER BY DATEPART(weekday, ReviewDate)
+        """, (seven_days_ago,)),
+        
+        'topReviewHours': fetch_query("""
+            SELECT TOP 5
+                DATEPART(hour, ReviewDate) as Hour,
+                COUNT(*) as ReviewCount
+            FROM ReviewLogs
+            WHERE ReviewDate >= ?
+            GROUP BY DATEPART(hour, ReviewDate)
+            ORDER BY COUNT(*) DESC
+        """, (thirty_days_ago,)),
+        
+        'categoryGrowthTrend': fetch_query("""
+            SELECT 
+                c.CategoryName,
+                COUNT(CASE WHEN f.DateAdded >= DATEADD(day, -7, GETDATE()) THEN 1 END) as LastWeek,
+                COUNT(CASE WHEN f.DateAdded >= DATEADD(day, -30, GETDATE()) THEN 1 END) as LastMonth,
+                COUNT(*) as AllTime
+            FROM Categories c
+            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
+            GROUP BY c.CategoryName
+            HAVING COUNT(*) > 0
+            ORDER BY COUNT(CASE WHEN f.DateAdded >= DATEADD(day, -7, GETDATE()) THEN 1 END) DESC
+        """),
+        
+        # New chart for Progress tab
+        'monthlyProgress': fetch_query("""
+            SELECT 
+                YEAR(ReviewDate) as Year,
+                MONTH(ReviewDate) as Month,
+                COUNT(*) as TotalReviews,
+                COUNT(DISTINCT FactID) as UniqueFactsReviewed,
+                COUNT(DISTINCT CONVERT(date, ReviewDate)) as ActiveDays
+            FROM ReviewLogs
+            WHERE ReviewDate >= DATEADD(month, -6, GETDATE())
+            GROUP BY YEAR(ReviewDate), MONTH(ReviewDate)
+            ORDER BY YEAR(ReviewDate), MONTH(ReviewDate)
         """)
     }
 
@@ -262,35 +469,84 @@ def chart_data():
 
     # Profile snapshot
     profile = safe_fetch_one("""
-        SELECT TOP 1 XP, Level, CurrentStreak, LongestStreak, LastCheckinDate
+        SELECT TOP 1 XP, Level, CurrentStreak, LongestStreak, LastCheckinDate,
+               TotalReviews, TotalAdds, TotalEdits, TotalDeletes
         FROM GamificationProfile
         ORDER BY ProfileID
     """)
 
-    # Compute level progression using same arithmetic progression as the app
-    def level_progress(xp_val: int):
+    # Compute level progression aligned with stored Level (gated at 99 unless all achievements unlocked)
+    def level_progress(xp_val: int, stored_level: int):
         try:
             xp_val = int(xp_val or 0)
         except Exception:
             xp_val = 0
-        lvl = 1
-        need = 100
-        rem = xp_val
-        while rem >= need and lvl < 100:
-            rem -= need
-            lvl += 1
-            need += 50
-        xp_into = rem
-        xp_to_next = 0 if lvl >= 100 else (need - rem)
+        try:
+            stored_level = int(stored_level or 1)
+        except Exception:
+            stored_level = 1
+
+        cfg = getattr(config, 'LEVELING_CONFIG', {})
+        b1_end = int(cfg.get('band1_end', 4))
+        b1_step = int(cfg.get('band1_step', 100))
+        b2_end = int(cfg.get('band2_end', 9))
+        b2_step = int(cfg.get('band2_step', 500))
+        b3_end = int(cfg.get('band3_end', 14))
+        b3_step = int(cfg.get('band3_step', 1000))
+        b4_end = int(cfg.get('band4_end', 19))
+        b4_step = int(cfg.get('band4_step', 5000))
+        const_end = int(cfg.get('const_end', 98))
+        total_target = int(cfg.get('total_xp_l100', 1_000_000))
+
+        def early_band_step(lvl: int) -> int:
+            if lvl <= b1_end:
+                return b1_step
+            if lvl <= b2_end:
+                return b2_step
+            if lvl <= b3_end:
+                return b3_step
+            if lvl <= b4_end:
+                return b4_step
+            return 0
+
+        EARLY_SUM = sum(early_band_step(l) for l in range(1, b4_end + 1))
+        const_start = b4_end + 1
+        const_levels = max(0, const_end - const_start + 1)
+        MID_CONST = (total_target - EARLY_SUM) // (const_levels + 1) if (const_levels + 1) > 0 else 0
+
+        def step_for_level(lvl: int) -> int:
+            if lvl >= 100:
+                return 0
+            if lvl <= b4_end:
+                return early_band_step(lvl)
+            if lvl <= const_end:
+                return int(MID_CONST)
+            # lvl == 99
+            sum_const = MID_CONST * const_levels
+            final_needed = total_target - (EARLY_SUM + sum_const)
+            return int(final_needed)
+
+        # Total XP required to reach stored_level
+        total_required = 0
+        cur = 1
+        while cur < stored_level:
+            total_required += step_for_level(cur)
+            cur += 1
+
+        need_next = step_for_level(stored_level)
+        xp_into = max(0, xp_val - total_required)
+        if stored_level < 100:
+            xp_into = min(xp_into, need_next)
+        xp_to_next = 0 if stored_level >= 100 else max(0, need_next - xp_into)
         return {
-            'level': lvl,
+            'level': stored_level,
             'xp': xp_val,
-            'xp_into_level': xp_into,
-            'xp_to_next': xp_to_next,
-            'next_level_requirement': 0 if lvl >= 100 else need
+            'xp_into_level': int(xp_into),
+            'xp_to_next': int(xp_to_next),
+            'next_level_requirement': 0 if stored_level >= 100 else int(need_next)
         }
 
-    gamify = level_progress(profile.get('XP') if profile else 0)
+    gamify = level_progress(profile.get('XP') if profile else 0, profile.get('Level', 1) if profile else 1)
 
     # Achievements summary
     totals = safe_fetch_one("SELECT COUNT(*) AS Total FROM Achievements")
@@ -310,6 +566,56 @@ def chart_data():
         """)
     except Exception:
         recent_achievements = []
+
+    # Full achievements with status and progress
+    # Build counters: known/favorites from Facts, others from profile
+    try:
+        known_count_row = fetch_query("SELECT COUNT(*) AS C FROM Facts WHERE IsEasy = 1")
+        known_count = int(known_count_row[0]['C']) if known_count_row else 0
+    except Exception:
+        known_count = 0
+    try:
+        fav_count_row = fetch_query("SELECT COUNT(*) AS C FROM Facts WHERE IsFavorite = 1")
+        favorites_count_val = int(fav_count_row[0]['C']) if fav_count_row else 0
+    except Exception:
+        favorites_count_val = 0
+
+    counters = {
+        'known': known_count,
+        'favorites': favorites_count_val,
+        'reviews': int((profile or {}).get('TotalReviews', 0) or 0),
+        'adds': int((profile or {}).get('TotalAdds', 0) or 0),
+        'edits': int((profile or {}).get('TotalEdits', 0) or 0),
+        'deletes': int((profile or {}).get('TotalDeletes', 0) or 0),
+        'streak': int((profile or {}).get('CurrentStreak', 0) or 0),
+    }
+
+    try:
+        ach_rows = fetch_query(
+            """
+            SELECT a.AchievementID, a.Code, a.Name, a.Category, a.Threshold, a.RewardXP,
+                   u.UnlockID, u.UnlockDate, u.Notified
+            FROM Achievements a
+            LEFT JOIN AchievementUnlocks u ON u.AchievementID = a.AchievementID
+            ORDER BY a.Category, a.Threshold
+            """
+        )
+    except Exception:
+        ach_rows = []
+    achievements_full = []
+    for r in ach_rows:
+        progress = counters.get(str(r.get('Category')), 0)
+        achievements_full.append({
+            'Code': r.get('Code'),
+            'Name': r.get('Name'),
+            'Category': r.get('Category'),
+            'Threshold': int(r.get('Threshold') or 0),
+            'RewardXP': int(r.get('RewardXP') or 0),
+            'Unlocked': r.get('UnlockID') is not None,
+            'UnlockDate': r.get('UnlockDate'),
+            'Notified': bool(r.get('Notified')) if r.get('UnlockID') is not None else False,
+            'ProgressCurrent': int(progress),
+        })
     
     # Format data for frontend
     formatted_data = {
@@ -329,10 +635,28 @@ def chart_data():
         # Include favorite/known fact tables for the frontend
         'allFavoriteFacts': format_table_data(data['allFavoriteFacts']),
         'allKnownFacts': format_table_data(data['allKnownFacts']),
+        # Duration analytics
+        'session_duration_stats': data['sessionDurationStats'][0] if data['sessionDurationStats'] else {},
+        'avg_facts_per_session': data['avgFactsPerSession'][0] if data['avgFactsPerSession'] else {},
+        'best_efficiency': data['bestEfficiency'][0] if data['bestEfficiency'] else {},
+        'session_duration_distribution': format_pie_chart(data['sessionDurationDistribution'], 'DurationRange', 'SessionCount'),
+        'avg_review_time_per_fact': data['avgReviewTimePerFact'][0] if data['avgReviewTimePerFact'] else {},
+        'category_review_time': format_bar_chart(data['categoryReviewTime'], 'CategoryName', 'AvgReviewTime'),
+        'daily_session_duration': format_duration_line_chart(data['dailySessionDuration']),
+        'session_efficiency': format_table_data(data['sessionEfficiency']),
+        'timeout_analysis': format_timeout_chart(data['timeoutAnalysis']),
+        # New Overview charts
+        'known_vs_unknown': format_known_unknown_chart(data['knownVsUnknownRatio']),
+        'weekly_review_pattern': format_weekly_pattern(data['weeklyReviewPattern']),
+        'top_review_hours': format_top_hours(data['topReviewHours']),
+        'category_growth_trend': format_growth_trend(data['categoryGrowthTrend']),
+        # New Progress chart
+        'monthly_progress': format_monthly_progress(data['monthlyProgress']),
         # Gamification exports
         'gamification': gamify,
         'achievements_summary': achievements_summary,
-        'recent_achievements': recent_achievements
+        'recent_achievements': recent_achievements,
+        'achievements': achievements_full
     }
 
     # If all=true, also include ALL facts (including those with 0 reviews)
@@ -370,22 +694,7 @@ def chart_data():
                 f.LastViewedDate ASC
         """))
 
-    # Add average per-view duration by day for last 30 days
-    avg_view_duration = fetch_query("""
-        SELECT 
-            CONVERT(varchar, ReviewDate, 23) as Date,
-            AVG(CASE WHEN SessionDuration IS NULL THEN NULL ELSE CAST(SessionDuration AS FLOAT) END) as AvgSeconds
-        FROM ReviewLogs
-        WHERE ReviewDate >= ?
-        GROUP BY CONVERT(varchar, ReviewDate, 23)
-        ORDER BY CONVERT(varchar, ReviewDate, 23)
-    """, (thirty_days_ago,))
-
-    formatted_data['avg_view_duration_per_day'] = format_single_line_chart(
-        avg_view_duration,
-        label='Avg View Duration (s)',
-        value_field='AvgSeconds'
-    )
+    # removed avg per-view duration series
 
     # Add recent session summaries (last 20 sessions)
     recent_sessions = fetch_query("""
@@ -581,6 +890,213 @@ def format_single_line_chart(data, label='Series', value_field='Value'):
             'backgroundColor': 'rgba(249, 115, 22, 0.1)',
             'fill': True
         }]
+    }
+
+def format_duration_line_chart(data):
+    """Format duration data for line chart with multiple metrics"""
+    labels = []
+    avg_duration = []
+    total_duration = []
+    session_count = []
+    
+    for row in data:
+        labels.append(row['Date'])
+        avg_duration.append(round(row['AvgDuration'] / 60, 2) if row['AvgDuration'] else 0)  # Convert to minutes
+        total_duration.append(round(row['TotalDuration'] / 60, 2) if row['TotalDuration'] else 0)  # Convert to minutes
+        session_count.append(row['SessionCount'])
+    
+    return {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'Avg Duration (min)',
+                'data': avg_duration,
+                'borderColor': '#10b981',
+                'backgroundColor': 'rgba(16, 185, 129, 0.1)',
+                'yAxisID': 'y',
+                'fill': True
+            },
+            {
+                'label': 'Total Duration (min)',
+                'data': total_duration,
+                'borderColor': '#3b82f6',
+                'backgroundColor': 'rgba(59, 130, 246, 0.1)',
+                'yAxisID': 'y',
+                'fill': True
+            },
+            {
+                'label': 'Sessions',
+                'data': session_count,
+                'borderColor': '#f59e0b',
+                'backgroundColor': 'rgba(245, 158, 11, 0.1)',
+                'yAxisID': 'y1',
+                'type': 'bar'
+            }
+        ]
+    }
+
+def format_timeout_chart(data):
+    """Format timeout analysis data for chart"""
+    labels = []
+    timeout_count = []
+    timeout_percentage = []
+    
+    for row in data:
+        labels.append(row['Date'])
+        timeout_count.append(row['TimeoutCount'])
+        timeout_percentage.append(float(row['TimeoutPercentage']) if row['TimeoutPercentage'] else 0)
+    
+    return {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'Timeout Count',
+                'data': timeout_count,
+                'type': 'bar',
+                'backgroundColor': '#ef4444',
+                'yAxisID': 'y'
+            },
+            {
+                'label': 'Timeout %',
+                'data': timeout_percentage,
+                'type': 'line',
+                'borderColor': '#dc2626',
+                'backgroundColor': 'transparent',
+                'borderWidth': 2,
+                'yAxisID': 'y1'
+            }
+        ]
+    }
+
+def format_known_unknown_chart(data):
+    """Format known vs unknown facts for doughnut chart"""
+    if not data or not data[0]:
+        return {'labels': [], 'data': []}
+    row = data[0]
+    return {
+        'labels': ['Known Facts', 'Unknown Facts'],
+        'data': [row.get('KnownFacts', 0), row.get('UnknownFacts', 0)]
+    }
+
+def format_weekly_pattern(data):
+    """Format weekly review pattern as radar chart data"""
+    days_order = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    day_data = {row['DayName']: row['ReviewCount'] for row in data if row.get('DayName')}
+    
+    return {
+        'labels': days_order,
+        'datasets': [{
+            'label': 'Reviews',
+            'data': [day_data.get(day, 0) for day in days_order],
+            'backgroundColor': 'rgba(59, 130, 246, 0.2)',
+            'borderColor': '#3b82f6',
+            'pointBackgroundColor': '#3b82f6',
+            'pointBorderColor': '#fff',
+            'pointHoverBackgroundColor': '#fff',
+            'pointHoverBorderColor': '#3b82f6'
+        }]
+    }
+
+def format_top_hours(data):
+    """Format top review hours as horizontal bar chart"""
+    hours = []
+    counts = []
+    for row in data:
+        hour = row.get('Hour', 0)
+        hour_str = f"{hour:02d}:00-{(hour+1)%24:02d}:00"
+        hours.append(hour_str)
+        counts.append(row.get('ReviewCount', 0))
+    
+    return {
+        'labels': hours,
+        'datasets': [{
+            'label': 'Reviews',
+            'data': counts,
+            'backgroundColor': '#10b981',
+            'borderColor': '#059669',
+            'borderWidth': 1
+        }]
+    }
+
+def format_growth_trend(data):
+    """Format category growth trend"""
+    categories = []
+    last_week = []
+    last_month = []
+    
+    for row in data[:8]:  # Top 8 categories
+        categories.append(row.get('CategoryName', ''))
+        last_week.append(row.get('LastWeek', 0))
+        last_month.append(row.get('LastMonth', 0))
+    
+    return {
+        'labels': categories,
+        'datasets': [
+            {
+                'label': 'Last 7 Days',
+                'data': last_week,
+                'backgroundColor': '#f59e0b',
+                'borderColor': '#d97706',
+                'borderWidth': 1
+            },
+            {
+                'label': 'Last 30 Days',
+                'data': last_month,
+                'backgroundColor': '#3b82f6',
+                'borderColor': '#2563eb',
+                'borderWidth': 1
+            }
+        ]
+    }
+
+def format_monthly_progress(data):
+    """Format monthly progress data"""
+    labels = []
+    reviews = []
+    unique_facts = []
+    active_days = []
+    
+    month_names = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    
+    for row in data:
+        year = row.get('Year', 2024)
+        month = row.get('Month', 1)
+        labels.append(f"{month_names[month]} {year}")
+        reviews.append(row.get('TotalReviews', 0))
+        unique_facts.append(row.get('UniqueFactsReviewed', 0))
+        active_days.append(row.get('ActiveDays', 0))
+    
+    return {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'Total Reviews',
+                'data': reviews,
+                'type': 'line',
+                'borderColor': '#3b82f6',
+                'backgroundColor': 'transparent',
+                'borderWidth': 2,
+                'tension': 0.4,
+                'yAxisID': 'y'
+            },
+            {
+                'label': 'Unique Facts',
+                'data': unique_facts,
+                'type': 'bar',
+                'backgroundColor': '#10b981',
+                'yAxisID': 'y'
+            },
+            {
+                'label': 'Active Days',
+                'data': active_days,
+                'type': 'line',
+                'borderColor': '#f59e0b',
+                'backgroundColor': 'transparent',
+                'borderWidth': 2,
+                'borderDash': [5, 5],
+                'yAxisID': 'y1'
+            }
+        ]
     }
 
 if __name__ == '__main__':

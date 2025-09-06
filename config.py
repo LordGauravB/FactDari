@@ -113,3 +113,22 @@ def get_font(font_type):
         return (UI_CONFIG['font_family'], UI_CONFIG['normal_font_size'])
 
 # (no chart config helpers are needed; Chart.js is configured in the template)
+
+# Leveling configuration (makes Level 100 total XP adjustable and early band sizes tunable)
+LEVELING_CONFIG = {
+    # Total XP required to reach Level 100 (used to fit constant and final steps)
+    'total_xp_l100': int(os.environ.get('FACTDARI_LEVEL_TOTAL_XP_L100', '1000000')),
+
+    # Early bands (inclusive end levels and per-level step sizes)
+    'band1_end': int(os.environ.get('FACTDARI_LEVEL_BAND1_END', '4')),
+    'band1_step': int(os.environ.get('FACTDARI_LEVEL_BAND1_STEP', '100')),
+    'band2_end': int(os.environ.get('FACTDARI_LEVEL_BAND2_END', '9')),
+    'band2_step': int(os.environ.get('FACTDARI_LEVEL_BAND2_STEP', '500')),
+    'band3_end': int(os.environ.get('FACTDARI_LEVEL_BAND3_END', '14')),
+    'band3_step': int(os.environ.get('FACTDARI_LEVEL_BAND3_STEP', '1000')),
+    'band4_end': int(os.environ.get('FACTDARI_LEVEL_BAND4_END', '19')),
+    'band4_step': int(os.environ.get('FACTDARI_LEVEL_BAND4_STEP', '5000')),
+
+    # End of the constant step band (start is band4_end + 1; final step is at level 99)
+    'const_end': int(os.environ.get('FACTDARI_LEVEL_CONST_END', '98')),
+}

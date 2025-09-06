@@ -170,6 +170,20 @@
                     </svg>
                     Insights
                 </button>
+                <button class="tab-btn" data-tab="sessions" role="tab" aria-selected="false" aria-controls="sessions-tab" title="Press Ctrl+4">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Session Analytics
+                </button>
+                <button class="tab-btn" data-tab="achievements" role="tab" aria-selected="false" aria-controls="achievements-tab" title="Press Ctrl+5">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                        <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/>
+                        <path d="M17 5h3a2 2 0 0 1-2 2h-1M7 5H4a2 2 0 0 0 2 2h1"/>
+                    </svg>
+                    Achievements
+                </button>
             </nav>
 
             <!-- Tab Contents -->
@@ -253,6 +267,82 @@
                             </div>
                         </article>
 
+                        <!-- New Overview Charts -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Knowledge Progress</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="known-vs-unknown" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="known-vs-unknown"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Ratio of known vs unknown facts
+                            </div>
+                        </article>
+
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Weekly Review Pattern</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="weekly-pattern" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="weekly-pattern"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Review activity by day of week
+                            </div>
+                        </article>
+
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Peak Review Hours</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="top-hours" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="top-hours"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Your top 5 most active hours
+                            </div>
+                        </article>
+
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Category Growth Trend</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="growth-trend" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="growth-trend"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Facts added per category over time
+                            </div>
+                        </article>
                         
                     </div>
                 </section>
@@ -260,28 +350,6 @@
                 <!-- Progress Tab -->
                 <section id="progress-tab" class="tab-content" role="tabpanel">
                     <div class="charts-grid">
-                        <article class="chart-card span-2">
-                            <header class="chart-header">
-                                <h3>Recent Achievements</h3>
-                            </header>
-                            <div class="chart-container table-chart">
-                                <div class="table-container">
-                                    <table id="achievements-table" class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>When</th>
-                                                <th>Achievement</th>
-                                                <th>Reward</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div class="chart-description">
-                                10 most recently unlocked achievements
-                            </div>
-                        </article>
                         <article class="chart-card">
                             <header class="chart-header">
                                 <h3>Facts Added Timeline</h3>
@@ -320,11 +388,12 @@
                             </div>
                         </article>
 
-                        <article class="chart-card">
+                        <!-- New Monthly Progress Chart -->
+                        <article class="chart-card span-2">
                             <header class="chart-header">
-                                <h3>Avg View Duration (30 days)</h3>
+                                <h3>Monthly Progress Overview</h3>
                                 <div class="chart-actions">
-                                    <button class="btn-icon expand-btn" data-chart="avg-view-duration" aria-label="Expand chart">
+                                    <button class="btn-icon expand-btn" data-chart="monthly-progress" aria-label="Expand chart">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
                                         </svg>
@@ -332,41 +401,10 @@
                                 </div>
                             </header>
                             <div class="chart-container">
-                                <canvas id="avg-view-duration"></canvas>
+                                <canvas id="monthly-progress"></canvas>
                             </div>
                             <div class="chart-description">
-                                Average seconds spent per fact per day
-                            </div>
-                        </article>
-
-                        <article class="chart-card">
-                            <header class="chart-header">
-                                <h3>Recent Sessions</h3>
-                                <div class="chart-actions">
-                                    <button class="btn-icon expand-btn" data-chart="sessions-table" aria-label="Expand table">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </header>
-                            <div class="chart-container table-chart">
-                                <div class="table-container">
-                                    <table id="sessions-table" class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Start Time</th>
-                                                <th>Duration (s)</th>
-                                                <th>Views</th>
-                                                <th>Distinct Facts</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div class="chart-description">
-                                Last 20 review sessions summary
+                                Monthly reviews, unique facts, and active days (last 6 months)
                             </div>
                         </article>
 
@@ -539,6 +577,292 @@
                             </div>
                             <div class="chart-description">
                                 Daily review activity over the last 30 days
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- Session Analytics Tab -->
+                <section id="sessions-tab" class="tab-content" role="tabpanel">
+                    <!-- Session Metrics Section -->
+                    <section class="metrics-section" aria-label="Session metrics">
+                        <div class="metrics-grid">
+                            <article class="metric-card" title="Average duration of review sessions">
+                                <div class="metric-icon">⏱️</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="avg-session-duration">--</div>
+                                    <div class="metric-label">Average Session</div>
+                                </div>
+                            </article>
+                            
+                            <article class="metric-card" title="Total time spent reviewing">
+                                <div class="metric-icon">⏳</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="total-session-time">--</div>
+                                    <div class="metric-label">Total Time</div>
+                                </div>
+                            </article>
+                            
+                            <article class="metric-card" title="Longest review session">
+                                <div class="metric-icon">🏁</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="max-session-duration">--</div>
+                                    <div class="metric-label">Longest Session</div>
+                                </div>
+                            </article>
+                            
+                            <article class="metric-card" title="Total number of review sessions">
+                                <div class="metric-icon">📈</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="total-sessions">--</div>
+                                    <div class="metric-label">Total Sessions</div>
+                                </div>
+                            </article>
+                            
+                            <article class="metric-card" title="Average facts reviewed per session">
+                                <div class="metric-icon">📊</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="avg-facts-per-session">--</div>
+                                    <div class="metric-label">Avg Facts/Session</div>
+                                </div>
+                            </article>
+                            
+                            <article class="metric-card" title="Best review efficiency (facts per minute)">
+                                <div class="metric-icon">⚡</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="best-efficiency">--</div>
+                                    <div class="metric-label">Best Efficiency</div>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+
+                    <div class="charts-grid">
+
+                        <!-- Session Duration Distribution -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Session Duration Distribution</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="session-duration-distribution" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="session-duration-distribution"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                How long your sessions typically last
+                            </div>
+                        </article>
+
+                        <!-- Review Time Stats -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Review Time Per Fact</h3>
+                            </header>
+                            <div class="chart-container">
+                                <div class="review-time-stats">
+                                    <div class="time-stat">
+                                        <span class="time-label">Average:</span>
+                                        <span class="time-value" id="avg-review-time">--</span>
+                                    </div>
+                                    <div class="time-stat">
+                                        <span class="time-label">Fastest:</span>
+                                        <span class="time-value" id="min-review-time">--</span>
+                                    </div>
+                                    <div class="time-stat">
+                                        <span class="time-label">Slowest:</span>
+                                        <span class="time-value" id="max-review-time">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Time spent reviewing individual facts
+                            </div>
+                        </article>
+
+                        <!-- Daily Session Duration Trend -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Daily Session Duration Trend</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="daily-session-duration" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="daily-session-duration"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Session duration patterns over the last 30 days
+                            </div>
+                        </article>
+
+                        <!-- Category Review Time -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Average Review Time by Category</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="category-review-time" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="category-review-time"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Which categories take longer to review
+                            </div>
+                        </article>
+
+                        <!-- Session Efficiency Table -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Session Efficiency Analysis</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="session-efficiency-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="session-efficiency-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Start Time</th>
+                                                <th>Duration (min)</th>
+                                                <th>Unique Facts</th>
+                                                <th>Total Reviews</th>
+                                                <th>Facts/min</th>
+                                                <th>Reviews/min</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Detailed efficiency metrics for recent sessions
+                            </div>
+                        </article>
+
+                        <!-- Recent Sessions Table -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Recent Sessions</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="sessions-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="sessions-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Start Time</th>
+                                                <th>Duration (s)</th>
+                                                <th>Views</th>
+                                                <th>Distinct Facts</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Last 20 review sessions summary
+                            </div>
+                        </article>
+
+                        <!-- Timeout Analysis -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Session Timeout Analysis</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="timeout-analysis" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="timeout-analysis"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Track session timeouts and inactivity patterns
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- Achievements Tab -->
+                <section id="achievements-tab" class="tab-content" role="tabpanel">
+                    <div class="charts-grid">
+
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Recent Achievements</h3>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="achievements-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>When</th>
+                                                <th>Achievement</th>
+                                                <th>Reward</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                10 most recently unlocked achievements
+                            </div>
+                        </article>
+
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>All Achievements</h3>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="all-achievements-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Status</th>
+                                                <th>Name</th>
+                                                <th>Category</th>
+                                                <th>Progress</th>
+                                                <th>Reward</th>
+                                                <th>Unlocked At</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                All achievements with current progress
                             </div>
                         </article>
                     </div>

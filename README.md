@@ -114,6 +114,45 @@ Edit `config.py` to customize:
 - `FACTDARI_XP_REVIEW_BONUS_CAP` (default: `5`): max time-based bonus
 - `FACTDARI_XP_FAVORITE` (default: `1`), `FACTDARI_XP_KNOWN` (default: `10`), `FACTDARI_XP_ADD` (default: `2`), `FACTDARI_XP_EDIT` (default: `1`), `FACTDARI_XP_DELETE` (default: `0`)
 - `FACTDARI_XP_DAILY_CHECKIN` (default: `2`): XP on daily streak check-in
+
+### Leveling Configuration
+- `FACTDARI_LEVEL_TOTAL_XP_L100` (default: `1000000`): total XP to reach Level 100
+- `FACTDARI_LEVEL_BAND1_END` (default: `4`): last level of band 1
+- `FACTDARI_LEVEL_BAND1_STEP` (default: `100`): XP per level for band 1
+- `FACTDARI_LEVEL_BAND2_END` (default: `9`): last level of band 2
+- `FACTDARI_LEVEL_BAND2_STEP` (default: `500`): XP per level for band 2
+- `FACTDARI_LEVEL_BAND3_END` (default: `14`): last level of band 3
+- `FACTDARI_LEVEL_BAND3_STEP` (default: `1000`): XP per level for band 3
+- `FACTDARI_LEVEL_BAND4_END` (default: `19`): last level of band 4
+- `FACTDARI_LEVEL_BAND4_STEP` (default: `5000`): XP per level for band 4
+- `FACTDARI_LEVEL_CONST_END` (default: `98`): end level of the constant step band (start is `BAND4_END+1`; final step is at 99)
+
+## How XP Works
+
+- Per‑view reviews: Awards XP when you finish viewing a fact and move away or the view is finalized by inactivity.
+  - Base: +1 XP after a short grace (default 2s).
+  - Time bonus: +1 for each additional step (default 5s) after grace, capped (default +5).
+  - Max per view with defaults: 6 XP (1 base + 5 bonus).
+- Daily check‑in: The first time you start a reviewing session on a new day, you gain daily XP (default +2) and the app evaluates streak achievements (3, 7, 14, 30, 60, 90, 180, 365 days).
+- Actions: Small XP for common actions.
+  - Favorite (mark ON): +1 XP (default).
+  - Known (mark ON): +10 XP (default).
+  - Add fact: +2 XP (default).
+  - Edit fact: +1 XP (default).
+  - Delete fact: +0 XP (default).
+  - Note: These award when toggled/triggered; they are not “first‑time only” by default.
+- Achievements: Unlock thresholds grant additional XP automatically across categories (known, favorites, reviews, adds, edits, deletes, streak). If you jump past multiple thresholds, you receive all applicable rewards.
+- Leveling:
+  - Level step sizes are designed to total exactly 1,000,000 XP at Level 100 (configurable via env):
+    - Level 1–4: +100 XP per level (FACTDARI_LEVEL_BAND1_STEP)
+    - Level 5–9: +500 XP per level (FACTDARI_LEVEL_BAND2_STEP)
+    - Level 10–14: +1000 XP per level (FACTDARI_LEVEL_BAND3_STEP)
+    - Level 15–19: +5000 XP per level (FACTDARI_LEVEL_BAND4_STEP)
+    - Level 20–98: constant step automatically fitted so that the total is exactly `FACTDARI_LEVEL_TOTAL_XP_L100`
+    - Level 99→100: final step equals the exact remainder to hit the target total
+  - Level 100 is gated—your stored Level stays at 99 until all achievements are unlocked, even if you meet the XP target.
+
+All values are configurable via environment variables listed in “XP Rewards” above.
 ## Making This Repo Public
 
 Before making the repository public:

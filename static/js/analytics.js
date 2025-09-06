@@ -21,6 +21,7 @@
   let leastSortState = { index: 2, dir: 'asc' }; // Reviews asc
   let favoriteSortState = { index: 2, dir: 'desc' }; // Reviews desc
   let knownSortState = { index: 2, dir: 'desc' }; // Reviews desc
+  let achievementsSortState = { index: 0, dir: 'desc' }; // Status desc (Unlocked first)
   let sortHandlersAttached = false;
 
   function qs(sel) { return document.querySelector(sel); }
@@ -65,8 +66,9 @@
     
     // Sessions data for table/modal
     sessionsData = data.recent_sessions || [];
-    // Populate recent achievements table
+    // Populate achievements
     renderAchievementsTable(data.recent_achievements || []);
+    renderAllAchievementsTable(data.achievements || []);
     
     return data;
   }
@@ -149,13 +151,11 @@
     setText('#active-categories', totalCategories);
     setText('#favorites-count', favoritesCount);
     setText('#known-facts-count', knownFactsCount);
-    setText('#level-value', `Lv ${level}`);
-    setText('#xp-value', xpToNext > 0 ? `${xp} (${xpToNext}\u2192)` : `${xp} (MAX)`);
-    setText('#achievements-count', `${ach.unlocked || 0}/${ach.total || 0}`);
-    
-    // Also update navbar gamification stats
+    // Update navbar gamification stats
     setText('#nav-level-value', `Lv ${level}`);
-    setText('#nav-xp-value', xpToNext > 0 ? `${xp} (${xpToNext}\u2192)` : `${xp} (MAX)`);
+    const gated = (level < 100) && (xpToNext <= 0);
+    const xpText = gated ? `${xp} (achievements required)` : (xpToNext > 0 ? `${xp} (${xpToNext}\u2192)` : `${xp} (MAX)`);
+    setText('#nav-xp-value', xpText);
     setText('#nav-achievements-count', `${ach.unlocked || 0}/${ach.total || 0}`);
   }
 
@@ -576,6 +576,73 @@
     });
   }
 
+  function renderAllAchievementsTable(rows) {
+    const table = qs('#all-achievements-table');
+    const tbody = qs('#all-achievements-table tbody');
+    if (!table || !tbody) return;
+    const data = Array.isArray(rows) ? rows.slice() : [];
+
+    // Sorting helper
+    const sortBy = (idx, dir) => {
+      const asc = dir === 'asc';
+      const getVal = (r) => {
+        switch(idx) {
+          case 0: return r.Unlocked ? 1 : 0; // status
+          case 1: return (r.Name || '').toLowerCase();
+          case 2: return (r.Category || '').toLowerCase();
+          case 3: return (r.ProgressCurrent || 0) / Math.max(1, r.Threshold || 1); // ratio
+          case 4: return r.RewardXP || 0;
+          case 5: return r.UnlockDate ? new Date(r.UnlockDate).getTime() : 0;
+          default: return 0;
+        }
+      };
+      data.sort((a, b) => {
+        // Always show unlocked achievements first
+        if (a.Unlocked !== b.Unlocked) {
+          return a.Unlocked ? -1 : 1;
+        }
+        // Then apply the selected sorting
+        const va = getVal(a), vb = getVal(b);
+        if (typeof va === 'string' && typeof vb === 'string') return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+        return asc ? (va - vb) : (vb - va);
+      });
+    };
+    sortBy(achievementsSortState.index, achievementsSortState.dir);
+
+    tbody.innerHTML = '';
+    data.forEach(r => {
+      const tr = document.createElement('tr');
+      const status = r.Unlocked ? 'Unlocked' : 'Locked';
+      const progress = `${Math.min(r.ProgressCurrent || 0, r.Threshold || 0)}/${r.Threshold || 0}`;
+      const when = r.UnlockDate ? new Date(r.UnlockDate).toLocaleString() : '';
+      tr.innerHTML = `
+        <td>${status}</td>
+        <td>${r.Name || ''}</td>
+        <td>${r.Category || ''}</td>
+        <td style="text-align:center;">${progress}</td>
+        <td style="text-align:center;">${r.RewardXP || 0} XP</td>
+        <td>${when}</td>
+      `;
+      if (r.Unlocked) tr.classList.add('row-unlocked');
+      tbody.appendChild(tr);
+    });
+
+    if (!table.dataset.sortAttached) {
+      const ths = Array.from(table.querySelectorAll('thead th'));
+      ths.forEach((th, idx) => {
+        th.classList.add('sortable');
+        th.addEventListener('click', () => {
+          const newDir = (achievementsSortState.index === idx && achievementsSortState.dir === 'asc') ? 'desc' : 'asc';
+          achievementsSortState = { index: idx, dir: newDir };
+          renderAllAchievementsTable(rows || []);
+          applySortIndicator(table, idx, newDir);
+        });
+      });
+      table.dataset.sortAttached = '1';
+      applySortIndicator(table, achievementsSortState.index, achievementsSortState.dir);
+    }
+  }
+
   function renderKnownTable(data) {
     const knownTbody = qs('#known-facts-table tbody');
     if (!knownTbody) return;
@@ -757,10 +824,29 @@
         doughnutChart('favorite_categories', 'favorite-categories', data.favorite_category_distribution);
         doughnutChart('known_categories', 'known-categories', data.known_category_distribution);
         doughnutChart('categories_viewed_today', 'categories-viewed-today', data.categories_viewed_today);
+        
+        // New Overview charts
+        doughnutChart('known_vs_unknown', 'known-vs-unknown', data.known_vs_unknown);
+        renderRadarChart('weekly_pattern', 'weekly-pattern', data.weekly_review_pattern);
+        renderHorizontalBarChart('top_hours', 'top-hours', data.top_review_hours);
+        renderGroupedBarChart('growth_trend', 'growth-trend', data.category_growth_trend);
+        
         lineChart('reviews_per_day', 'reviews-per-day', data.reviews_per_day);
-        lineChart('avg_view_duration', 'avg-view-duration', data.avg_view_duration_per_day);
+        // removed avg view duration chart
         barChart('facts_timeline', 'facts-timeline', data.facts_added_timeline);
         barChart('category_reviews', 'category-reviews', data.category_reviews, true);
+        
+        // New Progress chart
+        renderMonthlyProgress('monthly_progress', 'monthly-progress', data.monthly_progress);
+        
+        // Duration analytics charts
+        renderDurationStats(data.session_duration_stats, data.avg_review_time_per_fact, data.avg_facts_per_session, data.best_efficiency);
+        pieChart('session_duration_distribution', 'session-duration-distribution', data.session_duration_distribution);
+        renderDurationLineChart('daily_session_duration', 'daily-session-duration', data.daily_session_duration);
+        barChart('category_review_time', 'category-review-time', data.category_review_time, true);
+        renderSessionEfficiencyTable(data.session_efficiency);
+        renderTimeoutChart('timeout_analysis', 'timeout-analysis', data.timeout_analysis);
+        
         populateTables(data.most_reviewed_facts, data.least_reviewed_facts, data.allFavoriteFacts, data.allKnownFacts);
         renderHeatmap(data.review_heatmap);
         renderSessionsTable(sessionsData);
@@ -1062,9 +1148,17 @@
             'known-categories': 'known_categories',
             'categories-viewed-today': 'categories_viewed_today',
             'reviews-per-day': 'reviews_per_day',
-            'avg-view-duration': 'avg_view_duration',
             'facts-timeline': 'facts_timeline',
             'category-reviews': 'category_reviews',
+            'session-duration-distribution': 'session_duration_distribution',
+            'daily-session-duration': 'daily_session_duration',
+            'category-review-time': 'category_review_time',
+            'timeout-analysis': 'timeout_analysis',
+            'known-vs-unknown': 'known_vs_unknown',
+            'weekly-pattern': 'weekly_pattern',
+            'top-hours': 'top_hours',
+            'growth-trend': 'growth_trend',
+            'monthly-progress': 'monthly_progress'
           };
           const chartRef = charts[idMap[key]];
           if (!chartRef || !modal || !modalChartContainer) return;
@@ -1122,6 +1216,42 @@
             data: JSON.parse(JSON.stringify(chartRef.config.data)), // Deep clone
             options: chartOptions
           });
+        }
+        
+        // Session efficiency table expansion
+        if (key === 'session-efficiency-table') {
+          if (!modal || !modalChartContainer) return;
+          modal.style.display = 'flex';
+          modalChartContainer.innerHTML = '';
+          modalChartContainer.style.height = 'auto';
+          
+          const tableContainer = document.createElement('div');
+          tableContainer.className = 'table-container';
+          const table = document.createElement('table');
+          table.className = 'data-table';
+          const thead = document.createElement('thead');
+          thead.innerHTML = `
+            <tr>
+              <th>Start Time</th>
+              <th>Duration (min)</th>
+              <th>Unique Facts</th>
+              <th>Total Reviews</th>
+              <th>Facts/min</th>
+              <th>Reviews/min</th>
+            </tr>
+          `;
+          table.appendChild(thead);
+          const tbody = document.createElement('tbody');
+          
+          // Get session efficiency data from the page
+          const existingRows = document.querySelectorAll('#session-efficiency-table tbody tr');
+          existingRows.forEach(row => {
+            tbody.appendChild(row.cloneNode(true));
+          });
+          
+          table.appendChild(tbody);
+          tableContainer.appendChild(table);
+          modalChartContainer.appendChild(tableContainer);
         }
         
         // Sessions table expansion
@@ -1239,11 +1369,499 @@
           case '1':
           case '2':
           case '3':
+          case '4':
             e.preventDefault();
             const tabIndex = parseInt(e.key) - 1;
             const tabs = qsa('.tab-btn');
             if (tabs[tabIndex]) tabs[tabIndex].click();
             break;
+        }
+      }
+    });
+  }
+  
+  // Render duration statistics
+  function renderDurationStats(sessionStats, reviewTimeStats, avgFactsPerSession, bestEfficiency) {
+    if (sessionStats) {
+      const avgSession = sessionStats.AvgDuration ? Math.round(sessionStats.AvgDuration / 60) : 0;
+      const totalTime = sessionStats.TotalDuration ? Math.round(sessionStats.TotalDuration / 3600) : 0;
+      const maxSession = sessionStats.MaxDuration ? Math.round(sessionStats.MaxDuration / 60) : 0;
+      const totalSessions = sessionStats.SessionCount || 0;
+      
+      const avgEl = qs('#avg-session-duration');
+      const totalEl = qs('#total-session-time');
+      const maxEl = qs('#max-session-duration');
+      const sessionsEl = qs('#total-sessions');
+      
+      if (avgEl) avgEl.textContent = `${avgSession} min`;
+      if (totalEl) totalEl.textContent = `${totalTime} hrs`;
+      if (maxEl) maxEl.textContent = `${maxSession} min`;
+      if (sessionsEl) sessionsEl.textContent = totalSessions;
+    }
+    
+    // Add new metrics
+    if (avgFactsPerSession && avgFactsPerSession.AvgFactsPerSession !== undefined) {
+      const avgFactsEl = qs('#avg-facts-per-session');
+      if (avgFactsEl) {
+        avgFactsEl.textContent = Math.round(avgFactsPerSession.AvgFactsPerSession);
+      }
+    }
+    
+    if (bestEfficiency && bestEfficiency.BestFactsPerMinute !== undefined) {
+      const bestEffEl = qs('#best-efficiency');
+      if (bestEffEl) {
+        bestEffEl.textContent = `${bestEfficiency.BestFactsPerMinute}/min`;
+      }
+    }
+    
+    if (reviewTimeStats) {
+      const avgTime = reviewTimeStats.AvgTimePerReview || 0;
+      const minTime = reviewTimeStats.MinTimePerReview || 0;
+      const maxTime = reviewTimeStats.MaxTimePerReview || 0;
+      
+      const avgReviewEl = qs('#avg-review-time');
+      const minReviewEl = qs('#min-review-time');
+      const maxReviewEl = qs('#max-review-time');
+      
+      if (avgReviewEl) avgReviewEl.textContent = `${avgTime}s`;
+      if (minReviewEl) minReviewEl.textContent = `${minTime}s`;
+      if (maxReviewEl) maxReviewEl.textContent = `${maxTime}s`;
+    }
+  }
+  
+  // Render duration line chart with multiple Y axes
+  function renderDurationLineChart(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+    
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+    
+    charts[key] = new Chart(ctx, {
+      type: 'line',
+      data: payload,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            display: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            }
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Duration (minutes)',
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Session Count',
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            grid: {
+              drawOnChartArea: false,
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              usePointStyle: true
+            }
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1
+          }
+        }
+      }
+    });
+  }
+  
+  // Render session efficiency table
+  function renderSessionEfficiencyTable(sessions) {
+    const tbody = qs('#session-efficiency-table tbody');
+    if (!tbody || !sessions) return;
+    
+    tbody.innerHTML = '';
+    sessions.forEach(session => {
+      const tr = document.createElement('tr');
+      const startTime = session.StartTime ? new Date(session.StartTime).toLocaleString() : '';
+      const duration = session.DurationSeconds ? Math.round(session.DurationSeconds / 60) : 0;
+      
+      tr.innerHTML = `
+        <td>${startTime}</td>
+        <td>${duration}</td>
+        <td>${session.UniqueFactsReviewed || 0}</td>
+        <td>${session.TotalReviews || 0}</td>
+        <td>${session.FactsPerMinute || 0}</td>
+        <td>${session.ReviewsPerMinute || 0}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  
+  // Render timeout analysis chart
+  function renderTimeoutChart(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+    
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+    
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: payload,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            display: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            }
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Timeout Count',
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Timeout Percentage (%)',
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            grid: {
+              drawOnChartArea: false,
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              usePointStyle: true
+            }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1
+          }
+        }
+      }
+    });
+  }
+  
+  // Render Radar Chart
+  function renderRadarChart(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+    
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+    
+    charts[key] = new Chart(ctx, {
+      type: 'radar',
+      data: payload,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          r: {
+            beginAtZero: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            pointLabels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              font: {
+                size: 11
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1
+          }
+        }
+      }
+    });
+  }
+  
+  // Render Horizontal Bar Chart
+  function renderHorizontalBarChart(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+    
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+    
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: payload,
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            }
+          },
+          y: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              font: {
+                size: 11
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  
+  // Render Grouped Bar Chart
+  function renderGroupedBarChart(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+    
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+    
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: payload,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              usePointStyle: true
+            }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              maxRotation: 45,
+              minRotation: 45
+            }
+          },
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            }
+          }
+        }
+      }
+    });
+  }
+  
+  // Render Monthly Progress Chart
+  function renderMonthlyProgress(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+    
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+    
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: payload,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            }
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Reviews / Facts',
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Active Days',
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            grid: {
+              drawOnChartArea: false,
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              usePointStyle: true
+            }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1
+          }
         }
       }
     });

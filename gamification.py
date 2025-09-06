@@ -26,23 +26,18 @@ class Gamification:
                 )
                 row = cur.fetchone()
                 if not row:
-                    # Bootstrap a row if missing
+                    # Bootstrap a row if missing, then re-select it for accurate values
                     cur.execute("INSERT INTO GamificationProfile (XP, Level) VALUES (0,1)")
                     conn.commit()
-                    return {
-                        'ProfileID': 1,
-                        'XP': 0,
-                        'Level': 1,
-                        'TotalReviews': 0,
-                        'TotalKnown': 0,
-                        'TotalFavorites': 0,
-                        'TotalAdds': 0,
-                        'TotalEdits': 0,
-                        'TotalDeletes': 0,
-                        'CurrentStreak': 0,
-                        'LongestStreak': 0,
-                        'LastCheckinDate': None,
-                    }
+                    cur.execute(
+                        """
+                        SELECT TOP 1 ProfileID, XP, Level, TotalReviews, TotalKnown, TotalFavorites,
+                               TotalAdds, TotalEdits, TotalDeletes, CurrentStreak, LongestStreak, LastCheckinDate
+                        FROM GamificationProfile
+                        ORDER BY ProfileID
+                        """
+                    )
+                    row = cur.fetchone()
                 cols = [d[0] for d in cur.description]
                 return dict(zip(cols, row))
 
@@ -58,9 +53,19 @@ class Gamification:
             return 0
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
-                cur.execute(f"UPDATE GamificationProfile SET {field} = {field} + ?", (amount,))
+                # Target the first (and only) profile row explicitly
+                cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
+                r = cur.fetchone()
+                if not r:
+                    # Ensure a row exists
+                    cur.execute("INSERT INTO GamificationProfile (XP, Level) VALUES (0,1)")
+                    conn.commit()
+                    cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
+                    r = cur.fetchone()
+                pid = int(r[0])
+                cur.execute(f"UPDATE GamificationProfile SET {field} = {field} + ? WHERE ProfileID = ?", (amount, pid))
                 conn.commit()
-                cur.execute(f"SELECT TOP 1 {field} FROM GamificationProfile")
+                cur.execute(f"SELECT {field} FROM GamificationProfile WHERE ProfileID = ?", (pid,))
                 return int(cur.fetchone()[0])
 
     def award_xp(self, amount: int) -> dict:
@@ -68,8 +73,16 @@ class Gamification:
             return self.get_profile()
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
-                # Update XP
-                cur.execute("UPDATE GamificationProfile SET XP = XP + ?", (amount,))
+                cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
+                r = cur.fetchone()
+                if not r:
+                    cur.execute("INSERT INTO GamificationProfile (XP, Level) VALUES (0,1)")
+                    conn.commit()
+                    cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
+                    r = cur.fetchone()
+                pid = int(r[0])
+                # Update XP for that profile
+                cur.execute("UPDATE GamificationProfile SET XP = XP + ? WHERE ProfileID = ?", (amount, pid))
                 conn.commit()
         # Recompute level after XP change
         return self.recompute_level()
@@ -85,8 +98,12 @@ class Gamification:
 
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
-                cur.execute("UPDATE GamificationProfile SET Level = ?", (int(level),))
-                conn.commit()
+                cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
+                r = cur.fetchone()
+                if r:
+                    pid = int(r[0])
+                    cur.execute("UPDATE GamificationProfile SET Level = ? WHERE ProfileID = ?", (int(level), pid))
+                    conn.commit()
         profile['Level'] = int(level)
         return profile
 
@@ -111,11 +128,15 @@ class Gamification:
                 rows = cur.fetchall()
                 for r in rows:
                     ach_id, code, name, reward = r
-                    cur.execute(
-                        "INSERT INTO AchievementUnlocks (AchievementID) VALUES (?)",
-                        (ach_id,)
-                    )
-                    unlocked.append({'Code': code, 'Name': name, 'RewardXP': int(reward)})
+                    try:
+                        cur.execute(
+                            "INSERT INTO AchievementUnlocks (AchievementID) VALUES (?)",
+                            (ach_id,)
+                        )
+                        unlocked.append({'Code': code, 'Name': name, 'RewardXP': int(reward)})
+                    except Exception:
+                        # Likely a concurrent unlock; ignore
+                        pass
                 if rows:
                     conn.commit()
         # Grant cumulative XP for all unlocked
@@ -199,37 +220,85 @@ class Gamification:
                 return {'profile': prof, 'unlocked': unlocked}
 
     def get_level_progress(self) -> dict:
-        """Return progress metrics for current XP/level.
+        """Return progress metrics using stored Level (with gating) and current XP.
         Keys: level, xp, xp_into_level, xp_to_next, next_level_requirement
         """
         prof = self.get_profile()
         xp = int(prof.get('XP', 0))
-        # Recreate progression used in _level_for_xp
-        level = 1
-        need = 100
-        remaining = xp
-        while remaining >= need and level < 100:
-            remaining -= need
-            level += 1
-            need += 50
-        xp_into = remaining
-        xp_to_next = (need - remaining) if level < 100 else 0
+        level = int(prof.get('Level', 1) or 1)
+
+        # Early bands from config
+        cfg = getattr(config, 'LEVELING_CONFIG', {})
+        b1_end = int(cfg.get('band1_end', 4))
+        b1_step = int(cfg.get('band1_step', 100))
+        b2_end = int(cfg.get('band2_end', 9))
+        b2_step = int(cfg.get('band2_step', 500))
+        b3_end = int(cfg.get('band3_end', 14))
+        b3_step = int(cfg.get('band3_step', 1000))
+        b4_end = int(cfg.get('band4_end', 19))
+        b4_step = int(cfg.get('band4_step', 5000))
+        const_end = int(cfg.get('const_end', 98))
+        total_target = int(cfg.get('total_xp_l100', 1_000_000))
+
+        def early_band_step(lvl: int) -> int:
+            if lvl <= b1_end:
+                return b1_step
+            if lvl <= b2_end:
+                return b2_step
+            if lvl <= b3_end:
+                return b3_step
+            if lvl <= b4_end:
+                return b4_step
+            return 0
+
+        # Early sum (levels 1..b4_end)
+        EARLY_SUM = sum(early_band_step(l) for l in range(1, b4_end + 1))
+        # Constant band is levels (b4_end+1) .. const_end; final step is level 99
+        const_start = b4_end + 1
+        const_levels = max(0, const_end - const_start + 1)
+        REMAINING = total_target - EARLY_SUM
+        MID_CONST = REMAINING // (const_levels + 1) if (const_levels + 1) > 0 else 0
+
+        def step_for_level(lvl: int) -> int:
+            if lvl >= 100:
+                return 0
+            if lvl <= b4_end:
+                return early_band_step(lvl)
+            if lvl <= const_end:
+                return int(MID_CONST)
+            # lvl == 99: final step to fit total exactly
+            sum_const = MID_CONST * const_levels
+            final_needed = total_target - (EARLY_SUM + sum_const)
+            return int(final_needed)
+
+        # Total XP required to reach current stored level
+        total_required = 0
+        cur = 1
+        while cur < level:
+            total_required += step_for_level(cur)
+            cur += 1
+        need_next = step_for_level(level)
+        xp_into = max(0, xp - total_required)
+        if level < 100:
+            xp_into = min(xp_into, need_next)
+        xp_to_next = 0 if level >= 100 else max(0, need_next - xp_into)
         return {
             'level': level,
             'xp': xp,
-            'xp_into_level': xp_into,
-            'xp_to_next': xp_to_next,
-            'next_level_requirement': 0 if level >= 100 else need
+            'xp_into_level': int(xp_into),
+            'xp_to_next': int(xp_to_next),
+            'next_level_requirement': 0 if level >= 100 else int(need_next)
         }
 
     def get_achievements_with_status(self) -> list:
         """List all achievements with unlock status and progress.
-        Adds ProgressCurrent based on GamificationProfile counters.
+        ProgressCurrent derives from Facts for 'known' and 'favorites',
+        and from profile lifetime counters for other categories.
         """
         prof = self.get_profile()
         counters = {
-            'known': int(prof.get('TotalKnown', 0) or 0),
-            'favorites': int(prof.get('TotalFavorites', 0) or 0),
+            'known': 0,  # placeholder, will be computed from Facts
+            'favorites': 0,  # placeholder, will be computed from Facts
             'reviews': int(prof.get('TotalReviews', 0) or 0),
             'adds': int(prof.get('TotalAdds', 0) or 0),
             'edits': int(prof.get('TotalEdits', 0) or 0),
@@ -239,6 +308,18 @@ class Gamification:
         out = []
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
+                # Compute current states from Facts
+                try:
+                    cur.execute("SELECT COUNT(*) FROM Facts WHERE IsEasy = 1")
+                    counters['known'] = int(cur.fetchone()[0] or 0)
+                except Exception:
+                    counters['known'] = 0
+                try:
+                    cur.execute("SELECT COUNT(*) FROM Facts WHERE IsFavorite = 1")
+                    counters['favorites'] = int(cur.fetchone()[0] or 0)
+                except Exception:
+                    counters['favorites'] = 0
+
                 cur.execute(
                     """
                     SELECT a.AchievementID, a.Code, a.Name, a.Category, a.Threshold, a.RewardXP,
@@ -289,17 +370,64 @@ class Gamification:
 
     # --- Internal helpers ---
     def _level_for_xp(self, xp: int) -> int:
-        """Compute level from XP with gently increasing requirements.
-        Level 1 at 0 XP. To reach next levels: 100, 150, 200, 250, ... (arith. progression).
+        """Compute level from XP using banded + fitted progression to reach 1,000,000 at Level 100.
+        - Levels 1–4: 100 per level
+        - Levels 5–9: 500 per level
+        - Levels 10–14: 1000 per level
+        - Levels 15–19: 5000 per level
+        - Levels 20–98: constant step computed to make total to Level 100 be 1,000,000
+        - Level 99→100: final step is the exact remainder to reach 1,000,000
         Caps at 100.
         """
-        level = 1
-        need = 100
+        cfg = getattr(config, 'LEVELING_CONFIG', {})
+        b1_end = int(cfg.get('band1_end', 4))
+        b1_step = int(cfg.get('band1_step', 100))
+        b2_end = int(cfg.get('band2_end', 9))
+        b2_step = int(cfg.get('band2_step', 500))
+        b3_end = int(cfg.get('band3_end', 14))
+        b3_step = int(cfg.get('band3_step', 1000))
+        b4_end = int(cfg.get('band4_end', 19))
+        b4_step = int(cfg.get('band4_step', 5000))
+        const_end = int(cfg.get('const_end', 98))
+        total_target = int(cfg.get('total_xp_l100', 1_000_000))
+
+        def early_band_step(lvl: int) -> int:
+            if lvl <= b1_end:
+                return b1_step
+            if lvl <= b2_end:
+                return b2_step
+            if lvl <= b3_end:
+                return b3_step
+            if lvl <= b4_end:
+                return b4_step
+            return 0
+
+        EARLY_SUM = sum(early_band_step(l) for l in range(1, b4_end + 1))
+        const_start = b4_end + 1
+        const_levels = max(0, const_end - const_start + 1)
+        MID_CONST = (total_target - EARLY_SUM) // (const_levels + 1) if (const_levels + 1) > 0 else 0
+
+        def step_for_level(lvl: int) -> int:
+            if lvl >= 100:
+                return 0
+            if lvl <= b4_end:
+                return early_band_step(lvl)
+            if lvl <= const_end:
+                return int(MID_CONST)
+            # lvl == 99
+            sum_const = MID_CONST * const_levels
+            final_needed = total_target - (EARLY_SUM + sum_const)
+            return int(final_needed)
+
         remaining = int(xp)
-        while remaining >= need and level < 100:
-            remaining -= need
-            level += 1
-            need += 50  # increase requirement each level
+        level = 1
+        while level < 100:
+            need = step_for_level(level)
+            if remaining >= need:
+                remaining -= need
+                level += 1
+            else:
+                break
         return level
 
     def _all_achievements_unlocked(self) -> bool:

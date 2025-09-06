@@ -364,6 +364,9 @@ body {
   background: var(--bg-secondary);
   white-space: nowrap;
   border-radius: var(--radius-sm);
+  text-align: center;
+  line-height: 1;
+  position: relative;
 }
 
 .metric-content {
@@ -1099,7 +1102,19 @@ body {
 
 /* --- Overrides to ensure icons render correctly regardless of encoding --- */
 /* Hide any inline text in metric icons and render the proper emoji via ::before */
-.metric-icon { color: transparent; }
+.metric-icon { 
+  color: transparent; 
+}
+
+.metric-icon::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 /* Total Facts */
 article[title="Total number of facts in your collection"] .metric-icon::before {
@@ -1137,10 +1152,66 @@ article[title="Number of facts marked as known"] .metric-icon::before {
   color: var(--text);
 }
 
+/* Session Analytics Metric Icons */
+article[title="Average duration of review sessions"] .metric-icon::before {
+  content: "\23F1"; /* ⏱️ */
+  color: var(--text);
+}
+
+article[title="Total time spent reviewing"] .metric-icon::before {
+  content: "\23F3"; /* ⏳ */
+  color: var(--text);
+}
+
+article[title="Longest review session"] .metric-icon::before {
+  content: "\01F3C1"; /* 🏁 */
+  color: var(--text);
+}
+
+article[title="Total number of review sessions"] .metric-icon::before {
+  content: "\01F4C8"; /* 📈 */
+  color: var(--text);
+}
+
+article[title="Average facts reviewed per session"] .metric-icon::before {
+  content: "\01F4CA"; /* 📊 */
+  color: var(--text);
+}
+
+article[title="Best review efficiency (facts per minute)"] .metric-icon::before {
+  content: "\26A1"; /* ⚡ */
+  color: var(--text);
+}
+
 /* Fix medal icons for top 3 review counts */
 .medal-gold::before { content: "\01F947 "; }
 .medal-silver::before { content: "\01F948 "; }
 .medal-bronze::before { content: "\01F949 "; }
 
+/* Review time stats styles */
+.review-time-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 20px;
+}
+
+.time-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    background: rgba(16, 185, 129, 0.05);
+    border-radius: 6px;
+}
+
+.time-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.time-value {
+    color: var(--success);
+    font-weight: 600;
+}
 
 
