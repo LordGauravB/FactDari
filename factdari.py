@@ -114,12 +114,31 @@ class FactDariApp:
         # Speech state
         self.speech_engine = pyttsx3.init()
         self.speaking_thread = None
+
+        # Timing/session state
+        self.current_session_id = None
+        self.session_start_time = None
+        self.current_fact_start_time = None
+        self.current_review_log_id = None
+        # Inactivity tracking
+        self.idle_timeout_seconds = getattr(config, 'IDLE_TIMEOUT_SECONDS', 300)
+        self.idle_end_session = getattr(config, 'IDLE_END_SESSION', True)
+        self.idle_navigate_home = getattr(config, 'IDLE_NAVIGATE_HOME', True)
+        self.last_activity_time = datetime.now()
+        self.idle_triggered = False
         
         # Create main window
         self.root = tk.Tk()
         self.root.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
         self.root.overrideredirect(True)
         self.root.configure(bg=self.BG_COLOR)
+
+        # Ensure DB schema supports sessions + durations
+        try:
+            self.ensure_schema()
+        except Exception as _:
+            # Non-fatal: app can still run without migrations
+            pass
         
         # Set up UI elements
         self.setup_ui()
@@ -136,9 +155,15 @@ class FactDariApp:
         self.set_static_position()
         self.update_coordinates()
         self.root.after(250, self.update_ui)
-        
+
         # Show the home page
         self.show_home_page()
+
+        # Ensure we close any active session at process exit
+        try:
+            atexit.register(self.end_active_session)
+        except Exception:
+            pass
     
     def load_categories(self):
         """Load categories for the dropdown"""
@@ -363,6 +388,9 @@ class FactDariApp:
         self.root.bind("<FocusOut>", lambda event: self.root.attributes('-alpha', 0.7))
         self.root.bind("<s>", self.set_static_position)
         self.category_dropdown.bind("<<ComboboxSelected>>", self.on_category_change)
+        # Global input to detect activity
+        self.root.bind_all('<Any-KeyPress>', lambda e: self.record_activity())
+        self.root.bind_all('<Button>', lambda e: self.record_activity())
         
         # Keyboard shortcuts for navigation and actions
         self.root.bind("<Left>", lambda e: self.show_previous_fact())
@@ -540,6 +568,21 @@ class FactDariApp:
             print(f"Database error in fetch_query: {e}")
             return []
 
+    def table_exists(self, table_name):
+        """Check if a table exists in the database (SQL Server)."""
+        try:
+            rows = self.fetch_query(
+                """
+                SELECT 1
+                FROM sys.tables
+                WHERE Name = ? AND schema_id = SCHEMA_ID('dbo')
+                """,
+                (table_name,)
+            )
+            return bool(rows)
+        except Exception:
+            return False
+
     def column_exists(self, table_name, column_name):
         """Check if a column exists in the given table (SQL Server)."""
         try:
@@ -569,6 +612,83 @@ class FactDariApp:
         except Exception as e:
             print(f"Database error in execute_update: {e}")
             return False
+
+    def execute_insert_return_id(self, query, params=None):
+        """Execute an INSERT with OUTPUT ... RETURNING pattern and return the new ID."""
+        try:
+            with pyodbc.connect(self.CONN_STR) as conn:
+                with conn.cursor() as cursor:
+                    if params:
+                        cursor.execute(query, params)
+                    else:
+                        cursor.execute(query)
+                    row = cursor.fetchone()
+                    conn.commit()
+                    return row[0] if row else None
+        except Exception as e:
+            print(f"Database error in execute_insert_return_id: {e}")
+            return None
+
+    def ensure_schema(self):
+        """Create missing tables/columns for sessions and per-view durations."""
+        ddl = """
+        /* Create ReviewSessions if missing */
+        IF OBJECT_ID('dbo.ReviewSessions','U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.ReviewSessions (
+                SessionID INT IDENTITY(1,1) PRIMARY KEY,
+                StartTime DATETIME NOT NULL,
+                EndTime DATETIME NULL,
+                DurationSeconds INT NULL,
+                TimedOut BIT NOT NULL CONSTRAINT DF_ReviewSessions_TimedOut DEFAULT 0
+            );
+        END;
+
+        /* Ensure ReviewLogs table exists */
+        IF OBJECT_ID('dbo.ReviewLogs','U') IS NULL
+        BEGIN
+            -- Create minimal ReviewLogs table if missing (defensive)
+            CREATE TABLE dbo.ReviewLogs (
+                ReviewLogID INT IDENTITY(1,1) PRIMARY KEY,
+                FactID INT NOT NULL,
+                ReviewDate DATETIME NOT NULL
+            );
+        END;
+        
+        /* Ensure SessionDuration column exists for per-view timing */
+        IF COL_LENGTH('dbo.ReviewLogs','SessionDuration') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD SessionDuration INT NULL;
+        END;
+        /* Ensure per-view TimedOut flag exists */
+        IF COL_LENGTH('dbo.ReviewLogs','TimedOut') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD TimedOut BIT NOT NULL CONSTRAINT DF_ReviewLogs_TimedOut DEFAULT 0;
+        END;
+        /* Ensure session-level TimedOut flag exists */
+        IF COL_LENGTH('dbo.ReviewSessions','TimedOut') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewSessions ADD TimedOut BIT NOT NULL CONSTRAINT DF_ReviewSessions_TimedOut DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.ReviewLogs','SessionID') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD SessionID INT NULL;
+        END;
+        IF OBJECT_ID('dbo.FK_ReviewLogs_ReviewSessions','F') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs
+            ADD CONSTRAINT FK_ReviewLogs_ReviewSessions
+            FOREIGN KEY (SessionID) REFERENCES dbo.ReviewSessions(SessionID);
+        END;
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.indexes 
+            WHERE name = 'IX_ReviewLogs_SessionID' AND object_id = OBJECT_ID('dbo.ReviewLogs')
+        )
+        BEGIN
+            CREATE INDEX IX_ReviewLogs_SessionID ON dbo.ReviewLogs(SessionID);
+        END;
+        """
+        self.execute_update(ddl)
     
     def count_facts(self):
         """Count total facts in the database"""
@@ -592,6 +712,14 @@ class FactDariApp:
         if not self.is_home_page:
             self.update_fact_count()
             self.update_review_stats()
+            # Check inactivity only while in reviewing mode
+            try:
+                if self.current_session_id:
+                    idle_seconds = int((datetime.now() - self.last_activity_time).total_seconds())
+                    if not self.idle_triggered and idle_seconds >= int(self.idle_timeout_seconds):
+                        self.handle_idle_timeout()
+            except Exception:
+                pass
         self.root.after(100, self.update_ui)
     
     def update_fact_count(self):
@@ -900,7 +1028,27 @@ class FactDariApp:
     
     def track_fact_view(self, fact_id):
         """Track that a fact has been viewed"""
-        # Update the fact's view count and last viewed date
+        now = datetime.now()
+        self.record_activity()
+
+        # 1) Finalize previous view's duration if any
+        try:
+            if self.current_review_log_id and self.current_fact_start_time:
+                elapsed = int((now - self.current_fact_start_time).total_seconds())
+                if elapsed < 0:
+                    elapsed = 0
+                self.execute_update(
+                    """
+                    UPDATE ReviewLogs
+                    SET SessionDuration = ?
+                    WHERE ReviewLogID = ?
+                    """,
+                    (elapsed, self.current_review_log_id)
+                )
+        except Exception as _:
+            pass
+
+        # 2) Update the fact's view count and last viewed date
         self.execute_update("""
             UPDATE Facts 
             SET TotalViews = TotalViews + 1,
@@ -908,12 +1056,116 @@ class FactDariApp:
                 LastViewedDate = GETDATE()
             WHERE FactID = ?
         """, (fact_id,))
-        
-        # Log the review
-        self.execute_update("""
-            INSERT INTO ReviewLogs (FactID, ReviewDate)
-            VALUES (?, GETDATE())
-        """, (fact_id,))
+
+        # 3) Start a new view log and remember its ID + start time
+        try:
+            # Ensure we have a session
+            if not self.current_session_id:
+                self.start_new_session()
+
+            new_id = self.execute_insert_return_id(
+                """
+                INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID)
+                OUTPUT INSERTED.ReviewLogID
+                VALUES (?, GETDATE(), ?)
+                """,
+                (fact_id, self.current_session_id)
+            )
+            self.current_review_log_id = new_id
+            self.current_fact_start_time = now
+        except Exception as _:
+            # If we couldn't insert with SessionID for some reason, fall back to basic insert
+            self.execute_update(
+                """
+                INSERT INTO ReviewLogs (FactID, ReviewDate)
+                VALUES (?, GETDATE())
+                """,
+                (fact_id,)
+            )
+            self.current_review_log_id = None
+            self.current_fact_start_time = now
+
+    def finalize_current_fact_view(self, timed_out=False):
+        """Finalize timing for the current fact view, if active.
+        If timed_out=True, also mark the log as ended due to inactivity.
+        """
+        try:
+            if self.current_review_log_id and self.current_fact_start_time:
+                elapsed = int((datetime.now() - self.current_fact_start_time).total_seconds())
+                if elapsed < 0:
+                    elapsed = 0
+                # Try to update with TimedOut flag if column exists
+                updated = self.execute_update(
+                    """
+                    UPDATE ReviewLogs
+                    SET SessionDuration = ?, TimedOut = ?
+                    WHERE ReviewLogID = ?
+                    """,
+                    (elapsed, 1 if timed_out else 0, self.current_review_log_id)
+                )
+                if not updated:
+                    # Fallback without TimedOut if migration hasn't applied
+                    self.execute_update(
+                        """
+                        UPDATE ReviewLogs
+                        SET SessionDuration = ?
+                        WHERE ReviewLogID = ?
+                        """,
+                        (elapsed, self.current_review_log_id)
+                    )
+        except Exception:
+            pass
+        finally:
+            self.current_review_log_id = None
+            self.current_fact_start_time = None
+
+    def start_new_session(self):
+        """Start a new reviewing session and store SessionID."""
+        # End any existing session first
+        self.end_active_session()
+        self.session_start_time = datetime.now()
+        session_id = self.execute_insert_return_id(
+            """
+            INSERT INTO ReviewSessions (StartTime)
+            OUTPUT INSERTED.SessionID
+            VALUES (GETDATE())
+            """
+        )
+        self.current_session_id = session_id
+
+    def end_active_session(self, timed_out=False):
+        """End the active reviewing session, if any. If timed_out=True, marks session TimedOut."""
+        try:
+            # Finalize any ongoing fact view first
+            self.finalize_current_fact_view(timed_out=False)
+
+            if self.current_session_id:
+                updated = self.execute_update(
+                    """
+                    UPDATE ReviewSessions
+                    SET EndTime = GETDATE(),
+                        DurationSeconds = DATEDIFF(second, StartTime, GETDATE()),
+                        TimedOut = ?
+                    WHERE SessionID = ?
+                    """,
+                    (1 if timed_out else 0, self.current_session_id)
+                )
+                if not updated:
+                    # Fallback without TimedOut if migration hasn't applied yet
+                    self.execute_update(
+                        """
+                        UPDATE ReviewSessions
+                        SET EndTime = GETDATE(),
+                            DurationSeconds = DATEDIFF(second, StartTime, GETDATE())
+                        WHERE SessionID = ?
+                        """,
+                        (self.current_session_id,)
+                    )
+        except Exception as e:
+            print(f"Error ending session: {e}")
+        finally:
+            self.current_session_id = None
+            self.session_start_time = None
     
     def toggle_favorite(self):
         """Toggle the favorite status of the current fact"""
@@ -1490,6 +1742,8 @@ class FactDariApp:
     
     def show_home_page(self):
         """Show the home page with welcome message and start button"""
+        # End any active reviewing session and finalize current view
+        self.end_active_session()
         self.is_home_page = True
         
         # Hide all fact-related UI elements
@@ -1537,7 +1791,14 @@ class FactDariApp:
     def start_reviewing(self):
         """Switch from home page to fact viewing interface"""
         self.is_home_page = False
-        
+        self.record_activity()
+
+        # Start a new reviewing session
+        try:
+            self.start_new_session()
+        except Exception as _:
+            pass
+
         # Hide home page elements
         self.slogan_label.pack_forget()
         self.start_button.pack_forget()
@@ -1572,10 +1833,43 @@ class FactDariApp:
         # Apply rounded corners again after UI changes
         self.root.update_idletasks()
         self.apply_rounded_corners()
-    
+
     def run(self):
         """Start the application mainloop"""
         self.root.mainloop()
+
+    # Activity/idle helpers
+    def record_activity(self):
+        """Record user activity and reset idle trigger."""
+        self.last_activity_time = datetime.now()
+        self.idle_triggered = False
+
+    def handle_idle_timeout(self):
+        """Handle inactivity: finalize current view and optionally end session."""
+        self.idle_triggered = True
+        try:
+            # Finalize current fact view as timed out
+            self.finalize_current_fact_view(timed_out=True)
+            if self.idle_end_session:
+                # End the session as timed out
+                self.end_active_session(timed_out=True)
+                # Optionally navigate to Home after ending session
+                if self.idle_navigate_home:
+                    try:
+                        self.show_home_page()
+                    except Exception:
+                        pass
+            # Let the user know
+            try:
+                msg = "Ended due to inactivity"
+                if self.idle_navigate_home and self.idle_end_session:
+                    msg += "; returned to Home"
+                self.status_label.config(text=msg, fg=self.STATUS_COLOR)
+                self.clear_status_after_delay(4000)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
 
 # Usage example

@@ -41,14 +41,27 @@ CREATE TABLE Facts (
     IsEasy BIT NOT NULL CONSTRAINT DF_Facts_IsEasy DEFAULT 0
 );
 
--- Step 6: Create simplified ReviewLogs table
+-- Step 6: Create ReviewSessions table (for full session tracking)
+CREATE TABLE ReviewSessions (
+    SessionID INT IDENTITY(1,1) PRIMARY KEY,
+    StartTime DATETIME NOT NULL,
+    EndTime DATETIME NULL,
+    DurationSeconds INT NULL,
+    TimedOut BIT NOT NULL CONSTRAINT DF_ReviewSessions_TimedOut DEFAULT 0
+);
+
+-- Step 7: Create ReviewLogs table with per-view duration and optional session link
 CREATE TABLE ReviewLogs (
     ReviewLogID INT IDENTITY(1,1) PRIMARY KEY,
     FactID INT NOT NULL,
     ReviewDate DATETIME NOT NULL,
     SessionDuration INT, -- seconds
+    SessionID INT NULL,
+    TimedOut BIT NOT NULL CONSTRAINT DF_ReviewLogs_TimedOut DEFAULT 0,
     CONSTRAINT FK_ReviewLogs_Facts FOREIGN KEY (FactID)
-        REFERENCES Facts(FactID) ON DELETE CASCADE
+        REFERENCES Facts(FactID) ON DELETE CASCADE,
+    CONSTRAINT FK_ReviewLogs_ReviewSessions FOREIGN KEY (SessionID)
+        REFERENCES ReviewSessions(SessionID)
 );
 
 -- Helpful indexes for app queries
@@ -56,6 +69,7 @@ CREATE INDEX IX_Facts_CategoryID ON Facts(CategoryID);
 CREATE INDEX IX_Facts_LastViewedDate ON Facts(LastViewedDate);
 CREATE INDEX IX_ReviewLogs_FactID ON ReviewLogs(FactID);
 CREATE INDEX IX_ReviewLogs_ReviewDate ON ReviewLogs(ReviewDate);
+CREATE INDEX IX_ReviewLogs_SessionID ON ReviewLogs(SessionID);
 GO
 
 /* Add a normalized, persisted computed column for duplicate prevention */
@@ -84,7 +98,7 @@ BEGIN
 END
 GO
 
--- Step 7: Insert expanded categories
+-- Step 8: Insert expanded categories
 INSERT INTO Categories (CategoryName, Description)
 VALUES
 ('General Knowledge', 'Broad facts and trivia across domains'),
@@ -104,7 +118,7 @@ VALUES
 ('Earth Science', 'Geology, weather, climate, plate tectonics');
 GO
 
--- Step 8: Cache category IDs for readable inserts
+-- Step 9: Cache category IDs for readable inserts
 DECLARE
   @Cat_General INT = (SELECT CategoryID FROM Categories WHERE CategoryName='General Knowledge'),
   @Cat_Science INT = (SELECT CategoryID FROM Categories WHERE CategoryName='Science'),

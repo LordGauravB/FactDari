@@ -11,6 +11,7 @@
   let fullLeastReviewedData = [];
   let fullFavoriteData = [];
   let fullKnownData = [];
+  let sessionsData = [];
   // Current datasets and sort state for main tables
   let currentMostData = [];
   let currentLeastData = [];
@@ -61,6 +62,9 @@
       fullFavoriteData = data.allFavoriteFacts || [];
       fullKnownData = data.allKnownFacts || [];
     }
+    
+    // Sessions data for table/modal
+    sessionsData = data.recent_sessions || [];
     
     return data;
   }
@@ -521,6 +525,26 @@
     });
   }
 
+  function renderSessionsTable(rows) {
+    const tbody = qs('#sessions-table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    (rows || []).forEach(row => {
+      const tr = document.createElement('tr');
+      const start = row.StartTime ? new Date(row.StartTime).toLocaleString() : '';
+      const duration = row.DurationSeconds ?? '';
+      const views = row.Views ?? 0;
+      const distinct = row.DistinctFacts ?? 0;
+      tr.innerHTML = `
+        <td>${start}</td>
+        <td style="text-align:center;">${duration}</td>
+        <td style="text-align:center;">${views}</td>
+        <td style="text-align:center;">${distinct}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
   function renderKnownTable(data) {
     const knownTbody = qs('#known-facts-table tbody');
     if (!knownTbody) return;
@@ -703,10 +727,12 @@
         doughnutChart('known_categories', 'known-categories', data.known_category_distribution);
         doughnutChart('categories_viewed_today', 'categories-viewed-today', data.categories_viewed_today);
         lineChart('reviews_per_day', 'reviews-per-day', data.reviews_per_day);
+        lineChart('avg_view_duration', 'avg-view-duration', data.avg_view_duration_per_day);
         barChart('facts_timeline', 'facts-timeline', data.facts_added_timeline);
         barChart('category_reviews', 'category-reviews', data.category_reviews, true);
         populateTables(data.most_reviewed_facts, data.least_reviewed_facts, data.allFavoriteFacts, data.allKnownFacts);
         renderHeatmap(data.review_heatmap);
+        renderSessionsTable(sessionsData);
       }, 100);
       
       hideLoadingState();
@@ -962,6 +988,41 @@
             modalChartContainer.appendChild(sourceHeatmap);
           }
           
+        } else if (key === 'sessions-table') {
+          if (!modal || !modalChartContainer) return;
+          modal.style.display = 'flex';
+          modalChartContainer.innerHTML = '';
+          modalChartContainer.style.height = 'auto';
+          
+          const tableContainer = document.createElement('div');
+          tableContainer.className = 'table-container';
+          const table = document.createElement('table');
+          table.className = 'data-table';
+          const thead = document.createElement('thead');
+          thead.innerHTML = `
+            <tr>
+              <th>Start Time</th>
+              <th>Duration (s)</th>
+              <th>Views</th>
+              <th>Distinct Facts</th>
+            </tr>
+          `;
+          table.appendChild(thead);
+          const tbody = document.createElement('tbody');
+          (sessionsData || []).forEach(row => {
+            const tr = document.createElement('tr');
+            const start = row.StartTime ? new Date(row.StartTime).toLocaleString() : '';
+            tr.innerHTML = `
+              <td>${start}</td>
+              <td style="text-align:center;">${row.DurationSeconds ?? ''}</td>
+              <td style="text-align:center;">${row.Views ?? 0}</td>
+              <td style="text-align:center;">${row.DistinctFacts ?? 0}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+          table.appendChild(tbody);
+          tableContainer.appendChild(table);
+          modalChartContainer.appendChild(tableContainer);
         } else {
           // Handle regular charts
           const idMap = {
@@ -970,6 +1031,7 @@
             'known-categories': 'known_categories',
             'categories-viewed-today': 'categories_viewed_today',
             'reviews-per-day': 'reviews_per_day',
+            'avg-view-duration': 'avg_view_duration',
             'facts-timeline': 'facts_timeline',
             'category-reviews': 'category_reviews',
           };
@@ -1029,6 +1091,44 @@
             data: JSON.parse(JSON.stringify(chartRef.config.data)), // Deep clone
             options: chartOptions
           });
+        }
+        
+        // Sessions table expansion
+        if (key === 'sessions-table') {
+          if (!modal || !modalChartContainer) return;
+          modal.style.display = 'flex';
+          modalChartContainer.innerHTML = '';
+          modalChartContainer.style.height = 'auto';
+          
+          const tableContainer = document.createElement('div');
+          tableContainer.className = 'table-container';
+          const table = document.createElement('table');
+          table.className = 'data-table';
+          const thead = document.createElement('thead');
+          thead.innerHTML = `
+            <tr>
+              <th>Start Time</th>
+              <th>Duration (s)</th>
+              <th>Views</th>
+              <th>Distinct Facts</th>
+            </tr>
+          `;
+          table.appendChild(thead);
+          const tbody = document.createElement('tbody');
+          (sessionsData || []).forEach(row => {
+            const tr = document.createElement('tr');
+            const start = row.StartTime ? new Date(row.StartTime).toLocaleString() : '';
+            tr.innerHTML = `
+              <td>${start}</td>
+              <td style="text-align:center;">${row.DurationSeconds ?? ''}</td>
+              <td style="text-align:center;">${row.Views ?? 0}</td>
+              <td style="text-align:center;">${row.DistinctFacts ?? 0}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+          table.appendChild(tbody);
+          tableContainer.appendChild(table);
+          modalChartContainer.appendChild(tableContainer);
         }
       });
     });

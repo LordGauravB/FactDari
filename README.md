@@ -97,6 +97,11 @@ Edit `config.py` to customize:
 - Color schemes
 - Font settings
 - UI element sizes
+- Inactivity timeout behavior
+
+### Inactivity Timeout
+- `FACTDARI_IDLE_TIMEOUT_SECONDS` (default: `300`): seconds of no input before the app considers you idle.
+- `FACTDARI_IDLE_END_SESSION` (default: `true`): when idle, end the active session as timed out. If set to `false`, only the current fact view is finalized as timed out and the session remains open.
 
 ## Requirements
 

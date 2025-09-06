@@ -17,6 +17,14 @@ DB_CONFIG = {
     'trusted_connection': os.environ.get('FACTDARI_DB_TRUSTED', 'yes')
 }
 
+# Idle timeout behavior (inactivity)
+# Seconds before considering the user idle (default: 300s = 5 minutes)
+IDLE_TIMEOUT_SECONDS = int(os.environ.get('FACTDARI_IDLE_TIMEOUT_SECONDS', '300'))
+# If true, also end the session when idle; otherwise just finalize current view
+IDLE_END_SESSION = os.environ.get('FACTDARI_IDLE_END_SESSION', 'true').lower() in ('1', 'true', 'yes', 'y')
+# If true, auto-navigate to Home on idle timeout (only if ending session)
+IDLE_NAVIGATE_HOME = os.environ.get('FACTDARI_IDLE_NAVIGATE_HOME', 'true').lower() in ('1', 'true', 'yes', 'y')
+
 # UI Configuration
 UI_CONFIG = {
     # Window dimensions

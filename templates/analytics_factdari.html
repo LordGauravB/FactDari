@@ -281,6 +281,56 @@
                             </div>
                         </article>
 
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Avg View Duration (30 days)</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="avg-view-duration" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="avg-view-duration"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Average seconds spent per fact per day
+                            </div>
+                        </article>
+
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Recent Sessions</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="sessions-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="sessions-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Start Time</th>
+                                                <th>Duration (s)</th>
+                                                <th>Views</th>
+                                                <th>Distinct Facts</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Last 20 review sessions summary
+                            </div>
+                        </article>
+
                     </div>
                 </section>
 

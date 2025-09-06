@@ -271,7 +271,7 @@ def chart_data():
         'allFavoriteFacts': format_table_data(data['allFavoriteFacts']),
         'allKnownFacts': format_table_data(data['allKnownFacts'])
     }
-    
+
     # If all=true, also include ALL facts (including those with 0 reviews)
     if return_all:
         # Get ALL facts sorted by review count (including 0 reviews)
@@ -306,7 +306,40 @@ def chart_data():
                 CASE WHEN f.LastViewedDate IS NULL THEN 0 ELSE 1 END ASC,
                 f.LastViewedDate ASC
         """))
-    
+
+    # Add average per-view duration by day for last 30 days
+    avg_view_duration = fetch_query("""
+        SELECT 
+            CONVERT(varchar, ReviewDate, 23) as Date,
+            AVG(CASE WHEN SessionDuration IS NULL THEN NULL ELSE CAST(SessionDuration AS FLOAT) END) as AvgSeconds
+        FROM ReviewLogs
+        WHERE ReviewDate >= ?
+        GROUP BY CONVERT(varchar, ReviewDate, 23)
+        ORDER BY CONVERT(varchar, ReviewDate, 23)
+    """, (thirty_days_ago,))
+
+    formatted_data['avg_view_duration_per_day'] = format_single_line_chart(
+        avg_view_duration,
+        label='Avg View Duration (s)',
+        value_field='AvgSeconds'
+    )
+
+    # Add recent session summaries (last 20 sessions)
+    recent_sessions = fetch_query("""
+        SELECT TOP 20
+            s.SessionID,
+            s.StartTime,
+            s.EndTime,
+            s.DurationSeconds,
+            COUNT(rl.ReviewLogID) AS Views,
+            COUNT(DISTINCT rl.FactID) AS DistinctFacts
+        FROM ReviewSessions s
+        LEFT JOIN ReviewLogs rl ON rl.SessionID = s.SessionID
+        GROUP BY s.SessionID, s.StartTime, s.EndTime, s.DurationSeconds
+        ORDER BY s.SessionID DESC
+    """)
+    formatted_data['recent_sessions'] = recent_sessions
+
     return jsonify(formatted_data)
 
 def calculate_review_streak():
@@ -463,6 +496,27 @@ def format_bar_chart(data, label_field, value_field):
             'label': 'Total Reviews',
             'data': [row[value_field] for row in data],
             'backgroundColor': '#9C27B0'
+        }]
+    }
+
+def format_single_line_chart(data, label='Series', value_field='Value'):
+    """Format data with Date + single numeric field for a simple line chart."""
+    labels = [str(row.get('Date')) for row in data]
+    series = []
+    for row in data:
+        val = row.get(value_field)
+        try:
+            series.append(0 if val is None else float(val))
+        except Exception:
+            series.append(0)
+    return {
+        'labels': labels,
+        'datasets': [{
+            'label': label,
+            'data': series,
+            'borderColor': '#f97316',
+            'backgroundColor': 'rgba(249, 115, 22, 0.1)',
+            'fill': True
         }]
     }
 
