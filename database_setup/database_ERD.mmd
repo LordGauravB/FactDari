@@ -1,7 +1,7 @@
 erDiagram
     Categories {
         int CategoryID PK
-        nvarchar(100) CategoryName
+        nvarchar(100) CategoryName UNIQUE
         nvarchar(255) Description
         bit IsActive
         datetime CreatedDate
@@ -11,11 +11,21 @@ erDiagram
         int FactID PK
         int CategoryID FK
         nvarchar(MAX) Content
+        nvarchar(450) ContentKey UNIQUE    %% normalized, persisted computed
         date DateAdded
         datetime LastViewedDate
         int ReviewCount
         int TotalViews
         bit IsFavorite
+        bit IsEasy
+    }
+
+    ReviewSessions {
+        int SessionID PK
+        datetime StartTime
+        datetime EndTime
+        int DurationSeconds
+        bit TimedOut
     }
 
     ReviewLogs {
@@ -23,7 +33,45 @@ erDiagram
         int FactID FK
         datetime ReviewDate
         int SessionDuration
+        int SessionID FK
+        bit TimedOut
     }
 
-    Categories ||--o{ Facts : "has"
-    Facts ||--o{ ReviewLogs : "has"
+    GamificationProfile {
+        int ProfileID PK
+        int XP
+        int Level
+        int TotalReviews
+        int TotalKnown
+        int TotalFavorites
+        int TotalAdds
+        int TotalEdits
+        int TotalDeletes
+        int CurrentStreak
+        int LongestStreak
+        date LastCheckinDate
+    }
+
+    Achievements {
+        int AchievementID PK
+        nvarchar(64) Code UNIQUE
+        nvarchar(200) Name
+        nvarchar(32) Category
+        int Threshold
+        int RewardXP
+        bit IsHidden
+        datetime CreatedDate
+    }
+
+    AchievementUnlocks {
+        int UnlockID PK
+        int AchievementID FK UNIQUE   %% one unlock per achievement
+        datetime UnlockDate
+        bit Notified
+    }
+
+    %% Relationships
+    Categories ||--o{ Facts : contains
+    Facts ||--o{ ReviewLogs : "has (ON DELETE CASCADE)"
+    ReviewSessions ||--o{ ReviewLogs : logs
+    Achievements ||--o{ AchievementUnlocks : unlocks
