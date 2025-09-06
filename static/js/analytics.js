@@ -65,6 +65,8 @@
     
     // Sessions data for table/modal
     sessionsData = data.recent_sessions || [];
+    // Populate recent achievements table
+    renderAchievementsTable(data.recent_achievements || []);
     
     return data;
   }
@@ -135,6 +137,11 @@
     const streak = data.review_streak?.current_streak || 0;
     const favoritesCount = data.favorites_count || 0;
     const knownFactsCount = data.known_facts_count || 0;
+    const gamify = data.gamification || {};
+    const level = gamify.level || 1;
+    const xp = gamify.xp || 0;
+    const xpToNext = (gamify.xp_to_next ?? 0);
+    const ach = data.achievements_summary || { unlocked: 0, total: 0 };
 
     setText('#total-cards', totalFacts);
     setText('#due-today', today);
@@ -142,6 +149,14 @@
     setText('#active-categories', totalCategories);
     setText('#favorites-count', favoritesCount);
     setText('#known-facts-count', knownFactsCount);
+    setText('#level-value', `Lv ${level}`);
+    setText('#xp-value', xpToNext > 0 ? `${xp} (${xpToNext}\u2192)` : `${xp} (MAX)`);
+    setText('#achievements-count', `${ach.unlocked || 0}/${ach.total || 0}`);
+    
+    // Also update navbar gamification stats
+    setText('#nav-level-value', `Lv ${level}`);
+    setText('#nav-xp-value', xpToNext > 0 ? `${xp} (${xpToNext}\u2192)` : `${xp} (MAX)`);
+    setText('#nav-achievements-count', `${ach.unlocked || 0}/${ach.total || 0}`);
   }
 
   function destroyChart(key) { if (charts[key]) { charts[key].destroy(); charts[key] = null; } }
@@ -540,6 +555,22 @@
         <td style="text-align:center;">${duration}</td>
         <td style="text-align:center;">${views}</td>
         <td style="text-align:center;">${distinct}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderAchievementsTable(rows) {
+    const tbody = qs('#achievements-table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    (rows || []).forEach(row => {
+      const tr = document.createElement('tr');
+      const when = row.UnlockDate ? new Date(row.UnlockDate).toLocaleString() : '';
+      tr.innerHTML = `
+        <td>${when}</td>
+        <td>${row.Name || ''}</td>
+        <td style="text-align:center;">${row.RewardXP || 0} XP</td>
       `;
       tbody.appendChild(tr);
     });

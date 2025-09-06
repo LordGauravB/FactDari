@@ -251,6 +251,65 @@ def chart_data():
             WHERE IsEasy = 1
         """)
     }
+
+    # Gamification: level/xp and achievements
+    def safe_fetch_one(q, params=None, default=None):
+        try:
+            rows = fetch_query(q, params)
+            return rows[0] if rows else (default or {})
+        except Exception:
+            return default or {}
+
+    # Profile snapshot
+    profile = safe_fetch_one("""
+        SELECT TOP 1 XP, Level, CurrentStreak, LongestStreak, LastCheckinDate
+        FROM GamificationProfile
+        ORDER BY ProfileID
+    """)
+
+    # Compute level progression using same arithmetic progression as the app
+    def level_progress(xp_val: int):
+        try:
+            xp_val = int(xp_val or 0)
+        except Exception:
+            xp_val = 0
+        lvl = 1
+        need = 100
+        rem = xp_val
+        while rem >= need and lvl < 100:
+            rem -= need
+            lvl += 1
+            need += 50
+        xp_into = rem
+        xp_to_next = 0 if lvl >= 100 else (need - rem)
+        return {
+            'level': lvl,
+            'xp': xp_val,
+            'xp_into_level': xp_into,
+            'xp_to_next': xp_to_next,
+            'next_level_requirement': 0 if lvl >= 100 else need
+        }
+
+    gamify = level_progress(profile.get('XP') if profile else 0)
+
+    # Achievements summary
+    totals = safe_fetch_one("SELECT COUNT(*) AS Total FROM Achievements")
+    unlocked = safe_fetch_one("SELECT COUNT(*) AS Unlocked FROM AchievementUnlocks")
+    achievements_summary = {
+        'total': totals.get('Total', 0) if totals else 0,
+        'unlocked': unlocked.get('Unlocked', 0) if unlocked else 0
+    }
+
+    # Recent unlocked achievements
+    try:
+        recent_achievements = fetch_query("""
+            SELECT TOP 10 a.Code, a.Name, a.RewardXP, u.UnlockDate
+            FROM AchievementUnlocks u
+            JOIN Achievements a ON a.AchievementID = u.AchievementID
+            ORDER BY u.UnlockDate DESC, u.UnlockID DESC
+        """)
+    except Exception:
+        recent_achievements = []
     
     # Format data for frontend
     formatted_data = {
@@ -269,7 +328,11 @@ def chart_data():
         'known_facts_count': data['knownFactsCount'][0]['KnownCount'] if data['knownFactsCount'] else 0,
         # Include favorite/known fact tables for the frontend
         'allFavoriteFacts': format_table_data(data['allFavoriteFacts']),
-        'allKnownFacts': format_table_data(data['allKnownFacts'])
+        'allKnownFacts': format_table_data(data['allKnownFacts']),
+        # Gamification exports
+        'gamification': gamify,
+        'achievements_summary': achievements_summary,
+        'recent_achievements': recent_achievements
     }
 
     # If all=true, also include ALL facts (including those with 0 reviews)

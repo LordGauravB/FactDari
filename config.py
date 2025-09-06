@@ -25,6 +25,28 @@ IDLE_END_SESSION = os.environ.get('FACTDARI_IDLE_END_SESSION', 'true').lower() i
 # If true, auto-navigate to Home on idle timeout (only if ending session)
 IDLE_NAVIGATE_HOME = os.environ.get('FACTDARI_IDLE_NAVIGATE_HOME', 'true').lower() in ('1', 'true', 'yes', 'y')
 
+# XP rewards and tuning (can be overridden via env vars)
+XP_CONFIG = {
+    # Base XP for review and time-based bonus
+    'review_base_xp': int(os.environ.get('FACTDARI_XP_REVIEW_BASE', '1')),
+    # Bonus XP: +1 for each N seconds after grace
+    'review_bonus_step_seconds': int(os.environ.get('FACTDARI_XP_REVIEW_BONUS_STEP_SECONDS', '5')),
+    # Grace before timing bonus starts
+    'review_grace_seconds': int(os.environ.get('FACTDARI_XP_REVIEW_GRACE_SECONDS', '2')),
+    # Max bonus increments added to base
+    'review_bonus_cap': int(os.environ.get('FACTDARI_XP_REVIEW_BONUS_CAP', '5')),
+
+    # Action XP
+    'xp_favorite': int(os.environ.get('FACTDARI_XP_FAVORITE', '1')),
+    'xp_known': int(os.environ.get('FACTDARI_XP_KNOWN', '10')),
+    'xp_add': int(os.environ.get('FACTDARI_XP_ADD', '2')),
+    'xp_edit': int(os.environ.get('FACTDARI_XP_EDIT', '1')),
+    'xp_delete': int(os.environ.get('FACTDARI_XP_DELETE', '0')),
+
+    # Daily check-in for streaks
+    'xp_daily_checkin': int(os.environ.get('FACTDARI_XP_DAILY_CHECKIN', '2')),
+}
+
 # UI Configuration
 UI_CONFIG = {
     # Window dimensions

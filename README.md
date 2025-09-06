@@ -11,6 +11,7 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - **Review Tracking**: Automatically tracks when and how often you review each fact
 - **Text-to-Speech**: Listen to facts with built-in TTS support
 - **Analytics Dashboard**: Web-based analytics to visualize your learning patterns
+- **Gamification**: XP, levels, daily streaks, and unlockable achievements
 - **Navigation Controls**: Easy navigation through facts with previous/next buttons
 - **Search & Filter**: Filter facts by category, favorites, or knowledge status
 - **Dark Theme**: Eye-friendly dark interface with customizable transparency
@@ -24,6 +25,7 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - Category-based filtering
 - Speech synthesis for audio learning
 - Automatic review logging
+- Click the level text to view achievements
 
 ### Analytics Dashboard
 - Category distribution charts
@@ -81,6 +83,7 @@ util/RunFactDari.vbs
 - **Analytics**: Flask web server with Chart.js visualizations
 - **Speech**: pyttsx3 for text-to-speech functionality
 - **Configuration**: Centralized config.py for all settings
+- **Gamification**: SQL-backed XP/levels, daily streak tracking, and achievements (see `gamification.py`)
 
 ## Database Schema
 
@@ -98,11 +101,19 @@ Edit `config.py` to customize:
 - Font settings
 - UI element sizes
 - Inactivity timeout behavior
+- XP reward tuning
 
 ### Inactivity Timeout
 - `FACTDARI_IDLE_TIMEOUT_SECONDS` (default: `300`): seconds of no input before the app considers you idle.
 - `FACTDARI_IDLE_END_SESSION` (default: `true`): when idle, end the active session as timed out. If set to `false`, only the current fact view is finalized as timed out and the session remains open.
 
+### XP Rewards
+- `FACTDARI_XP_REVIEW_BASE` (default: `1`): base XP per completed view
+- `FACTDARI_XP_REVIEW_GRACE_SECONDS` (default: `2`): seconds before counting a view
+- `FACTDARI_XP_REVIEW_BONUS_STEP_SECONDS` (default: `5`): +1 XP per step beyond grace
+- `FACTDARI_XP_REVIEW_BONUS_CAP` (default: `5`): max time-based bonus
+- `FACTDARI_XP_FAVORITE` (default: `1`), `FACTDARI_XP_KNOWN` (default: `10`), `FACTDARI_XP_ADD` (default: `2`), `FACTDARI_XP_EDIT` (default: `1`), `FACTDARI_XP_DELETE` (default: `0`)
+- `FACTDARI_XP_DAILY_CHECKIN` (default: `2`): XP on daily streak check-in
 ## Making This Repo Public
 
 Before making the repository public:

@@ -54,6 +54,23 @@
                     </svg>
                     <h1>FactDari Analytics</h1>
                 </div>
+                <div class="gamification-stats">
+                    <div class="stat-item" title="Your current level">
+                        <span class="stat-icon">🏆</span>
+                        <span class="stat-value" id="nav-level-value">Lv 1</span>
+                        <span class="stat-label">Level</span>
+                    </div>
+                    <div class="stat-item" title="XP and progress to next level">
+                        <span class="stat-icon">⚡</span>
+                        <span class="stat-value" id="nav-xp-value">6 (94→)</span>
+                        <span class="stat-label">XP (to next)</span>
+                    </div>
+                    <div class="stat-item" title="Achievements unlocked">
+                        <span class="stat-icon">🥇</span>
+                        <span class="stat-value" id="nav-achievements-count">0/80</span>
+                        <span class="stat-label">Achievements</span>
+                    </div>
+                </div>
                 <div class="nav-actions">
                     <div class="auto-refresh-timer" title="Data automatically refreshes every 5 minutes">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
@@ -243,6 +260,28 @@
                 <!-- Progress Tab -->
                 <section id="progress-tab" class="tab-content" role="tabpanel">
                     <div class="charts-grid">
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Recent Achievements</h3>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="achievements-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>When</th>
+                                                <th>Achievement</th>
+                                                <th>Reward</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                10 most recently unlocked achievements
+                            </div>
+                        </article>
                         <article class="chart-card">
                             <header class="chart-header">
                                 <h3>Facts Added Timeline</h3>

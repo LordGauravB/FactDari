@@ -11,7 +11,11 @@ USE FactDari;
 GO
 
 -- Step 3: Drop tables if they exist (order matters due to FKs)
+IF OBJECT_ID('AchievementUnlocks', 'U') IS NOT NULL DROP TABLE AchievementUnlocks;
+IF OBJECT_ID('Achievements', 'U') IS NOT NULL DROP TABLE Achievements;
+IF OBJECT_ID('GamificationProfile', 'U') IS NOT NULL DROP TABLE GamificationProfile;
 IF OBJECT_ID('ReviewLogs', 'U') IS NOT NULL DROP TABLE ReviewLogs;
+IF OBJECT_ID('ReviewSessions', 'U') IS NOT NULL DROP TABLE ReviewSessions;
 IF OBJECT_ID('Facts', 'U') IS NOT NULL DROP TABLE Facts;
 IF OBJECT_ID('Categories', 'U') IS NOT NULL DROP TABLE Categories;
 GO
@@ -64,6 +68,47 @@ CREATE TABLE ReviewLogs (
         REFERENCES ReviewSessions(SessionID)
 );
 
+-- Step 8: Create GamificationProfile table (for user stats and XP/level tracking)
+CREATE TABLE GamificationProfile (
+    ProfileID INT IDENTITY(1,1) PRIMARY KEY,
+    XP INT NOT NULL CONSTRAINT DF_GamificationProfile_XP DEFAULT 0,
+    Level INT NOT NULL CONSTRAINT DF_GamificationProfile_Level DEFAULT 1,
+    TotalReviews INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalReviews DEFAULT 0,
+    TotalKnown INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalKnown DEFAULT 0,
+    TotalFavorites INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalFavorites DEFAULT 0,
+    TotalAdds INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAdds DEFAULT 0,
+    TotalEdits INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalEdits DEFAULT 0,
+    TotalDeletes INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalDeletes DEFAULT 0,
+    CurrentStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_CurrentStreak DEFAULT 0,
+    LongestStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_LongestStreak DEFAULT 0,
+    LastCheckinDate DATE NULL
+);
+
+-- Step 9: Create Achievements table (catalog of all possible achievements)
+CREATE TABLE Achievements (
+    AchievementID INT IDENTITY(1,1) PRIMARY KEY,
+    Code NVARCHAR(64) NOT NULL UNIQUE,
+    Name NVARCHAR(200) NOT NULL,
+    Category NVARCHAR(32) NOT NULL,
+    Threshold INT NOT NULL,
+    RewardXP INT NOT NULL,
+    IsHidden BIT NOT NULL CONSTRAINT DF_Achievements_IsHidden DEFAULT 0,
+    CreatedDate DATETIME NOT NULL CONSTRAINT DF_Achievements_CreatedDate DEFAULT GETDATE()
+);
+
+-- Step 10: Create AchievementUnlocks table (tracks which achievements have been earned)
+CREATE TABLE AchievementUnlocks (
+    UnlockID INT IDENTITY(1,1) PRIMARY KEY,
+    AchievementID INT NOT NULL
+        CONSTRAINT FK_AchievementUnlocks_Achievements
+        REFERENCES Achievements(AchievementID),
+    UnlockDate DATETIME NOT NULL CONSTRAINT DF_AchievementUnlocks_UnlockDate DEFAULT GETDATE(),
+    Notified BIT NOT NULL CONSTRAINT DF_AchievementUnlocks_Notified DEFAULT 0
+);
+
+-- Create unique index to ensure each achievement can only be unlocked once
+CREATE UNIQUE INDEX UX_AchievementUnlocks_AchievementID ON AchievementUnlocks(AchievementID);
+
 -- Helpful indexes for app queries
 CREATE INDEX IX_Facts_CategoryID ON Facts(CategoryID);
 CREATE INDEX IX_Facts_LastViewedDate ON Facts(LastViewedDate);
@@ -98,7 +143,7 @@ BEGIN
 END
 GO
 
--- Step 8: Insert expanded categories
+-- Step 11: Insert expanded categories
 INSERT INTO Categories (CategoryName, Description)
 VALUES
 ('General Knowledge', 'Broad facts and trivia across domains'),
@@ -118,7 +163,7 @@ VALUES
 ('Earth Science', 'Geology, weather, climate, plate tectonics');
 GO
 
--- Step 9: Cache category IDs for readable inserts
+-- Step 12: Cache category IDs for readable inserts
 DECLARE
   @Cat_General INT = (SELECT CategoryID FROM Categories WHERE CategoryName='General Knowledge'),
   @Cat_Science INT = (SELECT CategoryID FROM Categories WHERE CategoryName='Science'),
@@ -136,7 +181,7 @@ DECLARE
   @Cat_FoodDrink INT = (SELECT CategoryID FROM Categories WHERE CategoryName='Food & Drink'),
   @Cat_EarthScience INT = (SELECT CategoryID FROM Categories WHERE CategoryName='Earth Science');
 
--- Step 9: Insert the original 5 sample facts (recategorized)
+-- Step 13: Insert the original 5 sample facts (recategorized)
 INSERT INTO Facts (CategoryID, Content, DateAdded, LastViewedDate, ReviewCount, TotalViews)
 VALUES
 (@Cat_Health, 'The human brain uses about 20% of the body''s total energy despite being only 2% of body weight.', GETDATE(), NULL, 0, 0),
@@ -145,7 +190,7 @@ VALUES
 (@Cat_Tech, 'The first computer bug was an actual moth found in a Harvard Mark II computer in 1947.', GETDATE(), NULL, 0, 0),
 (@Cat_Animals, 'Octopuses have three hearts and blue blood.', GETDATE(), NULL, 0, 0);
 
--- Step 10: Insert the 100 additional interesting facts
+-- Step 14: Insert the 100 additional interesting facts
 INSERT INTO Facts (CategoryID, Content, DateAdded, LastViewedDate, ReviewCount, TotalViews)
 VALUES
 (@Cat_Space, 'A day on Venus is longer than its year because Venus rotates very slowly in the opposite direction.', GETDATE(), NULL, 0, 0),
@@ -444,7 +489,113 @@ VALUES
 (@Cat_ArtsCulture, N'Primary colors for additive light mixing are red, green, and blue.', GETDATE(), NULL, 0, 0);
 GO
 
--- Step 11: Verify the setup
+-- Step 15: Initialize GamificationProfile with a single row
+INSERT INTO GamificationProfile (XP, Level)
+VALUES (0, 1);
+GO
+
+-- Step 16: Insert achievement definitions
+;WITH Seeds (Code, Name, Category, Threshold, RewardXP) AS (
+    -- Known facts achievements
+    SELECT 'KNOWN_5','Know 5 facts','known',5,10 UNION ALL
+    SELECT 'KNOWN_10','Know 10 facts','known',10,15 UNION ALL
+    SELECT 'KNOWN_50','Know 50 facts','known',50,25 UNION ALL
+    SELECT 'KNOWN_100','Know 100 facts','known',100,50 UNION ALL
+    SELECT 'KNOWN_300','Know 300 facts','known',300,100 UNION ALL
+    SELECT 'KNOWN_500','Know 500 facts','known',500,150 UNION ALL
+    SELECT 'KNOWN_1000','Know 1000 facts','known',1000,250 UNION ALL
+    SELECT 'KNOWN_5000','Know 5000 facts','known',5000,600 UNION ALL
+    SELECT 'KNOWN_10000','Know 10000 facts','known',10000,1000 UNION ALL
+    SELECT 'KNOWN_30000','Know 30000 facts','known',30000,2500 UNION ALL
+    SELECT 'KNOWN_50000','Know 50000 facts','known',50000,4000 UNION ALL
+    SELECT 'KNOWN_100000','Know 100000 facts','known',100000,7000 UNION ALL
+    -- Favorite facts achievements
+    SELECT 'FAV_5','Favorite 5 facts','favorites',5,5 UNION ALL
+    SELECT 'FAV_10','Favorite 10 facts','favorites',10,10 UNION ALL
+    SELECT 'FAV_50','Favorite 50 facts','favorites',50,20 UNION ALL
+    SELECT 'FAV_100','Favorite 100 facts','favorites',100,40 UNION ALL
+    SELECT 'FAV_300','Favorite 300 facts','favorites',300,80 UNION ALL
+    SELECT 'FAV_500','Favorite 500 facts','favorites',500,120 UNION ALL
+    SELECT 'FAV_1000','Favorite 1000 facts','favorites',1000,200 UNION ALL
+    SELECT 'FAV_5000','Favorite 5000 facts','favorites',5000,500 UNION ALL
+    SELECT 'FAV_10000','Favorite 10000 facts','favorites',10000,900 UNION ALL
+    SELECT 'FAV_30000','Favorite 30000 facts','favorites',30000,2200 UNION ALL
+    SELECT 'FAV_50000','Favorite 50000 facts','favorites',50000,3500 UNION ALL
+    SELECT 'FAV_100000','Favorite 100000 facts','favorites',100000,6000 UNION ALL
+    -- Review achievements
+    SELECT 'REV_5','Review 5 times','reviews',5,10 UNION ALL
+    SELECT 'REV_10','Review 10 times','reviews',10,15 UNION ALL
+    SELECT 'REV_50','Review 50 times','reviews',50,25 UNION ALL
+    SELECT 'REV_100','Review 100 times','reviews',100,50 UNION ALL
+    SELECT 'REV_300','Review 300 times','reviews',300,100 UNION ALL
+    SELECT 'REV_500','Review 500 times','reviews',500,150 UNION ALL
+    SELECT 'REV_1000','Review 1000 times','reviews',1000,250 UNION ALL
+    SELECT 'REV_5000','Review 5000 times','reviews',5000,600 UNION ALL
+    SELECT 'REV_10000','Review 10000 times','reviews',10000,1000 UNION ALL
+    SELECT 'REV_30000','Review 30000 times','reviews',30000,2500 UNION ALL
+    SELECT 'REV_50000','Review 50000 times','reviews',50000,4000 UNION ALL
+    SELECT 'REV_100000','Review 100000 times','reviews',100000,7000 UNION ALL
+    -- Add facts achievements
+    SELECT 'ADD_5','Add 5 facts','adds',5,10 UNION ALL
+    SELECT 'ADD_10','Add 10 facts','adds',10,15 UNION ALL
+    SELECT 'ADD_50','Add 50 facts','adds',50,25 UNION ALL
+    SELECT 'ADD_100','Add 100 facts','adds',100,50 UNION ALL
+    SELECT 'ADD_300','Add 300 facts','adds',300,100 UNION ALL
+    SELECT 'ADD_500','Add 500 facts','adds',500,150 UNION ALL
+    SELECT 'ADD_1000','Add 1000 facts','adds',1000,250 UNION ALL
+    SELECT 'ADD_5000','Add 5000 facts','adds',5000,600 UNION ALL
+    SELECT 'ADD_10000','Add 10000 facts','adds',10000,1000 UNION ALL
+    SELECT 'ADD_30000','Add 30000 facts','adds',30000,2500 UNION ALL
+    SELECT 'ADD_50000','Add 50000 facts','adds',50000,4000 UNION ALL
+    SELECT 'ADD_100000','Add 100000 facts','adds',100000,7000 UNION ALL
+    -- Edit facts achievements
+    SELECT 'EDIT_5','Edit 5 facts','edits',5,10 UNION ALL
+    SELECT 'EDIT_10','Edit 10 facts','edits',10,15 UNION ALL
+    SELECT 'EDIT_50','Edit 50 facts','edits',50,25 UNION ALL
+    SELECT 'EDIT_100','Edit 100 facts','edits',100,50 UNION ALL
+    SELECT 'EDIT_300','Edit 300 facts','edits',300,100 UNION ALL
+    SELECT 'EDIT_500','Edit 500 facts','edits',500,150 UNION ALL
+    SELECT 'EDIT_1000','Edit 1000 facts','edits',1000,250 UNION ALL
+    SELECT 'EDIT_5000','Edit 5000 facts','edits',5000,600 UNION ALL
+    SELECT 'EDIT_10000','Edit 10000 facts','edits',10000,1000 UNION ALL
+    SELECT 'EDIT_30000','Edit 30000 facts','edits',30000,2500 UNION ALL
+    SELECT 'EDIT_50000','Edit 50000 facts','edits',50000,4000 UNION ALL
+    SELECT 'EDIT_100000','Edit 100000 facts','edits',100000,7000 UNION ALL
+    -- Delete facts achievements
+    SELECT 'DEL_5','Delete 5 facts','deletes',5,10 UNION ALL
+    SELECT 'DEL_10','Delete 10 facts','deletes',10,15 UNION ALL
+    SELECT 'DEL_50','Delete 50 facts','deletes',50,25 UNION ALL
+    SELECT 'DEL_100','Delete 100 facts','deletes',100,50 UNION ALL
+    SELECT 'DEL_300','Delete 300 facts','deletes',300,100 UNION ALL
+    SELECT 'DEL_500','Delete 500 facts','deletes',500,150 UNION ALL
+    SELECT 'DEL_1000','Delete 1000 facts','deletes',1000,250 UNION ALL
+    SELECT 'DEL_5000','Delete 5000 facts','deletes',5000,600 UNION ALL
+    SELECT 'DEL_10000','Delete 10000 facts','deletes',10000,1000 UNION ALL
+    SELECT 'DEL_30000','Delete 30000 facts','deletes',30000,2500 UNION ALL
+    SELECT 'DEL_50000','Delete 50000 facts','deletes',50000,4000 UNION ALL
+    SELECT 'DEL_100000','Delete 100000 facts','deletes',100000,7000 UNION ALL
+    -- Streak achievements (consecutive daily check-ins)
+    SELECT 'STREAK_3','3-day review streak','streak',3,10 UNION ALL
+    SELECT 'STREAK_7','7-day review streak','streak',7,20 UNION ALL
+    SELECT 'STREAK_14','14-day review streak','streak',14,35 UNION ALL
+    SELECT 'STREAK_30','30-day review streak','streak',30,75 UNION ALL
+    SELECT 'STREAK_60','60-day review streak','streak',60,150 UNION ALL
+    SELECT 'STREAK_90','90-day review streak','streak',90,250 UNION ALL
+    SELECT 'STREAK_180','180-day review streak','streak',180,500 UNION ALL
+    SELECT 'STREAK_365','365-day review streak','streak',365,1000
+)
+INSERT INTO Achievements (Code, Name, Category, Threshold, RewardXP, IsHidden, CreatedDate)
+SELECT s.Code, s.Name, s.Category, s.Threshold, s.RewardXP, 0, GETDATE()
+FROM Seeds s
+LEFT JOIN Achievements a ON a.Code = s.Code
+WHERE a.AchievementID IS NULL;
+GO
+
+-- Step 17: Verify the setup
 SELECT 'Categories' AS TableName, COUNT(*) AS RecordCount FROM Categories
 UNION ALL SELECT 'Facts', COUNT(*) FROM Facts
-UNION ALL SELECT 'ReviewLogs', COUNT(*) FROM ReviewLogs;
+UNION ALL SELECT 'ReviewLogs', COUNT(*) FROM ReviewLogs
+UNION ALL SELECT 'ReviewSessions', COUNT(*) FROM ReviewSessions
+UNION ALL SELECT 'GamificationProfile', COUNT(*) FROM GamificationProfile
+UNION ALL SELECT 'Achievements', COUNT(*) FROM Achievements
+UNION ALL SELECT 'AchievementUnlocks', COUNT(*) FROM AchievementUnlocks;

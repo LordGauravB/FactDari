@@ -16,6 +16,7 @@ from ctypes import wintypes
 from PIL import Image, ImageTk
 from datetime import datetime, timedelta
 from tkinter import ttk, simpledialog, messagebox
+import gamification
 
 class ToolTip:
     """Lightweight tooltip for Tk widgets."""
@@ -139,6 +140,13 @@ class FactDariApp:
         except Exception as _:
             # Non-fatal: app can still run without migrations
             pass
+        
+        # Initialize gamification helper (profile + achievements)
+        try:
+            self.gamify = gamification.Gamification(self.CONN_STR)
+            self.gamify.ensure_profile()
+        except Exception:
+            self.gamify = None
         
         # Set up UI elements
         self.setup_ui()
@@ -348,6 +356,15 @@ class FactDariApp:
                                        font=self.STATS_FONT, side='left', fg=self.BLUE_COLOR)
         self.review_stats_label.pack_configure(padx=10)
         
+        # Gamification progress (clickable to open Achievements)
+        self.level_label = self.create_label(self.stats_frame, "Level 1 • 0 XP", 
+                                        font=self.STATS_FONT, side='left', fg=self.GREEN_COLOR)
+        self.level_label.pack_configure(padx=10)
+        try:
+            self.level_label.bind("<Button-1>", lambda e: self.show_achievements_window())
+        except Exception:
+            pass
+        
         self.coordinate_label = self.create_label(self.stats_frame, "Coordinates: ", 
                                         font=self.STATS_FONT, side='left', fg=self.BLUE_COLOR)
         self.coordinate_label.pack_configure(padx=10)
@@ -433,6 +450,7 @@ class FactDariApp:
             ToolTip(self.delete_icon_button, "Delete fact (d)")
             ToolTip(self.prev_button, "Previous (←)")
             ToolTip(self.next_button, "Next (→)")
+            ToolTip(self.level_label, "Click for achievements")
         except Exception:
             pass
 
@@ -472,6 +490,80 @@ class FactDariApp:
         row("Static Position", "s")
 
         tk.Button(win, text="Close", command=win.destroy, bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5).pack(pady=10)
+
+    def show_achievements_window(self):
+        """Display achievements, status, and progress."""
+        if not getattr(self, 'gamify', None):
+            try:
+                self.status_label.config(text="Gamification unavailable", fg=self.STATUS_COLOR)
+                self.clear_status_after_delay(2000)
+            except Exception:
+                pass
+            return
+        win = tk.Toplevel(self.root)
+        win.title("Achievements")
+        try:
+            win.geometry(f"{self.POPUP_INFO_SIZE}{self.POPUP_POSITION}")
+        except Exception:
+            win.geometry(self.POPUP_INFO_SIZE)
+        win.configure(bg=self.BG_COLOR)
+
+        header = tk.Label(win, text="Achievements", fg=self.TEXT_COLOR, bg=self.BG_COLOR, font=self.TITLE_FONT)
+        header.pack(pady=(10, 4))
+        sub = tk.Label(win, text="Click a column to resize. New unlocks show green.", fg=self.STATUS_COLOR, bg=self.BG_COLOR, font=self.SMALL_FONT)
+        sub.pack()
+
+        # Treeview for achievements
+        cols = ("Status", "Name", "Category", "Progress", "Reward")
+        tree = ttk.Treeview(win, columns=cols, show='headings', height=16)
+        for c, w in (("Status", 80), ("Name", 220), ("Category", 90), ("Progress", 120), ("Reward", 70)):
+            tree.heading(c, text=c)
+            tree.column(c, width=w, anchor='w')
+        tree.pack(fill='both', expand=True, padx=10, pady=10)
+
+        # Fetch and populate
+        try:
+            data = self.gamify.get_achievements_with_status()
+        except Exception:
+            data = []
+        for row in data:
+            unlocked = row.get('Unlocked')
+            name = row.get('Name')
+            category = row.get('Category')
+            threshold = int(row.get('Threshold', 0))
+            reward = int(row.get('RewardXP', 0))
+            progress = int(row.get('ProgressCurrent', 0))
+            status_text = "Unlocked" if unlocked else "Locked"
+            prog_text = f"{min(progress, threshold)}/{threshold}"
+            vals = (status_text, name, category, prog_text, f"{reward} XP")
+            iid = tree.insert('', 'end', values=vals)
+            # Color coding
+            try:
+                if unlocked:
+                    tree.item(iid, tags=('unlocked',))
+            except Exception:
+                pass
+        try:
+            tree.tag_configure('unlocked', foreground=self.GREEN_COLOR)
+        except Exception:
+            pass
+
+        # Buttons
+        btns = tk.Frame(win, bg=self.BG_COLOR)
+        btns.pack(pady=(0, 10))
+
+        def mark_seen():
+            try:
+                self.gamify.mark_all_unnotified_as_notified()
+                self.status_label.config(text="Marked new unlocks as seen", fg=self.STATUS_COLOR)
+                self.clear_status_after_delay(2000)
+            except Exception:
+                pass
+
+        tk.Button(btns, text="Mark New Unlocks Seen", command=mark_seen,
+                  bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5).pack(side='left', padx=6)
+        tk.Button(btns, text="Close", command=win.destroy,
+                  bg=self.GRAY_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5).pack(side='left', padx=6)
 
     def confirm_dialog(self, title, message, ok_text="OK", cancel_text="Cancel"):
         """Custom modal confirmation dialog positioned via UI config. Returns True/False."""
@@ -687,6 +779,156 @@ class FactDariApp:
         BEGIN
             CREATE INDEX IX_ReviewLogs_SessionID ON dbo.ReviewLogs(SessionID);
         END;
+
+        /* Gamification core tables */
+        IF OBJECT_ID('dbo.GamificationProfile','U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.GamificationProfile (
+                ProfileID INT IDENTITY(1,1) PRIMARY KEY,
+                XP INT NOT NULL CONSTRAINT DF_GamificationProfile_XP DEFAULT 0,
+                Level INT NOT NULL CONSTRAINT DF_GamificationProfile_Level DEFAULT 1,
+                TotalReviews INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalReviews DEFAULT 0,
+                TotalKnown INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalKnown DEFAULT 0,
+                TotalFavorites INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalFavorites DEFAULT 0,
+                TotalAdds INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAdds DEFAULT 0,
+                TotalEdits INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalEdits DEFAULT 0,
+                TotalDeletes INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalDeletes DEFAULT 0,
+                CurrentStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_CurrentStreak DEFAULT 0,
+                LongestStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_LongestStreak DEFAULT 0,
+                LastCheckinDate DATE NULL
+            );
+        END;
+
+        IF OBJECT_ID('dbo.Achievements','U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.Achievements (
+                AchievementID INT IDENTITY(1,1) PRIMARY KEY,
+                Code NVARCHAR(64) NOT NULL UNIQUE,
+                Name NVARCHAR(200) NOT NULL,
+                Category NVARCHAR(32) NOT NULL,
+                Threshold INT NOT NULL,
+                RewardXP INT NOT NULL,
+                IsHidden BIT NOT NULL CONSTRAINT DF_Achievements_IsHidden DEFAULT 0,
+                CreatedDate DATETIME NOT NULL CONSTRAINT DF_Achievements_CreatedDate DEFAULT GETDATE()
+            );
+        END;
+
+        IF OBJECT_ID('dbo.AchievementUnlocks','U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.AchievementUnlocks (
+                UnlockID INT IDENTITY(1,1) PRIMARY KEY,
+                AchievementID INT NOT NULL
+                    CONSTRAINT FK_AchievementUnlocks_Achievements
+                    REFERENCES dbo.Achievements(AchievementID),
+                UnlockDate DATETIME NOT NULL CONSTRAINT DF_AchievementUnlocks_UnlockDate DEFAULT GETDATE(),
+                Notified BIT NOT NULL CONSTRAINT DF_AchievementUnlocks_Notified DEFAULT 0
+            );
+            CREATE UNIQUE INDEX UX_AchievementUnlocks_AchievementID ON dbo.AchievementUnlocks(AchievementID);
+        END;
+
+        /* Seed Achievements (insert any missing by Code) */
+            ;WITH Seeds (Code, Name, Category, Threshold, RewardXP) AS (
+                SELECT 'KNOWN_5','Know 5 facts','known',5,10 UNION ALL
+                SELECT 'KNOWN_10','Know 10 facts','known',10,15 UNION ALL
+                SELECT 'KNOWN_50','Know 50 facts','known',50,25 UNION ALL
+                SELECT 'KNOWN_100','Know 100 facts','known',100,50 UNION ALL
+                SELECT 'KNOWN_300','Know 300 facts','known',300,100 UNION ALL
+                SELECT 'KNOWN_500','Know 500 facts','known',500,150 UNION ALL
+                SELECT 'KNOWN_1000','Know 1000 facts','known',1000,250 UNION ALL
+                SELECT 'KNOWN_5000','Know 5000 facts','known',5000,600 UNION ALL
+                SELECT 'KNOWN_10000','Know 10000 facts','known',10000,1000 UNION ALL
+                SELECT 'KNOWN_30000','Know 30000 facts','known',30000,2500 UNION ALL
+                SELECT 'KNOWN_50000','Know 50000 facts','known',50000,4000 UNION ALL
+                SELECT 'KNOWN_100000','Know 100000 facts','known',100000,7000 UNION ALL
+
+                SELECT 'FAV_5','Favorite 5 facts','favorites',5,5 UNION ALL
+                SELECT 'FAV_10','Favorite 10 facts','favorites',10,10 UNION ALL
+                SELECT 'FAV_50','Favorite 50 facts','favorites',50,20 UNION ALL
+                SELECT 'FAV_100','Favorite 100 facts','favorites',100,40 UNION ALL
+                SELECT 'FAV_300','Favorite 300 facts','favorites',300,80 UNION ALL
+                SELECT 'FAV_500','Favorite 500 facts','favorites',500,120 UNION ALL
+                SELECT 'FAV_1000','Favorite 1000 facts','favorites',1000,200 UNION ALL
+                SELECT 'FAV_5000','Favorite 5000 facts','favorites',5000,500 UNION ALL
+                SELECT 'FAV_10000','Favorite 10000 facts','favorites',10000,900 UNION ALL
+                SELECT 'FAV_30000','Favorite 30000 facts','favorites',30000,2200 UNION ALL
+                SELECT 'FAV_50000','Favorite 50000 facts','favorites',50000,3500 UNION ALL
+                SELECT 'FAV_100000','Favorite 100000 facts','favorites',100000,6000 UNION ALL
+
+                SELECT 'REV_5','Review 5 times','reviews',5,10 UNION ALL
+                SELECT 'REV_10','Review 10 times','reviews',10,15 UNION ALL
+                SELECT 'REV_50','Review 50 times','reviews',50,25 UNION ALL
+                SELECT 'REV_100','Review 100 times','reviews',100,50 UNION ALL
+                SELECT 'REV_300','Review 300 times','reviews',300,100 UNION ALL
+                SELECT 'REV_500','Review 500 times','reviews',500,150 UNION ALL
+                SELECT 'REV_1000','Review 1000 times','reviews',1000,250 UNION ALL
+                SELECT 'REV_5000','Review 5000 times','reviews',5000,600 UNION ALL
+                SELECT 'REV_10000','Review 10000 times','reviews',10000,1000 UNION ALL
+                SELECT 'REV_30000','Review 30000 times','reviews',30000,2500 UNION ALL
+                SELECT 'REV_50000','Review 50000 times','reviews',50000,4000 UNION ALL
+                SELECT 'REV_100000','Review 100000 times','reviews',100000,7000 UNION ALL
+
+                SELECT 'ADD_5','Add 5 facts','adds',5,10 UNION ALL
+                SELECT 'ADD_10','Add 10 facts','adds',10,15 UNION ALL
+                SELECT 'ADD_50','Add 50 facts','adds',50,25 UNION ALL
+                SELECT 'ADD_100','Add 100 facts','adds',100,50 UNION ALL
+                SELECT 'ADD_300','Add 300 facts','adds',300,100 UNION ALL
+                SELECT 'ADD_500','Add 500 facts','adds',500,150 UNION ALL
+                SELECT 'ADD_1000','Add 1000 facts','adds',1000,250 UNION ALL
+                SELECT 'ADD_5000','Add 5000 facts','adds',5000,600 UNION ALL
+                SELECT 'ADD_10000','Add 10000 facts','adds',10000,1000 UNION ALL
+                SELECT 'ADD_30000','Add 30000 facts','adds',30000,2500 UNION ALL
+                SELECT 'ADD_50000','Add 50000 facts','adds',50000,4000 UNION ALL
+                SELECT 'ADD_100000','Add 100000 facts','adds',100000,7000 UNION ALL
+
+                SELECT 'EDIT_5','Edit 5 facts','edits',5,10 UNION ALL
+                SELECT 'EDIT_10','Edit 10 facts','edits',10,15 UNION ALL
+                SELECT 'EDIT_50','Edit 50 facts','edits',50,25 UNION ALL
+                SELECT 'EDIT_100','Edit 100 facts','edits',100,50 UNION ALL
+                SELECT 'EDIT_300','Edit 300 facts','edits',300,100 UNION ALL
+                SELECT 'EDIT_500','Edit 500 facts','edits',500,150 UNION ALL
+                SELECT 'EDIT_1000','Edit 1000 facts','edits',1000,250 UNION ALL
+                SELECT 'EDIT_5000','Edit 5000 facts','edits',5000,600 UNION ALL
+                SELECT 'EDIT_10000','Edit 10000 facts','edits',10000,1000 UNION ALL
+                SELECT 'EDIT_30000','Edit 30000 facts','edits',30000,2500 UNION ALL
+                SELECT 'EDIT_50000','Edit 50000 facts','edits',50000,4000 UNION ALL
+                SELECT 'EDIT_100000','Edit 100000 facts','edits',100000,7000 UNION ALL
+
+                SELECT 'DEL_5','Delete 5 facts','deletes',5,10 UNION ALL
+                SELECT 'DEL_10','Delete 10 facts','deletes',10,15 UNION ALL
+                SELECT 'DEL_50','Delete 50 facts','deletes',50,25 UNION ALL
+                SELECT 'DEL_100','Delete 100 facts','deletes',100,50 UNION ALL
+                SELECT 'DEL_300','Delete 300 facts','deletes',300,100 UNION ALL
+                SELECT 'DEL_500','Delete 500 facts','deletes',500,150 UNION ALL
+                SELECT 'DEL_1000','Delete 1000 facts','deletes',1000,250 UNION ALL
+                SELECT 'DEL_5000','Delete 5000 facts','deletes',5000,600 UNION ALL
+                SELECT 'DEL_10000','Delete 10000 facts','deletes',10000,1000 UNION ALL
+                SELECT 'DEL_30000','Delete 30000 facts','deletes',30000,2500 UNION ALL
+                SELECT 'DEL_50000','Delete 50000 facts','deletes',50000,4000 UNION ALL
+                SELECT 'DEL_100000','Delete 100000 facts','deletes',100000,7000 UNION ALL
+
+                /* Streaks */
+                SELECT 'STREAK_3','3-day review streak','streak',3,10 UNION ALL
+                SELECT 'STREAK_7','7-day review streak','streak',7,20 UNION ALL
+                SELECT 'STREAK_14','14-day review streak','streak',14,35 UNION ALL
+                SELECT 'STREAK_30','30-day review streak','streak',30,75 UNION ALL
+                SELECT 'STREAK_60','60-day review streak','streak',60,150 UNION ALL
+                SELECT 'STREAK_90','90-day review streak','streak',90,250 UNION ALL
+                SELECT 'STREAK_180','180-day review streak','streak',180,500 UNION ALL
+                SELECT 'STREAK_365','365-day review streak','streak',365,1000
+            )
+            INSERT INTO dbo.Achievements (Code, Name, Category, Threshold, RewardXP, IsHidden, CreatedDate)
+            SELECT s.Code, s.Name, s.Category, s.Threshold, s.RewardXP, 0, GETDATE()
+            FROM Seeds s
+            LEFT JOIN dbo.Achievements a ON a.Code = s.Code
+            WHERE a.AchievementID IS NULL;
+        
+
+        /* Ensure a single GamificationProfile row exists */
+        IF NOT EXISTS (SELECT 1 FROM dbo.GamificationProfile)
+        BEGIN
+            INSERT INTO dbo.GamificationProfile (XP, Level)
+            VALUES (0, 1);
+        END;
         """
         self.execute_update(ddl)
     
@@ -705,6 +947,22 @@ class FactDariApp:
         """
         result = self.fetch_query(query, (today,))
         return result[0][0] if result and len(result) > 0 else 0
+
+    def update_level_progress(self):
+        """Update level label from gamification profile with next-level hint."""
+        try:
+            if not hasattr(self, 'gamify') or not self.gamify:
+                return
+            prog = self.gamify.get_level_progress()
+            level = prog.get('level', 1)
+            xp = prog.get('xp', 0)
+            to_next = prog.get('xp_to_next', 0)
+            if level >= 100:
+                self.level_label.config(text=f"Level {level} • {xp} XP (MAX)")
+            else:
+                self.level_label.config(text=f"Level {level} • {xp} XP ({to_next} to next)")
+        except Exception:
+            pass
     
     def update_ui(self):
         """Update UI elements periodically"""
@@ -712,6 +970,11 @@ class FactDariApp:
         if not self.is_home_page:
             self.update_fact_count()
             self.update_review_stats()
+            # Update gamification progress
+            try:
+                self.update_level_progress()
+            except Exception:
+                pass
             # Check inactivity only while in reviewing mode
             try:
                 if self.current_session_id:
@@ -1045,6 +1308,11 @@ class FactDariApp:
                     """,
                     (elapsed, self.current_review_log_id)
                 )
+                # Award XP for the just-finished view
+                try:
+                    self._award_for_elapsed(elapsed)
+                except Exception:
+                    pass
         except Exception as _:
             pass
 
@@ -1113,6 +1381,11 @@ class FactDariApp:
                         """,
                         (elapsed, self.current_review_log_id)
                     )
+                # Award XP
+                try:
+                    self._award_for_elapsed(elapsed)
+                except Exception:
+                    pass
         except Exception:
             pass
         finally:
@@ -1132,6 +1405,35 @@ class FactDariApp:
             """
         )
         self.current_session_id = session_id
+        # Daily streak check-in and possible achievements
+        try:
+            if getattr(self, 'gamify', None):
+                result = self.gamify.daily_checkin()
+                unlocked = result.get('unlocked', []) if isinstance(result, dict) else []
+                prof = result.get('profile', {}) if isinstance(result, dict) else {}
+                if prof and isinstance(prof, dict):
+                    streak = prof.get('CurrentStreak', None)
+                    if streak:
+                        try:
+                            self.status_label.config(text=f"Daily streak: {int(streak)} day(s)", fg=self.STATUS_COLOR)
+                            self.clear_status_after_delay(2500)
+                        except Exception:
+                            pass
+                if unlocked:
+                    codes = [x.get('Code') for x in unlocked if x.get('Code')]
+                    try:
+                        self.gamify.mark_unlocked_notified_by_codes(codes)
+                    except Exception:
+                        pass
+                    try:
+                        self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                        self.clear_status_after_delay(2500)
+                    except Exception:
+                        pass
+                # Refresh level display
+                self.update_level_progress()
+        except Exception:
+            pass
 
     def end_active_session(self, timed_out=False):
         """End the active reviewing session, if any. If timed_out=True, marks session TimedOut."""
@@ -1204,6 +1506,25 @@ class FactDariApp:
                 self.all_facts[self.current_fact_index] = tuple(fact)
             
             self.clear_status_after_delay(2000)
+            # Gamification: first-time favorite action grants small XP and counts
+            try:
+                if new_status and getattr(self, 'gamify', None):
+                    total = self.gamify.increment_counter('TotalFavorites', 1)
+                    unlocked = self.gamify.unlock_achievements_if_needed('favorites', total)
+                    # XP for favoriting
+                    fav_xp = int(config.XP_CONFIG.get('xp_favorite', 1))
+                    if fav_xp:
+                        self.gamify.award_xp(fav_xp)
+                    if unlocked:
+                        self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                        self.clear_status_after_delay(2500)
+                        try:
+                            self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                        except Exception:
+                            pass
+                    self.update_level_progress()
+            except Exception:
+                pass
 
     def toggle_easy(self):
         """Toggle the 'known/easy' status of the current fact"""
@@ -1236,6 +1557,24 @@ class FactDariApp:
                 fact[3] = new_status
                 self.all_facts[self.current_fact_index] = tuple(fact)
             self.clear_status_after_delay(2000)
+            # Gamification: award when marking known
+            try:
+                if new_status and getattr(self, 'gamify', None):
+                    total = self.gamify.increment_counter('TotalKnown', 1)
+                    unlocked = self.gamify.unlock_achievements_if_needed('known', total)
+                    known_xp = int(config.XP_CONFIG.get('xp_known', 10))
+                    if known_xp:
+                        self.gamify.award_xp(known_xp)
+                    if unlocked:
+                        self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                        self.clear_status_after_delay(2500)
+                        try:
+                            self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                        except Exception:
+                            pass
+                    self.update_level_progress()
+            except Exception:
+                pass
     
     def add_new_fact(self):
         """Add a new fact to the database"""
@@ -1318,6 +1657,24 @@ class FactDariApp:
                 self.status_label.config(text="New fact added successfully!", fg=self.GREEN_COLOR)
                 self.clear_status_after_delay(3000)
                 self.update_fact_count()
+                # Gamification: count add
+                try:
+                    if getattr(self, 'gamify', None):
+                        total = self.gamify.increment_counter('TotalAdds', 1)
+                        unlocked = self.gamify.unlock_achievements_if_needed('adds', total)
+                        add_xp = int(config.XP_CONFIG.get('xp_add', 2))
+                        if add_xp:
+                            self.gamify.award_xp(add_xp)
+                        if unlocked:
+                            self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                            self.clear_status_after_delay(2500)
+                            try:
+                                self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                            except Exception:
+                                pass
+                        self.update_level_progress()
+                except Exception:
+                    pass
                 # Reload facts if we're in viewing mode
                 if not self.is_home_page:
                     self.load_all_facts()
@@ -1433,6 +1790,24 @@ class FactDariApp:
                 edit_window.destroy()
                 self.status_label.config(text="Fact updated successfully!", fg=self.GREEN_COLOR)
                 self.clear_status_after_delay(3000)
+                # Gamification: count edit
+                try:
+                    if getattr(self, 'gamify', None):
+                        total = self.gamify.increment_counter('TotalEdits', 1)
+                        unlocked = self.gamify.unlock_achievements_if_needed('edits', total)
+                        edit_xp = int(config.XP_CONFIG.get('xp_edit', 1))
+                        if edit_xp:
+                            self.gamify.award_xp(edit_xp)
+                        if unlocked:
+                            self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                            self.clear_status_after_delay(2500)
+                            try:
+                                self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                            except Exception:
+                                pass
+                        self.update_level_progress()
+                except Exception:
+                    pass
                 
                 # Update the current display
                 self.fact_label.config(text=content, font=(self.NORMAL_FONT[0], self.adjust_font_size(content)))
@@ -1463,6 +1838,24 @@ class FactDariApp:
                 self.status_label.config(text="Fact deleted!", fg=self.RED_COLOR)
                 self.clear_status_after_delay(3000)
                 self.update_fact_count()
+                # Gamification: count delete
+                try:
+                    if getattr(self, 'gamify', None):
+                        total = self.gamify.increment_counter('TotalDeletes', 1)
+                        unlocked = self.gamify.unlock_achievements_if_needed('deletes', total)
+                        del_xp = int(config.XP_CONFIG.get('xp_delete', 0))
+                        if del_xp:
+                            self.gamify.award_xp(del_xp)
+                        if unlocked:
+                            self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                            self.clear_status_after_delay(2500)
+                            try:
+                                self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                            except Exception:
+                                pass
+                        self.update_level_progress()
+                except Exception:
+                    pass
                 
                 # Remove from our list and show next fact
                 if self.all_facts and self.current_fact_index < len(self.all_facts):
@@ -1476,6 +1869,38 @@ class FactDariApp:
             else:
                 self.status_label.config(text="Error deleting fact!", fg=self.RED_COLOR)
                 self.clear_status_after_delay(3000)
+
+    def _award_for_elapsed(self, elapsed_seconds: int):
+        """Award XP and review counters for a completed view."""
+        if not getattr(self, 'gamify', None):
+            return
+        # Only count reviews after grace period
+        try:
+            grace = int(config.XP_CONFIG.get('review_grace_seconds', 2))
+        except Exception:
+            grace = 2
+        if elapsed_seconds < grace:
+            return
+        # Base XP + time bonus
+        base_xp = int(config.XP_CONFIG.get('review_base_xp', 1))
+        step = max(1, int(config.XP_CONFIG.get('review_bonus_step_seconds', 5)))
+        cap = int(config.XP_CONFIG.get('review_bonus_cap', 5))
+        extra = (max(0, elapsed_seconds - grace)) // step
+        xp = base_xp + min(cap, int(extra))
+        total = self.gamify.increment_counter('TotalReviews', 1)
+        unlocked = self.gamify.unlock_achievements_if_needed('reviews', total)
+        self.gamify.award_xp(int(xp))
+        if unlocked:
+            try:
+                self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                self.clear_status_after_delay(2500)
+            except Exception:
+                pass
+            try:
+                self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+            except Exception:
+                pass
+        self.update_level_progress()
     
     def manage_categories(self):
         """Open a window to manage categories"""
