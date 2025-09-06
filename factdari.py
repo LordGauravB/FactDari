@@ -16,6 +16,7 @@ from ctypes import wintypes
 from PIL import Image, ImageTk
 from datetime import datetime, timedelta
 from tkinter import ttk, simpledialog, messagebox
+from tkinter import font as tkfont
 import gamification
 
 class ToolTip:
@@ -80,6 +81,7 @@ class FactDariApp:
         self.POPUP_EDIT_CARD_SIZE = config.UI_CONFIG['popup_edit_card_size']
         self.POPUP_CATEGORIES_SIZE = config.UI_CONFIG['popup_categories_size']
         self.POPUP_INFO_SIZE = config.UI_CONFIG.get('popup_info_size', "420x480")
+        self.POPUP_ACHIEVEMENTS_SIZE = config.UI_CONFIG.get('popup_achievements_size', self.POPUP_INFO_SIZE)
         self.POPUP_CONFIRM_SIZE = config.UI_CONFIG.get('popup_confirm_size', "360x180")
         self.POPUP_RENAME_SIZE = config.UI_CONFIG.get('popup_rename_size', "420x200")
         self.CORNER_RADIUS = config.UI_CONFIG['corner_radius']
@@ -95,6 +97,9 @@ class FactDariApp:
         self.YELLOW_COLOR = config.UI_CONFIG['yellow_color']
         self.GRAY_COLOR = config.UI_CONFIG['gray_color']
         self.STATUS_COLOR = config.UI_CONFIG['status_color']
+        # Brand colors for welcome page
+        self.BRAND_FACT_COLOR = config.UI_CONFIG.get('brand_fact_color', '#34d399')
+        self.BRAND_DARI_COLOR = config.UI_CONFIG.get('brand_dari_color', '#38bdf8')
         
         # Fonts
         self.TITLE_FONT = config.get_font('title')
@@ -240,11 +245,45 @@ class FactDariApp:
         # Fact display
         self.fact_frame = tk.Frame(self.content_frame, bg=self.BG_COLOR)
         self.fact_frame.pack(side="top", fill="both", expand=True, pady=5)
-        
+
         # Add top padding to push content down
         self.padding_frame = tk.Frame(self.fact_frame, bg=self.BG_COLOR, height=30)
         self.padding_frame.pack(side="top", fill="x")
-        
+
+        # Brand header for Home (Fact light green, Dari sky blue)
+        self.brand_frame = tk.Frame(self.fact_frame, bg=self.BG_COLOR)
+        # Render the entire header on a single Canvas for perfect baseline alignment
+        brand_font = tkfont.Font(
+            family=self.LARGE_FONT[0],
+            size=self.LARGE_FONT[1],
+            weight=('bold' if len(self.LARGE_FONT) > 2 else 'normal')
+        )
+        prefix_text = "Welcome to "
+        fact_text = "Fact"
+        dari_text = "Dari"
+        w_prefix = brand_font.measure(prefix_text)
+        w_fact = brand_font.measure(fact_text)
+        w_dari = brand_font.measure(dari_text)
+        total_width = w_prefix + w_fact + w_dari
+        line_height = brand_font.metrics('linespace')
+        self.brand_canvas = tk.Canvas(
+            self.brand_frame,
+            bg=self.BG_COLOR,
+            highlightthickness=0,
+            bd=0,
+            width=total_width,
+            height=line_height
+        )
+        # Draw all segments aligned to top-left so they share the same baseline
+        x = 0
+        y = 0
+        self.brand_canvas.create_text(x, y, text=prefix_text, anchor='nw', fill=self.TEXT_COLOR, font=brand_font)
+        x += w_prefix
+        self.brand_canvas.create_text(x, y, text=fact_text, anchor='nw', fill=self.BRAND_FACT_COLOR, font=brand_font)
+        x += w_fact
+        self.brand_canvas.create_text(x, y, text=dari_text, anchor='nw', fill=self.BRAND_DARI_COLOR, font=brand_font)
+        self.brand_canvas.pack(side='left', padx=0)
+
         self.fact_label = tk.Label(self.fact_frame, text="Welcome to FactDari!", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
                                   font=self.LARGE_FONT, wraplength=450, justify="center")
         self.fact_label.pack(side="top", fill="both", expand=True, padx=10, pady=10)
@@ -504,23 +543,44 @@ class FactDariApp:
         win = tk.Toplevel(self.root)
         win.title("Achievements")
         try:
-            win.geometry(f"{self.POPUP_INFO_SIZE}{self.POPUP_POSITION}")
+            win.geometry(f"{self.POPUP_ACHIEVEMENTS_SIZE}{self.POPUP_POSITION}")
         except Exception:
-            win.geometry(self.POPUP_INFO_SIZE)
+            win.geometry(self.POPUP_ACHIEVEMENTS_SIZE)
         win.configure(bg=self.BG_COLOR)
 
         header = tk.Label(win, text="Achievements", fg=self.TEXT_COLOR, bg=self.BG_COLOR, font=self.TITLE_FONT)
         header.pack(pady=(10, 4))
-        sub = tk.Label(win, text="Click a column to resize. New unlocks show green.", fg=self.STATUS_COLOR, bg=self.BG_COLOR, font=self.SMALL_FONT)
+        sub = tk.Label(win, text="Click a column to resize. New (unseen) unlocks show green.", fg=self.STATUS_COLOR, bg=self.BG_COLOR, font=self.SMALL_FONT)
         sub.pack()
 
-        # Treeview for achievements
+        # Treeview for achievements (with scrollbars so all columns are accessible even on small widths)
         cols = ("Status", "Name", "Category", "Progress", "Reward")
-        tree = ttk.Treeview(win, columns=cols, show='headings', height=16)
+        table_frame = tk.Frame(win, bg=self.BG_COLOR)
+        table_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        # Use grid to position tree + scrollbars
+        try:
+            table_frame.grid_rowconfigure(0, weight=1)
+            table_frame.grid_columnconfigure(0, weight=1)
+        except Exception:
+            pass
+        tree = ttk.Treeview(table_frame, columns=cols, show='headings', height=16)
         for c, w in (("Status", 80), ("Name", 220), ("Category", 90), ("Progress", 120), ("Reward", 70)):
             tree.heading(c, text=c)
             tree.column(c, width=w, anchor='w')
-        tree.pack(fill='both', expand=True, padx=10, pady=10)
+        # Scrollbars
+        vsb = ttk.Scrollbar(table_frame, orient='vertical', command=tree.yview)
+        hsb = ttk.Scrollbar(table_frame, orient='horizontal', command=tree.xview)
+        tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        # Layout
+        try:
+            tree.grid(row=0, column=0, sticky='nsew')
+            vsb.grid(row=0, column=1, sticky='ns')
+            hsb.grid(row=1, column=0, sticky='ew')
+        except Exception:
+            # Fallback to pack if grid unavailable for any reason
+            tree.pack(fill='both', expand=True)
+            vsb.pack(side='right', fill='y')
+            hsb.pack(side='bottom', fill='x')
 
         # Fetch and populate
         try:
@@ -529,6 +589,7 @@ class FactDariApp:
             data = []
         for row in data:
             unlocked = row.get('Unlocked')
+            notified = bool(row.get('Notified'))
             name = row.get('Name')
             category = row.get('Category')
             threshold = int(row.get('Threshold', 0))
@@ -538,14 +599,14 @@ class FactDariApp:
             prog_text = f"{min(progress, threshold)}/{threshold}"
             vals = (status_text, name, category, prog_text, f"{reward} XP")
             iid = tree.insert('', 'end', values=vals)
-            # Color coding
+            # Color only new (unseen) unlocks
             try:
-                if unlocked:
-                    tree.item(iid, tags=('unlocked',))
+                if unlocked and not notified:
+                    tree.item(iid, tags=('new_unlock',))
             except Exception:
                 pass
         try:
-            tree.tag_configure('unlocked', foreground=self.GREEN_COLOR)
+            tree.tag_configure('new_unlock', foreground=self.GREEN_COLOR)
         except Exception:
             pass
 
@@ -2217,18 +2278,35 @@ class FactDariApp:
             self.speaker_button.place_forget()
         except Exception:
             pass
+
+        # Show brand header centered horizontally near the top
+        try:
+            self.brand_frame.place(relx=0.5, rely=0.3, anchor='center')
+        except Exception:
+            try:
+                self.brand_frame.pack(side='top', pady=(10, 0))
+            except Exception:
+                pass
+        # Hide the large fact label on Home to avoid overlaying the brand header
+        try:
+            self.fact_label.pack_forget()
+        except Exception:
+            pass
         
-        # Update the welcome message
-        self.fact_label.config(text="Welcome to FactDari!\n\nYour Simple Fact Viewer", 
-                             font=self.LARGE_FONT,
-                             wraplength=450, justify="center")
-        
-        # Show the slogan
+        # Show the slogan centered under the brand (optional)
         self.slogan_label.config(text="Review and remember facts effortlessly")
-        self.slogan_label.pack(side="top", pady=5)
+        try:
+            # Move a bit further down from the header
+            self.slogan_label.place(relx=0.5, rely=0.55, anchor='center')
+        except Exception:
+            self.slogan_label.pack(side="top", pady=5)
         
-        # Show the start reviewing button
-        self.start_button.pack(pady=20)
+        # Show the start reviewing button centered
+        try:
+            # Move a bit further down to create spacing
+            self.start_button.place(relx=0.5, rely=0.72, anchor='center')
+        except Exception:
+            self.start_button.pack(pady=20)
         
         # Update status to shortcut hint
         self.status_label.config(text="Shortcuts: Prev = Left/p, Next = Right/n/Space", fg=self.STATUS_COLOR)
@@ -2249,14 +2327,31 @@ class FactDariApp:
             pass
 
         # Hide home page elements
-        self.slogan_label.pack_forget()
-        self.start_button.pack_forget()
+        try:
+            self.slogan_label.place_forget()
+        except Exception:
+            try:
+                self.slogan_label.pack_forget()
+            except Exception:
+                pass
+        try:
+            self.start_button.place_forget()
+        except Exception:
+            try:
+                self.start_button.pack_forget()
+            except Exception:
+                pass
         
         # Show all fact-related UI elements
         self.category_frame.pack(side="right", padx=5, pady=3)
         self.nav_frame.pack(side="top", fill="x", pady=10)
         self.icon_buttons_frame.pack(side="top", fill="x", pady=5)
         self.stats_frame.pack(side="bottom", fill="x", padx=10, pady=3)
+        # Hide brand header when reviewing
+        try:
+            self.brand_frame.pack_forget()
+        except Exception:
+            pass
 
         # Swap back: hide info, show star icon
         try:
@@ -2268,11 +2363,24 @@ class FactDariApp:
             self.speaker_button.place(relx=1.0, rely=0, anchor="ne", x=-5, y=5)
             # Show level label next to Home icon while reviewing
             self.level_label.place(x=32, y=7)
+            # Hide brand header when reviewing
+            try:
+                self.brand_frame.place_forget()
+            except Exception:
+                try:
+                    self.brand_frame.pack_forget()
+                except Exception:
+                    pass
         except Exception:
             pass
         
         # Load facts and display the first one
         self.load_all_facts()
+        # Re-pack the fact label for reviewing view
+        try:
+            self.fact_label.pack(side="top", fill="both", expand=True, padx=10, pady=10)
+        except Exception:
+            pass
         if self.all_facts:
             self.display_current_fact()
         else:

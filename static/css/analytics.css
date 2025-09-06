@@ -157,22 +157,14 @@ body {
   font-size: 20px;
   font-weight: 700;
   margin: 0;
-  background: linear-gradient(135deg, var(--primary), var(--primary-light));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
-.nav-logo {
-  width: 32px;
-  height: 32px;
-  animation: float 3s ease-in-out infinite;
-}
+/* Brand coloring: Fact light green, Dari sky blue */
+.brand-fact { color: #34d399; }
+.brand-dari { color: #38bdf8; }
+.brand-analytics { color: var(--text-secondary); font-weight: 600; margin-left: 6px; }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
+/* removed nav-logo icon */
 
 .nav-actions {
   display: flex;

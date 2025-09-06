@@ -26,17 +26,7 @@ def index():
 
 # No static resource route is needed; template uses CDN-only assets
 
-@app.route('/favicon.ico')
-def favicon():
-    """Serve a small SVG favicon to avoid 404s"""
-    svg = (
-        "<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'>"
-        "<rect width='64' height='64' fill='#2563eb'/>"
-        "<text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle'"
-        " font-size='42' fill='white'>F</text>"
-        "</svg>"
-    )
-    return Response(svg, mimetype='image/svg+xml')
+# No favicon route; allow browser default or static hosting if desired
 
 @app.route('/api/chart-data')
 def chart_data():

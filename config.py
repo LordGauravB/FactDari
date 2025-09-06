@@ -50,7 +50,7 @@ XP_CONFIG = {
 # UI Configuration
 UI_CONFIG = {
     # Window dimensions
-    'window_width': 520,
+    'window_width': 535,
     'window_height': 380,
     'window_static_pos': "-1927+7",
     'popup_position': "-1923+400",
@@ -58,6 +58,8 @@ UI_CONFIG = {
     'popup_edit_card_size': "496x520",
     'popup_categories_size': "400x520",
     'popup_info_size': "420x480",
+    # Dedicated width for the Achievements popup (slightly wider)
+    'popup_achievements_size': os.environ.get('FACTDARI_POPUP_ACHIEVEMENTS_SIZE', "518x480"),
     'popup_confirm_size': "360x180",
     'popup_rename_size': "420x200",
     'corner_radius': 15,
@@ -73,6 +75,9 @@ UI_CONFIG = {
     'yellow_color': "#FFC107",
     'gray_color': "#607D8B",
     'status_color': "#b66d20",
+    # Brand colors (for desktop widget branding)
+    'brand_fact_color': os.environ.get('FACTDARI_BRAND_FACT_COLOR', "#34d399"),
+    'brand_dari_color': os.environ.get('FACTDARI_BRAND_DARI_COLOR', "#38bdf8"),
     
     # Fonts
     'font_family': "Trebuchet MS",
