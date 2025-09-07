@@ -2047,6 +2047,24 @@ class FactDariApp:
                 
             category_id = cat_result[0][0]
             
+            # Prevent duplicates: check against computed ContentKey, ignoring this FactID
+            try:
+                dup = self.fetch_query(
+                    """
+                    SELECT TOP 1 FactID
+                    FROM dbo.Facts
+                    WHERE ContentKey = CAST(LOWER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(?, CHAR(13), ' '), CHAR(10), ' '), CHAR(9), ' ')))) AS NVARCHAR(450))
+                      AND FactID <> ?
+                    """,
+                    (content, self.current_fact_id)
+                )
+            except Exception:
+                dup = []
+            if dup:
+                self.status_label.config(text="Another fact with identical content already exists!", fg=self.RED_COLOR)
+                self.clear_status_after_delay(3000)
+                return
+
             # Update the fact
             success = self.execute_update(
                 """

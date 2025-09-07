@@ -87,16 +87,22 @@ util/RunFactDari.vbs
 
 ## Database Schema
 
-- **Facts**: Stores fact content, category, review count, and metadata
-- **Categories**: Manages fact categories
-- **ReviewLogs**: Tracks all fact review events
-- **Preferences**: Stores user preferences and settings
+- **Categories**: Manages categories for facts (active flag + metadata)
+- **Facts**: Stores fact content, category link, review counts, favorites/known flags
+- **ReviewSessions**: Tracks review sessions (start/end, duration, timeout, per-session action counters)
+- **ReviewLogs**: One row per view/action (per-view duration, optional session link, action snapshots)
+- **GamificationProfile**: Single-row profile for XP, level, streaks, and lifetime counters
+- **Achievements**: Catalog of unlockable achievements (code, threshold, reward)
+- **AchievementUnlocks**: Records which achievements have been unlocked
 
 ## Configuration
 
 Edit `config.py` to customize:
 - Database connection settings
-- Database driver override via `FACTDARI_DB_DRIVER` (e.g., `ODBC Driver 17 for SQL Server`)
+- Database driver override via `FACTDARI_DB_DRIVER` (e.g., `ODBC Driver 17 for SQL Server` or `ODBC Driver 18 for SQL Server`)
+- With ODBC 18, you may also need:
+  - `FACTDARI_DB_ENCRYPT` (e.g., `yes`/`no`)
+  - `FACTDARI_DB_TRUST_CERT` (e.g., `yes` if using local/dev without a trusted cert)
 - Window dimensions and positioning
 - Color schemes
 - Font settings
