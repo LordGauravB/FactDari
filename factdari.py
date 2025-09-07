@@ -126,6 +126,9 @@ class FactDariApp:
         self.session_start_time = None
         self.current_fact_start_time = None
         self.current_review_log_id = None
+        # Timer pause state (exclude non-review time like add/edit/delete dialogs)
+        self.timer_paused = False
+        self.pause_started_at = None
         # Inactivity tracking
         self.idle_timeout_seconds = getattr(config, 'IDLE_TIMEOUT_SECONDS', 300)
         self.idle_end_session = getattr(config, 'IDLE_END_SESSION', True)
@@ -804,7 +807,7 @@ class FactDariApp:
             -- Create minimal ReviewLogs table if missing (defensive)
             CREATE TABLE dbo.ReviewLogs (
                 ReviewLogID INT IDENTITY(1,1) PRIMARY KEY,
-                FactID INT NOT NULL,
+                FactID INT NULL,
                 ReviewDate DATETIME NOT NULL
             );
         END;
@@ -840,6 +843,66 @@ class FactDariApp:
         )
         BEGIN
             CREATE INDEX IX_ReviewLogs_SessionID ON dbo.ReviewLogs(SessionID);
+        END;
+
+        /* Add action tracking columns to ReviewLogs */
+        IF COL_LENGTH('dbo.ReviewLogs','Action') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD Action NVARCHAR(16) NOT NULL CONSTRAINT DF_ReviewLogs_Action DEFAULT 'view';
+        END;
+        IF COL_LENGTH('dbo.ReviewLogs','FactEdited') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD FactEdited BIT NOT NULL CONSTRAINT DF_ReviewLogs_FactEdited DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.ReviewLogs','FactDeleted') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD FactDeleted BIT NOT NULL CONSTRAINT DF_ReviewLogs_FactDeleted DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.ReviewLogs','FactContentSnapshot') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD FactContentSnapshot NVARCHAR(MAX) NULL;
+        END;
+        IF COL_LENGTH('dbo.ReviewLogs','CategoryIDSnapshot') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD CategoryIDSnapshot INT NULL;
+        END;
+
+        /* Add per-session action counters */
+        IF COL_LENGTH('dbo.ReviewSessions','FactsAdded') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewSessions ADD FactsAdded INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsAdded DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.ReviewSessions','FactsEdited') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewSessions ADD FactsEdited INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsEdited DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.ReviewSessions','FactsDeleted') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewSessions ADD FactsDeleted INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsDeleted DEFAULT 0;
+        END;
+
+        /* Ensure FK from ReviewLogs(FactID) to Facts is ON DELETE SET NULL (to preserve logs for deleted cards) */
+        IF EXISTS (
+            SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ReviewLogs_Facts'
+        )
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs DROP CONSTRAINT FK_ReviewLogs_Facts;
+        END;
+        /* Make FactID nullable to support SET NULL */
+        IF EXISTS (
+            SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ReviewLogs') AND name = 'FactID' AND is_nullable = 0
+        )
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ALTER COLUMN FactID INT NULL;
+        END;
+        /* Recreate FK with SET NULL if not exists */
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ReviewLogs_Facts'
+        )
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs WITH NOCHECK
+            ADD CONSTRAINT FK_ReviewLogs_Facts FOREIGN KEY (FactID)
+            REFERENCES dbo.Facts(FactID) ON DELETE SET NULL;
         END;
 
         /* Gamification core tables */
@@ -1419,6 +1482,28 @@ class FactDariApp:
             self.current_review_log_id = None
             self.current_fact_start_time = now
 
+    def pause_review_timer(self):
+        """Pause the current review timer (exclude time until resumed)."""
+        try:
+            if self.current_fact_start_time and not self.timer_paused:
+                self.pause_started_at = datetime.now()
+                self.timer_paused = True
+        except Exception:
+            pass
+
+    def resume_review_timer(self):
+        """Resume the review timer, shifting the start time forward by the paused duration."""
+        try:
+            if self.timer_paused:
+                if self.current_fact_start_time and self.pause_started_at:
+                    delta = datetime.now() - self.pause_started_at
+                    # Shift start forward to exclude paused duration
+                    self.current_fact_start_time = self.current_fact_start_time + delta
+                self.pause_started_at = None
+                self.timer_paused = False
+        except Exception:
+            pass
+
     def finalize_current_fact_view(self, timed_out=False):
         """Finalize timing for the current fact view, if active.
         If timed_out=True, also mark the log as ended due to inactivity.
@@ -1658,11 +1743,22 @@ class FactDariApp:
     
     def add_new_fact(self):
         """Add a new fact to the database"""
+        # Pause review timer while user is adding a card
+        self.pause_review_timer()
         # Create a popup window
         add_window = tk.Toplevel(self.root)
         add_window.title("Add New Fact")
         add_window.geometry(f"{self.POPUP_ADD_CARD_SIZE}{self.POPUP_POSITION}")
         add_window.configure(bg=self.BG_COLOR)
+        
+        # On close, resume timer then destroy
+        def on_close_add():
+            try:
+                self.resume_review_timer()
+            except Exception:
+                pass
+            add_window.destroy()
+        add_window.protocol("WM_DELETE_WINDOW", on_close_add)
         
         # Get categories for dropdown
         categories = self.fetch_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
@@ -1705,7 +1801,7 @@ class FactDariApp:
         content_text = tk.Text(content_frame, height=8, width=40, font=self.NORMAL_FONT)
         content_text.pack(fill="x", padx=5, pady=5)
         
-        def save_fact():
+        def save_fact(close_after=True):
             category = cat_var.get()
             content = content_text.get("1.0", "end-1c").strip()
             
@@ -1723,20 +1819,55 @@ class FactDariApp:
                 
             category_id = cat_result[0][0]
             
-            # Insert the new fact
-            success = self.execute_update(
+            # Duplicate check using the same normalization as ContentKey
+            try:
+                dup = self.fetch_query(
+                    """
+                    SELECT TOP 1 FactID
+                    FROM dbo.Facts
+                    WHERE ContentKey = CAST(LOWER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(?, CHAR(13), ' '), CHAR(10), ' '), CHAR(9), ' ')))) AS NVARCHAR(450))
+                    """,
+                    (content,)
+                )
+            except Exception:
+                dup = []
+            if dup:
+                self.status_label.config(text="Fact Already Exists!", fg=self.RED_COLOR)
+                self.clear_status_after_delay(3000)
+                return
+
+            # Insert the new fact and get its ID
+            new_fact_id = self.execute_insert_return_id(
                 """
-                INSERT INTO Facts (CategoryID, Content, DateAdded, ReviewCount, TotalViews, IsFavorite) 
+                INSERT INTO Facts (CategoryID, Content, DateAdded, ReviewCount, TotalViews, IsFavorite)
+                OUTPUT INSERTED.FactID
                 VALUES (?, ?, GETDATE(), 0, 0, 0)
-                """, 
+                """,
                 (category_id, content)
             )
             
-            if success:
-                add_window.destroy()
+            if new_fact_id:
                 self.status_label.config(text="New fact added successfully!", fg=self.GREEN_COLOR)
                 self.clear_status_after_delay(3000)
                 self.update_fact_count()
+                # Log the add action in current session (if any)
+                try:
+                    if self.current_session_id:
+                        self.execute_update(
+                            """
+                            UPDATE ReviewSessions SET FactsAdded = ISNULL(FactsAdded,0) + 1 WHERE SessionID = ?
+                            """,
+                            (self.current_session_id,)
+                        )
+                        self.execute_update(
+                            """
+                            INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactContentSnapshot, CategoryIDSnapshot)
+                            VALUES (?, GETDATE(), ?, 0, 'add', ?, ?)
+                            """,
+                            (new_fact_id, self.current_session_id, content, category_id)
+                        )
+                except Exception:
+                    pass
                 # Gamification: count add
                 try:
                     if getattr(self, 'gamify', None):
@@ -1755,28 +1886,50 @@ class FactDariApp:
                         self.update_level_progress()
                 except Exception:
                     pass
-                # Reload facts if we're in viewing mode
-                if not self.is_home_page:
-                    self.load_all_facts()
-                    if self.all_facts:
-                        self.current_fact_index = len(self.all_facts) - 1
-                        self.display_current_fact()
+                # Do not reshuffle or navigate. Stay on current card.
+                # Counts and analytics are updated separately via update_fact_count().
+
+                # Either close or reset for adding another
+                if close_after:
+                    # Resume timer on close
+                    try:
+                        self.resume_review_timer()
+                    except Exception:
+                        pass
+                    add_window.destroy()
+                else:
+                    # Keep window open: clear text and focus for next entry
+                    content_text.delete('1.0', tk.END)
+                    try:
+                        content_text.focus_set()
+                    except Exception:
+                        pass
             else:
                 self.status_label.config(text="Error adding new fact!", fg=self.RED_COLOR)
                 self.clear_status_after_delay(3000)
         
-        # Save button
-        save_button = tk.Button(add_window, text="Save Fact", bg=self.GREEN_COLOR, fg=self.TEXT_COLOR, 
-                              command=save_fact, cursor="hand2", borderwidth=0, 
-                              highlightthickness=0, padx=10, pady=5,
-                              font=(self.NORMAL_FONT[0], self.NORMAL_FONT[1], 'bold'))
-        save_button.pack(pady=20)
+        # Buttons row
+        btn_row = tk.Frame(add_window, bg=self.BG_COLOR)
+        btn_row.pack(pady=20)
+        save_close_btn = tk.Button(btn_row, text="Save & Close", bg=self.GREEN_COLOR, fg=self.TEXT_COLOR,
+                                    command=lambda: save_fact(True), cursor="hand2", borderwidth=0,
+                                    highlightthickness=0, padx=10, pady=5,
+                                    font=(self.NORMAL_FONT[0], self.NORMAL_FONT[1], 'bold'))
+        save_close_btn.pack(side='left', padx=6)
+        add_another_btn = tk.Button(btn_row, text="Add Another", bg=self.BLUE_COLOR, fg=self.TEXT_COLOR,
+                                    command=lambda: save_fact(False), cursor="hand2", borderwidth=0,
+                                    highlightthickness=0, padx=10, pady=5,
+                                    font=(self.NORMAL_FONT[0], self.NORMAL_FONT[1], 'bold'))
+        add_another_btn.pack(side='left', padx=6)
     
     def edit_current_fact(self):
         """Edit the current fact"""
         if not self.current_fact_id:
             return
         
+        # Pause timer while editing
+        self.pause_review_timer()
+
         # Get current fact data
         query = """
         SELECT f.Content, c.CategoryName
@@ -1798,6 +1951,15 @@ class FactDariApp:
         edit_window.title("Edit Fact")
         edit_window.geometry(f"{self.POPUP_EDIT_CARD_SIZE}{self.POPUP_POSITION}")
         edit_window.configure(bg=self.BG_COLOR)
+
+        # Resume timer when window is closed via [X]
+        def on_close_edit():
+            try:
+                self.resume_review_timer()
+            except Exception:
+                pass
+            edit_window.destroy()
+        edit_window.protocol("WM_DELETE_WINDOW", on_close_edit)
         
         # Get categories for dropdown
         categories = self.fetch_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
@@ -1867,9 +2029,30 @@ class FactDariApp:
             )
             
             if success:
+                # Resume timer upon closing edit
+                try:
+                    self.resume_review_timer()
+                except Exception:
+                    pass
                 edit_window.destroy()
                 self.status_label.config(text="Fact updated successfully!", fg=self.GREEN_COLOR)
                 self.clear_status_after_delay(3000)
+                # Log the edit action in current session (if any)
+                try:
+                    if self.current_session_id:
+                        self.execute_update(
+                            "UPDATE ReviewSessions SET FactsEdited = ISNULL(FactsEdited,0) + 1 WHERE SessionID = ?",
+                            (self.current_session_id,)
+                        )
+                        self.execute_update(
+                            """
+                            INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactEdited, FactContentSnapshot, CategoryIDSnapshot)
+                            VALUES (?, GETDATE(), ?, 0, 'edit', 1, ?, ?)
+                            """,
+                            (self.current_fact_id, self.current_session_id, content, category_id)
+                        )
+                except Exception:
+                    pass
                 # Gamification: count edit
                 try:
                     if getattr(self, 'gamify', None):
@@ -1910,46 +2093,81 @@ class FactDariApp:
         if not self.current_fact_id:
             return
         
-        # Ask for confirmation
-        if self.confirm_dialog("Confirm Delete", "Are you sure you want to delete this fact?"):
-            # Delete the fact
-            success = self.execute_update("DELETE FROM Facts WHERE FactID = ?", (self.current_fact_id,))
-            if success:
-                self.status_label.config(text="Fact deleted!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
-                self.update_fact_count()
-                # Gamification: count delete
+        # Pause during confirmation and deletion flow
+        self.pause_review_timer()
+        try:
+            # Ask for confirmation
+            if self.confirm_dialog("Confirm Delete", "Are you sure you want to delete this fact?"):
+                # Capture snapshot before delete
                 try:
-                    if getattr(self, 'gamify', None):
-                        total = self.gamify.increment_counter('TotalDeletes', 1)
-                        unlocked = self.gamify.unlock_achievements_if_needed('deletes', total)
-                        del_xp = int(config.XP_CONFIG.get('xp_delete', 0))
-                        if del_xp:
-                            self.gamify.award_xp(del_xp)
-                        if unlocked:
-                            self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                            self.clear_status_after_delay(2500)
-                            try:
-                                self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
-                            except Exception:
-                                pass
-                        self.update_level_progress()
+                    row = self.fetch_query(
+                        "SELECT Content, CategoryID FROM Facts WHERE FactID = ?",
+                        (self.current_fact_id,)
+                    )
+                    content_snapshot = row[0][0] if row else None
+                    category_snapshot = row[0][1] if row else None
+                except Exception:
+                    content_snapshot = None
+                    category_snapshot = None
+
+                # Log the delete action in ReviewLogs (before deleting the Fact)
+                try:
+                    if self.current_session_id:
+                        self.execute_update(
+                            """
+                            INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactDeleted, FactContentSnapshot, CategoryIDSnapshot)
+                            VALUES (?, GETDATE(), ?, 0, 'delete', 1, ?, ?)
+                            """,
+                            (self.current_fact_id, self.current_session_id, content_snapshot, category_snapshot)
+                        )
+                        # Increment session counter
+                        self.execute_update(
+                            "UPDATE ReviewSessions SET FactsDeleted = ISNULL(FactsDeleted,0) + 1 WHERE SessionID = ?",
+                            (self.current_session_id,)
+                        )
                 except Exception:
                     pass
-                
-                # Remove from our list and show next fact
-                if self.all_facts and self.current_fact_index < len(self.all_facts):
-                    self.all_facts.pop(self.current_fact_index)
-                    if self.all_facts:
-                        self.current_fact_index = self.current_fact_index % len(self.all_facts)
-                        self.display_current_fact()
-                    else:
-                        self.fact_label.config(text="No facts found. Add some facts first!")
-                        self.current_fact_id = None
-            else:
-                self.status_label.config(text="Error deleting fact!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
 
+                # Delete the fact
+                success = self.execute_update("DELETE FROM Facts WHERE FactID = ?", (self.current_fact_id,))
+                if success:
+                    self.status_label.config(text="Fact deleted!", fg=self.RED_COLOR)
+                    self.clear_status_after_delay(3000)
+                    self.update_fact_count()
+                    # Gamification: count delete
+                    try:
+                        if getattr(self, 'gamify', None):
+                            total = self.gamify.increment_counter('TotalDeletes', 1)
+                            unlocked = self.gamify.unlock_achievements_if_needed('deletes', total)
+                            del_xp = int(config.XP_CONFIG.get('xp_delete', 0))
+                            if del_xp:
+                                self.gamify.award_xp(del_xp)
+                            if unlocked:
+                                self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                                self.clear_status_after_delay(2500)
+                                try:
+                                    self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                                except Exception:
+                                    pass
+                            self.update_level_progress()
+                    except Exception:
+                        pass
+                    
+                    # Remove from our list and show next fact
+                    if self.all_facts and self.current_fact_index < len(self.all_facts):
+                        self.all_facts.pop(self.current_fact_index)
+                        if self.all_facts:
+                            self.current_fact_index = self.current_fact_index % len(self.all_facts)
+                            self.display_current_fact()
+                        else:
+                            self.fact_label.config(text="No facts found. Add some facts first!")
+                            self.current_fact_id = None
+                else:
+                    self.status_label.config(text="Error deleting fact!", fg=self.RED_COLOR)
+                    self.clear_status_after_delay(3000)
+        finally:
+            # Always resume after delete flow
+            self.resume_review_timer()
     def _award_for_elapsed(self, elapsed_seconds: int):
         """Award XP and review counters for a completed view."""
         if not getattr(self, 'gamify', None):

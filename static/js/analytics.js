@@ -12,6 +12,9 @@
   let fullFavoriteData = [];
   let fullKnownData = [];
   let sessionsData = [];
+  // Recent reviews datasets
+  let recentReviewsData50 = [];
+  let recentReviewsData500 = [];
   // Current datasets and sort state for main tables
   let currentMostData = [];
   let currentLeastData = [];
@@ -43,12 +46,15 @@
           fullLeastReviewedData = allFactsData.all_least_reviewed_facts || [];
           fullFavoriteData = allFactsData.allFavoriteFacts || [];
           fullKnownData = allFactsData.allKnownFacts || [];
+          // Also grab the expanded recent reviews list
+          recentReviewsData500 = allFactsData.all_recent_card_reviews || [];
         } else {
           // Fallback to limited data
           fullMostReviewedData = data.most_reviewed_facts || [];
           fullLeastReviewedData = data.least_reviewed_facts || [];
           fullFavoriteData = data.allFavoriteFacts || [];
           fullKnownData = data.allKnownFacts || [];
+          recentReviewsData500 = recentReviewsData50 || [];
         }
       } catch (e) {
         // If the endpoint doesn't support all=true, use what we have
@@ -56,16 +62,20 @@
         fullLeastReviewedData = data.least_reviewed_facts || [];
         fullFavoriteData = data.allFavoriteFacts || [];
         fullKnownData = data.allKnownFacts || [];
+        recentReviewsData500 = recentReviewsData50 || [];
       }
     } else {
       fullMostReviewedData = data.all_most_reviewed_facts || [];
       fullLeastReviewedData = data.all_least_reviewed_facts || [];
       fullFavoriteData = data.allFavoriteFacts || [];
       fullKnownData = data.allKnownFacts || [];
+      recentReviewsData500 = data.all_recent_card_reviews || [];
     }
     
     // Sessions data for table/modal
     sessionsData = data.recent_sessions || [];
+    // Recent reviews data
+    recentReviewsData50 = data.recent_card_reviews || [];
     // Populate achievements
     renderAchievementsTable(data.recent_achievements || []);
     renderAllAchievementsTable(data.achievements || []);
@@ -576,6 +586,45 @@
     });
   }
 
+  function renderSessionActionsTable(rows) {
+    const tbody = qs('#session-actions-table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    (rows || []).forEach(r => {
+      const tr = document.createElement('tr');
+      const start = r.StartTime ? new Date(r.StartTime).toLocaleString() : '';
+      tr.innerHTML = `
+        <td>${start}</td>
+        <td style="text-align:center;">${r.FactsAdded ?? 0}</td>
+        <td style="text-align:center;">${r.FactsEdited ?? 0}</td>
+        <td style="text-align:center;">${r.FactsDeleted ?? 0}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderRecentReviewsTable(rows) {
+    const tbody = qs('#recent-reviews-table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    (rows || []).forEach(row => {
+      const tr = document.createElement('tr');
+      const sessionStart = row.StartTime ? new Date(row.StartTime).toLocaleString() : '';
+      const reviewTime = row.ReviewDate ? new Date(row.ReviewDate).toLocaleString() : '';
+      const factContent = row.Content || '';
+      const displayText = factContent.length > 150 ?
+        `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 150)}...</span>` :
+        `<span class="fact-text">${factContent}</span>`;
+      tr.innerHTML = `
+        <td>${sessionStart}</td>
+        <td>${reviewTime}</td>
+        <td>${row.CategoryName || ''}</td>
+        <td>${displayText}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
   function renderAllAchievementsTable(rows) {
     const table = qs('#all-achievements-table');
     const tbody = qs('#all-achievements-table tbody');
@@ -846,10 +895,14 @@
         barChart('category_review_time', 'category-review-time', data.category_review_time, true);
         renderSessionEfficiencyTable(data.session_efficiency);
         renderTimeoutChart('timeout_analysis', 'timeout-analysis', data.timeout_analysis);
+        // Session actions (Add/Edit/Delete)
+        renderGroupedBarChart('session_actions', 'session-actions-chart', data.session_actions_chart);
         
         populateTables(data.most_reviewed_facts, data.least_reviewed_facts, data.allFavoriteFacts, data.allKnownFacts);
         renderHeatmap(data.review_heatmap);
         renderSessionsTable(sessionsData);
+        renderRecentReviewsTable(recentReviewsData50);
+        renderSessionActionsTable(data.session_actions_table || []);
       }, 100);
       
       hideLoadingState();
@@ -1141,7 +1194,7 @@
           tableContainer.appendChild(table);
           modalChartContainer.appendChild(tableContainer);
         } else {
-          // Handle regular charts
+          // Handle regular charts (only when a valid chart id is mapped)
           const idMap = {
             'category-distribution': 'category_distribution',
             'favorite-categories': 'favorite_categories',
@@ -1158,64 +1211,68 @@
             'weekly-pattern': 'weekly_pattern',
             'top-hours': 'top_hours',
             'growth-trend': 'growth_trend',
-            'monthly-progress': 'monthly_progress'
+            'monthly-progress': 'monthly_progress',
+            'session-actions-chart': 'session_actions'
           };
-          const chartRef = charts[idMap[key]];
-          if (!chartRef || !modal || !modalChartContainer) return;
-          
-          modal.style.display = 'flex';
-          
-          // Clear and recreate canvas
-          modalChartContainer.innerHTML = '';
-          modalChartContainer.style.height = '60vh';
-          modalChartContainer.style.overflow = 'hidden';
-          
-          const newCanvas = document.createElement('canvas');
-          newCanvas.id = 'modal-chart';
-          modalChartContainer.appendChild(newCanvas);
-          
-          // Get context from the new canvas
-          const ctx = newCanvas.getContext('2d');
-          
-          // Destroy any existing modal chart
-          if (charts.modal) { 
-            charts.modal.destroy(); 
-            charts.modal = null; 
-          }
-          
-          // Create the new chart with enhanced options
-          const chartOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: chartRef.config.type === 'pie' || chartRef.config.type === 'doughnut' ? 'bottom' : 'top',
-                labels: {
-                  padding: 15,
-                  font: { size: 14 }
+          const chartKey = idMap[key];
+          if (chartKey) {
+            const chartRef = charts[chartKey];
+            if (!chartRef || !modal || !modalChartContainer) return;
+            
+            modal.style.display = 'flex';
+            
+            // Clear and recreate canvas
+            modalChartContainer.innerHTML = '';
+            modalChartContainer.style.height = '60vh';
+            modalChartContainer.style.overflow = 'hidden';
+            
+            const newCanvas = document.createElement('canvas');
+            newCanvas.id = 'modal-chart';
+            modalChartContainer.appendChild(newCanvas);
+            
+            // Get context from the new canvas
+            const ctx = newCanvas.getContext('2d');
+            
+            // Destroy any existing modal chart
+            if (charts.modal) { 
+              charts.modal.destroy(); 
+              charts.modal = null; 
+            }
+            
+            // Create the new chart with enhanced options
+            const chartOptions = {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: chartRef.config.type === 'pie' || chartRef.config.type === 'doughnut' ? 'bottom' : 'top',
+                  labels: {
+                    padding: 15,
+                    font: { size: 14 }
+                  }
                 }
               }
+            };
+            
+            // Copy over specific options from original chart
+            if (chartRef.config.options) {
+              if (chartRef.config.options.plugins) {
+                chartOptions.plugins = { ...chartOptions.plugins, ...chartRef.config.options.plugins };
+              }
+              if (chartRef.config.options.scales) {
+                chartOptions.scales = chartRef.config.options.scales;
+              }
+              if (chartRef.config.options.indexAxis) {
+                chartOptions.indexAxis = chartRef.config.options.indexAxis;
+              }
             }
-          };
-          
-          // Copy over specific options from original chart
-          if (chartRef.config.options) {
-            if (chartRef.config.options.plugins) {
-              chartOptions.plugins = { ...chartOptions.plugins, ...chartRef.config.options.plugins };
-            }
-            if (chartRef.config.options.scales) {
-              chartOptions.scales = chartRef.config.options.scales;
-            }
-            if (chartRef.config.options.indexAxis) {
-              chartOptions.indexAxis = chartRef.config.options.indexAxis;
-            }
+            
+            charts.modal = new Chart(ctx, {
+              type: chartRef.config.type,
+              data: JSON.parse(JSON.stringify(chartRef.config.data)), // Deep clone
+              options: chartOptions
+            });
           }
-          
-          charts.modal = new Chart(ctx, {
-            type: chartRef.config.type,
-            data: JSON.parse(JSON.stringify(chartRef.config.data)), // Deep clone
-            options: chartOptions
-          });
         }
         
         // Session efficiency table expansion
@@ -1284,6 +1341,50 @@
               <td style="text-align:center;">${row.DurationSeconds ?? ''}</td>
               <td style="text-align:center;">${row.Views ?? 0}</td>
               <td style="text-align:center;">${row.DistinctFacts ?? 0}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+          table.appendChild(tbody);
+          tableContainer.appendChild(table);
+          modalChartContainer.appendChild(tableContainer);
+        }
+
+        // Recent Reviews table expansion (show last 500)
+        if (key === 'recent-reviews-table') {
+          if (!modal || !modalChartContainer) return;
+          modal.style.display = 'flex';
+          modalChartContainer.innerHTML = '';
+          modalChartContainer.style.height = 'auto';
+
+          const tableContainer = document.createElement('div');
+          tableContainer.className = 'table-container';
+          const table = document.createElement('table');
+          table.className = 'data-table';
+          const thead = document.createElement('thead');
+          thead.innerHTML = `
+            <tr>
+              <th>Session Start</th>
+              <th>Review Time</th>
+              <th>Category</th>
+              <th>Fact</th>
+            </tr>
+          `;
+          table.appendChild(thead);
+          const tbody = document.createElement('tbody');
+          const rows = (recentReviewsData500 && recentReviewsData500.length) ? recentReviewsData500 : recentReviewsData50;
+          (rows || []).forEach(row => {
+            const tr = document.createElement('tr');
+            const sessionStart = row.StartTime ? new Date(row.StartTime).toLocaleString() : '';
+            const reviewTime = row.ReviewDate ? new Date(row.ReviewDate).toLocaleString() : '';
+            const factContent = row.Content || '';
+            const displayText = factContent.length > 200 ?
+              `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 200)}...</span>` :
+              `<span class="fact-text">${factContent}</span>`;
+            tr.innerHTML = `
+              <td>${sessionStart}</td>
+              <td>${reviewTime}</td>
+              <td>${row.CategoryName || ''}</td>
+              <td>${displayText}</td>
             `;
             tbody.appendChild(tr);
           });

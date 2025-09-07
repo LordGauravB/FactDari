@@ -54,7 +54,7 @@ def chart_data():
                 COUNT(DISTINCT FactID) as FactsReviewed,
                 COUNT(*) as TotalReviews
             FROM ReviewLogs
-            WHERE ReviewDate >= ?
+            WHERE ReviewDate >= ? AND (Action IS NULL OR Action = 'view')
             GROUP BY CONVERT(varchar, ReviewDate, 23)
             ORDER BY CONVERT(varchar, ReviewDate, 23)
         """, (thirty_days_ago,)),
@@ -111,7 +111,7 @@ def chart_data():
                 DATEPART(weekday, ReviewDate) as DayOfWeek,
                 COUNT(*) as ReviewCount
             FROM ReviewLogs
-            WHERE ReviewDate >= ?
+            WHERE ReviewDate >= ? AND (Action IS NULL OR Action = 'view')
             GROUP BY DATEPART(hour, ReviewDate), DATEPART(weekday, ReviewDate)
             ORDER BY DATEPART(weekday, ReviewDate), DATEPART(hour, ReviewDate)
         """, (seven_days_ago,)),
@@ -209,6 +209,7 @@ def chart_data():
             INNER JOIN Facts f ON c.CategoryID = f.CategoryID
             INNER JOIN ReviewLogs rl ON f.FactID = rl.FactID
             WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE())
+              AND (rl.Action IS NULL OR rl.Action = 'view')
             GROUP BY c.CategoryName
             ORDER BY COUNT(DISTINCT rl.FactID) DESC
         """),
@@ -263,7 +264,7 @@ def chart_data():
                     s.SessionID,
                     COUNT(DISTINCT rl.FactID) as FactCount
                 FROM ReviewSessions s
-                LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID
+                LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view')
                 WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
                 GROUP BY s.SessionID
             ) as SessionFacts
@@ -277,7 +278,7 @@ def chart_data():
                     ELSE 0 
                 END as BestFactsPerMinute
             FROM ReviewSessions s
-            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID
+            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view')
             WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
             GROUP BY s.SessionID, s.DurationSeconds
             ORDER BY BestFactsPerMinute DESC
@@ -364,7 +365,7 @@ def chart_data():
                     ELSE 0 
                 END as ReviewsPerMinute
             FROM ReviewSessions s
-            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID
+            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view')
             WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
             GROUP BY s.SessionID, s.StartTime, s.DurationSeconds
             ORDER BY s.SessionID DESC
@@ -377,7 +378,7 @@ def chart_data():
                 COUNT(*) as TotalReviews,
                 CAST(COUNT(CASE WHEN TimedOut = 1 THEN 1 END) * 100.0 / COUNT(*) as DECIMAL(5,2)) as TimeoutPercentage
             FROM ReviewLogs
-            WHERE ReviewDate >= ?
+            WHERE ReviewDate >= ? AND (Action IS NULL OR Action = 'view')
             GROUP BY CONVERT(varchar, ReviewDate, 23)
             ORDER BY CONVERT(varchar, ReviewDate, 23)
         """, (thirty_days_ago,)),
@@ -406,7 +407,7 @@ def chart_data():
                 COUNT(*) as ReviewCount,
                 COUNT(DISTINCT FactID) as UniqueFactsCount
             FROM ReviewLogs
-            WHERE ReviewDate >= ?
+            WHERE ReviewDate >= ? AND (Action IS NULL OR Action = 'view')
             GROUP BY DATEPART(weekday, ReviewDate)
             ORDER BY DATEPART(weekday, ReviewDate)
         """, (seven_days_ago,)),
@@ -416,7 +417,7 @@ def chart_data():
                 DATEPART(hour, ReviewDate) as Hour,
                 COUNT(*) as ReviewCount
             FROM ReviewLogs
-            WHERE ReviewDate >= ?
+            WHERE ReviewDate >= ? AND (Action IS NULL OR Action = 'view')
             GROUP BY DATEPART(hour, ReviewDate)
             ORDER BY COUNT(*) DESC
         """, (thirty_days_ago,)),
@@ -444,6 +445,7 @@ def chart_data():
                 COUNT(DISTINCT CONVERT(date, ReviewDate)) as ActiveDays
             FROM ReviewLogs
             WHERE ReviewDate >= DATEADD(month, -6, GETDATE())
+              AND (Action IS NULL OR Action = 'view')
             GROUP BY YEAR(ReviewDate), MONTH(ReviewDate)
             ORDER BY YEAR(ReviewDate), MONTH(ReviewDate)
         """)
@@ -696,11 +698,100 @@ def chart_data():
             COUNT(rl.ReviewLogID) AS Views,
             COUNT(DISTINCT rl.FactID) AS DistinctFacts
         FROM ReviewSessions s
-        LEFT JOIN ReviewLogs rl ON rl.SessionID = s.SessionID
+        LEFT JOIN ReviewLogs rl ON rl.SessionID = s.SessionID AND (rl.Action IS NULL OR rl.Action = 'view')
         GROUP BY s.SessionID, s.StartTime, s.EndTime, s.DurationSeconds
         ORDER BY s.SessionID DESC
     """)
     formatted_data['recent_sessions'] = recent_sessions
+
+    # Last card reviews (top 50 by latest session start time, then review time)
+    recent_card_reviews = fetch_query("""
+        SELECT TOP 50
+            rl.ReviewLogID,
+            s.StartTime,
+            rl.ReviewDate,
+            COALESCE(c.CategoryName, c2.CategoryName) AS CategoryName,
+            COALESCE(f.Content, rl.FactContentSnapshot) AS Content
+        FROM ReviewLogs rl
+        LEFT JOIN ReviewSessions s ON s.SessionID = rl.SessionID
+        LEFT JOIN Facts f ON f.FactID = rl.FactID
+        LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
+        LEFT JOIN Categories c2 ON rl.CategoryIDSnapshot = c2.CategoryID
+        WHERE (rl.Action IS NULL OR rl.Action = 'view')
+        ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.ReviewLogID DESC
+    """)
+    formatted_data['recent_card_reviews'] = format_table_data(recent_card_reviews)
+
+    # If all=true also provide the last 500 reviews for modal expansion
+    if return_all:
+        all_recent_card_reviews = fetch_query("""
+            SELECT TOP 500
+                rl.ReviewLogID,
+                s.StartTime,
+                rl.ReviewDate,
+                COALESCE(c.CategoryName, c2.CategoryName) AS CategoryName,
+                COALESCE(f.Content, rl.FactContentSnapshot) AS Content
+            FROM ReviewLogs rl
+            LEFT JOIN ReviewSessions s ON s.SessionID = rl.SessionID
+            LEFT JOIN Facts f ON f.FactID = rl.FactID
+            LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
+            LEFT JOIN Categories c2 ON rl.CategoryIDSnapshot = c2.CategoryID
+            WHERE (rl.Action IS NULL OR rl.Action = 'view')
+            ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.ReviewLogID DESC
+        """)
+        formatted_data['all_recent_card_reviews'] = format_table_data(all_recent_card_reviews)
+
+    # Session actions (Add/Edit/Delete) per recent sessions
+    session_actions_rows = fetch_query("""
+        SELECT TOP 20
+            s.SessionID,
+            s.StartTime,
+            ISNULL(s.FactsAdded, 0) AS FactsAdded,
+            ISNULL(s.FactsEdited, 0) AS FactsEdited,
+            ISNULL(s.FactsDeleted, 0) AS FactsDeleted
+        FROM ReviewSessions s
+        WHERE s.StartTime IS NOT NULL
+        ORDER BY s.SessionID DESC
+    """)
+
+    # Build grouped bar payload (oldest first for readability)
+    labels = []
+    added = []
+    edited = []
+    deleted = []
+    for r in reversed(session_actions_rows):
+        # Label with short datetime or session id fallback
+        st = r.get('StartTime')
+        try:
+            lbl = st.strftime('%m-%d %H:%M') if isinstance(st, datetime) else str(st)
+        except Exception:
+            lbl = f"#{r.get('SessionID')}"
+        labels.append(lbl)
+        added.append(int(r.get('FactsAdded') or 0))
+        edited.append(int(r.get('FactsEdited') or 0))
+        deleted.append(int(r.get('FactsDeleted') or 0))
+
+    formatted_data['session_actions_chart'] = {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'Added',
+                'data': added,
+                'backgroundColor': '#10b981'
+            },
+            {
+                'label': 'Edited',
+                'data': edited,
+                'backgroundColor': '#3b82f6'
+            },
+            {
+                'label': 'Deleted',
+                'data': deleted,
+                'backgroundColor': '#ef4444'
+            }
+        ]
+    }
+    formatted_data['session_actions_table'] = session_actions_rows
 
     return jsonify(formatted_data)
 
@@ -709,6 +800,7 @@ def calculate_review_streak():
     query = """
     SELECT DISTINCT CONVERT(date, ReviewDate) as ReviewDate
     FROM ReviewLogs
+    WHERE (Action IS NULL OR Action = 'view')
     ORDER BY CONVERT(date, ReviewDate) DESC
     """
     

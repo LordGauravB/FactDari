@@ -783,6 +783,38 @@
                             </div>
                         </article>
 
+                        <!-- Recent Card Reviews Table -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Last 50 Card Reviews</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="recent-reviews-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="recent-reviews-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Session Start</th>
+                                                <th>Review Time</th>
+                                                <th>Category</th>
+                                                <th>Fact</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Ordered by latest session start. Expand to view last 500.
+                            </div>
+                        </article>
+
                         <!-- Timeout Analysis -->
                         <article class="chart-card span-2">
                             <header class="chart-header">
@@ -800,6 +832,51 @@
                             </div>
                             <div class="chart-description">
                                 Track session timeouts and inactivity patterns
+                            </div>
+                        </article>
+
+                        <!-- Session Actions Chart -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Session Actions (Add / Edit / Delete)</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="session-actions-chart" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="session-actions-chart"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Added / Edited / Deleted counts per recent session
+                            </div>
+                        </article>
+
+                        <!-- Session Actions Table -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Recent Session Actions</h3>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="session-actions-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Start Time</th>
+                                                <th>Added</th>
+                                                <th>Edited</th>
+                                                <th>Deleted</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Last 20 sessions action counts
                             </div>
                         </article>
                     </div>
