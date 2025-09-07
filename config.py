@@ -17,6 +17,11 @@ DB_CONFIG = {
     'trusted_connection': os.environ.get('FACTDARI_DB_TRUSTED', 'yes'),
     # Optional ODBC driver override. Examples: 'ODBC Driver 18 for SQL Server', 'ODBC Driver 17 for SQL Server'
     'driver': os.environ.get('FACTDARI_DB_DRIVER', 'SQL Server'),
+    # Optional security toggles (useful with ODBC 18 where Encrypt defaults to yes)
+    # Set FACTDARI_DB_ENCRYPT to 'yes'/'no' to force Encrypt parameter
+    # Set FACTDARI_DB_TRUST_CERT to 'yes'/'no' to force TrustServerCertificate
+    'encrypt': os.environ.get('FACTDARI_DB_ENCRYPT', ''),
+    'trust_server_certificate': os.environ.get('FACTDARI_DB_TRUST_CERT', ''),
 }
 
 # Idle timeout behavior (inactivity)
@@ -98,12 +103,20 @@ def get_icon_path(icon_name):
 
 def get_connection_string():
     driver = DB_CONFIG.get('driver', 'SQL Server')
-    return (
-        "DRIVER={%s};" % driver
-        + f"SERVER={DB_CONFIG['server']};"
-        + f"DATABASE={DB_CONFIG['database']};"
-        + f"Trusted_Connection={DB_CONFIG['trusted_connection']};"
-    )
+    parts = [
+        "DRIVER={" + driver + "};",
+        f"SERVER={DB_CONFIG['server']};",
+        f"DATABASE={DB_CONFIG['database']};",
+        f"Trusted_Connection={DB_CONFIG['trusted_connection']};",
+    ]
+    # Append optional security flags if provided (empty values are ignored)
+    enc = (DB_CONFIG.get('encrypt') or '').strip()
+    if enc:
+        parts.append(f"Encrypt={enc};")
+    tsc = (DB_CONFIG.get('trust_server_certificate') or '').strip()
+    if tsc:
+        parts.append(f"TrustServerCertificate={tsc};")
+    return "".join(parts)
 
 def get_font(font_type):
     """Get font tuple based on predefined settings"""
