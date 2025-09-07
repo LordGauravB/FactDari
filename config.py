@@ -57,7 +57,7 @@ XP_CONFIG = {
 # UI Configuration
 UI_CONFIG = {
     # Window dimensions
-    'window_width': 535,
+    'window_width': 540,
     'window_height': 380,
     'window_static_pos': "-1927+7",
     'popup_position': "-1923+400",
