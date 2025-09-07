@@ -164,7 +164,7 @@
     // Update navbar gamification stats
     setText('#nav-level-value', `Lv ${level}`);
     const gated = (level < 100) && (xpToNext <= 0);
-    const xpText = gated ? `${xp} (achievements required)` : (xpToNext > 0 ? `${xp} (${xpToNext}\u2192)` : `${xp} (MAX)`);
+    const xpText = gated ? `${xp} (achievements required)` : (xpToNext > 0 ? `${xp} (${xpToNext}->)` : `${xp} (MAX)`);
     setText('#nav-xp-value', xpText);
     setText('#nav-achievements-count', `${ach.unlocked || 0}/${ach.total || 0}`);
   }

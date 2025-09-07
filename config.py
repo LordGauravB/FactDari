@@ -14,7 +14,9 @@ ICONS_DIR = os.environ.get('FACTDARI_ICONS_DIR', os.path.join(RESOURCES_DIR, "ap
 DB_CONFIG = {
     'server': os.environ.get('FACTDARI_DB_SERVER', 'localhost\\SQLEXPRESS'),
     'database': os.environ.get('FACTDARI_DB_NAME', 'FactDari'),
-    'trusted_connection': os.environ.get('FACTDARI_DB_TRUSTED', 'yes')
+    'trusted_connection': os.environ.get('FACTDARI_DB_TRUSTED', 'yes'),
+    # Optional ODBC driver override. Examples: 'ODBC Driver 18 for SQL Server', 'ODBC Driver 17 for SQL Server'
+    'driver': os.environ.get('FACTDARI_DB_DRIVER', 'SQL Server'),
 }
 
 # Idle timeout behavior (inactivity)
@@ -95,11 +97,12 @@ def get_icon_path(icon_name):
     return os.path.join(ICONS_DIR, icon_name)
 
 def get_connection_string():
+    driver = DB_CONFIG.get('driver', 'SQL Server')
     return (
-        r'DRIVER={SQL Server};'
-        f"SERVER={DB_CONFIG['server']};"
-        f"DATABASE={DB_CONFIG['database']};"
-        f"Trusted_Connection={DB_CONFIG['trusted_connection']};"
+        "DRIVER={%s};" % driver
+        + f"SERVER={DB_CONFIG['server']};"
+        + f"DATABASE={DB_CONFIG['database']};"
+        + f"Trusted_Connection={DB_CONFIG['trusted_connection']};"
     )
 
 def get_font(font_type):

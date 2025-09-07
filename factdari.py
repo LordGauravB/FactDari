@@ -118,8 +118,9 @@ class FactDariApp:
         self.current_fact_is_favorite = False  # Track if current fact is a favorite
         self.current_fact_is_easy = False  # Track if current fact is known/easy
         # Speech state
-        self.speech_engine = pyttsx3.init()
+        self.speech_engine = None  # not used for playback; preserved for future config
         self.speaking_thread = None
+        self.active_tts_engine = None  # engine instance used by the current speech thread
 
         # Timing/session state
         self.current_session_id = None
@@ -387,7 +388,7 @@ class FactDariApp:
         # Initially not placed; placed when showing home page
 
         # Level label: show next to Home icon (top-left), clickable for Achievements
-        self.level_label = tk.Label(self.fact_frame, text="Level 1 • 0 XP", fg=self.GREEN_COLOR, bg=self.BG_COLOR,
+        self.level_label = tk.Label(self.fact_frame, text="Level 1 - 0 XP", fg=self.GREEN_COLOR, bg=self.BG_COLOR,
                                     font=self.STATS_FONT, cursor="hand2")
         # Place to the right of the Home icon (20px wide) with padding
         self.level_label.place(x=32, y=7)
@@ -491,8 +492,8 @@ class FactDariApp:
             ToolTip(self.add_icon_button, "Add fact (a)")
             ToolTip(self.edit_icon_button, "Edit fact (e)")
             ToolTip(self.delete_icon_button, "Delete fact (d)")
-            ToolTip(self.prev_button, "Previous (←)")
-            ToolTip(self.next_button, "Next (→)")
+            ToolTip(self.prev_button, "Previous (<-)")
+            ToolTip(self.next_button, "Next (->)")
             ToolTip(self.level_label, "Click for achievements")
         except Exception:
             pass
@@ -1065,10 +1066,12 @@ class FactDariApp:
     def get_facts_viewed_today(self):
         """Get count of unique facts viewed today"""
         today = datetime.now().strftime('%Y-%m-%d')
+        # Count only actual view actions (exclude add/edit/delete logs)
         query = """
-        SELECT COUNT(DISTINCT FactID) 
-        FROM ReviewLogs 
+        SELECT COUNT(DISTINCT FactID)
+        FROM ReviewLogs
         WHERE CONVERT(date, ReviewDate) = CONVERT(date, ?)
+          AND (Action IS NULL OR Action = 'view')
         """
         result = self.fetch_query(query, (today,))
         return result[0][0] if result and len(result) > 0 else 0
@@ -1083,13 +1086,13 @@ class FactDariApp:
             xp = prog.get('xp', 0)
             to_next = prog.get('xp_to_next', 0)
             if level >= 100:
-                self.level_label.config(text=f"Level {level} • {xp} XP (MAX)")
+                self.level_label.config(text=f"Level {level} - {xp} XP (MAX)")
             else:
                 # If progress shows no XP to next but level < 100, it's gated by achievements
                 if int(to_next or 0) <= 0:
-                    self.level_label.config(text=f"Level {level} • {xp} XP (achievements required)")
+                    self.level_label.config(text=f"Level {level} - {xp} XP (achievements required)")
                 else:
-                    self.level_label.config(text=f"Level {level} • {xp} XP ({to_next} to next)")
+                    self.level_label.config(text=f"Level {level} - {xp} XP ({to_next} to next)")
         except Exception:
             pass
     
@@ -1106,7 +1109,7 @@ class FactDariApp:
                 pass
             # Check inactivity only while in reviewing mode
             try:
-                if self.current_session_id:
+                if self.current_session_id and not getattr(self, 'timer_paused', False):
                     idle_seconds = int((datetime.now() - self.last_activity_time).total_seconds())
                     if not self.idle_triggered and idle_seconds >= int(self.idle_timeout_seconds):
                         self.handle_idle_timeout()
@@ -1161,31 +1164,52 @@ class FactDariApp:
         
         def _worker():
             try:
-                self.speech_engine.stop()
-                self.speech_engine.say(text)
-                self.speech_engine.runAndWait()
+                # Initialize a fresh engine inside the worker to avoid reuse issues
+                engine = pyttsx3.init()
+                # Expose this engine so stop_speaking can interrupt it
+                self.active_tts_engine = engine
+                engine.say(text)
+                engine.runAndWait()
             except Exception:
                 pass
             finally:
+                try:
+                    # Clear active engine reference
+                    self.active_tts_engine = None
+                except Exception:
+                    pass
                 # Re-enable on UI thread
                 self.root.after(0, lambda: self.speaker_button.config(state="normal"))
-        
+
         self.speaking_thread = threading.Thread(target=_worker, daemon=True)
         self.speaking_thread.start()
 
     def stop_speaking(self):
         """Stop any ongoing speech immediately."""
         try:
-            if self.speaking_thread and self.speaking_thread.is_alive():
+            # Signal the active engine (if any) to stop
+            if getattr(self, 'active_tts_engine', None) is not None:
                 try:
-                    self.speech_engine.stop()
+                    self.active_tts_engine.stop()
                 except Exception:
                     pass
+                finally:
+                    # Do not reuse this engine
+                    self.active_tts_engine = None
+            # If a worker thread exists, let it wind down
+            if self.speaking_thread and self.speaking_thread.is_alive():
                 # Allow thread to wind down
                 try:
-                    self.speaking_thread.join(timeout=0.2)
+                    self.speaking_thread.join(timeout=1.0)
                 except Exception:
                     pass
+            # Ensure UI button is enabled even if thread ended unexpectedly
+            try:
+                self.speaker_button.config(state="normal")
+            except Exception:
+                pass
+            # Clear reference
+            self.speaking_thread = None
         except Exception:
             pass
     
@@ -1547,6 +1571,11 @@ class FactDariApp:
         """Start a new reviewing session and store SessionID."""
         # End any existing session first
         self.end_active_session()
+        # Reset per-session duplicate guard so single-card categories track one view per session
+        try:
+            self._last_tracked_fact = None
+        except Exception:
+            pass
         self.session_start_time = datetime.now()
         session_id = self.execute_insert_return_id(
             """
@@ -1916,7 +1945,7 @@ class FactDariApp:
                                     highlightthickness=0, padx=10, pady=5,
                                     font=(self.NORMAL_FONT[0], self.NORMAL_FONT[1], 'bold'))
         save_close_btn.pack(side='left', padx=6)
-        add_another_btn = tk.Button(btn_row, text="Add Another", bg=self.BLUE_COLOR, fg=self.TEXT_COLOR,
+        add_another_btn = tk.Button(btn_row, text="Save & Add Another", bg=self.BLUE_COLOR, fg=self.TEXT_COLOR,
                                     command=lambda: save_fact(False), cursor="hand2", borderwidth=0,
                                     highlightthickness=0, padx=10, pady=5,
                                     font=(self.NORMAL_FONT[0], self.NORMAL_FONT[1], 'bold'))
@@ -2605,7 +2634,7 @@ class FactDariApp:
             self.fact_label.config(text="No facts found. Add some facts first!")
         
         # Show shortcut hints
-        self.status_label.config(text="Shortcuts: ← Previous, → Next, Space Next", fg=self.STATUS_COLOR)
+        self.status_label.config(text="Shortcuts: <- Previous, -> Next, Space Next", fg=self.STATUS_COLOR)
 
         # Apply rounded corners again after UI changes
         self.root.update_idletasks()
