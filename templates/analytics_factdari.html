@@ -3,467 +3,954 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="FactDari Analytics Dashboard - Track your learning progress with interactive visualizations">
     <title>FactDari Analytics Dashboard</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Trebuchet MS', Arial, sans-serif;
-            background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
-            color: white;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        h1 {
-            text-align: center;
-            color: #4CAF50;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-        
-        .dashboard {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
-        .chart-container {
-            background: rgba(30, 30, 30, 0.9);
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(76, 175, 80, 0.3);
-        }
-        
-        .chart-container h2 {
-            color: #4CAF50;
-            margin-bottom: 15px;
-            font-size: 1.3em;
-            border-bottom: 2px solid #4CAF50;
-            padding-bottom: 10px;
-        }
-        
-        .chart-container.full-width {
-            grid-column: 1 / -1;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-card {
-            background: linear-gradient(135deg, #4CAF50 0%, #2196F3 100%);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        }
-        
-        .stat-card h3 {
-            font-size: 1em;
-            margin-bottom: 10px;
-            opacity: 0.9;
-        }
-        
-        .stat-card .value {
-            font-size: 2.5em;
-            font-weight: bold;
-        }
-        
-        .table-container {
-            overflow-x: auto;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        th {
-            background: rgba(76, 175, 80, 0.2);
-            font-weight: bold;
-            color: #4CAF50;
-        }
-        
-        tr:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-        
-        .heatmap-container {
-            margin-top: 15px;
-        }
-        
-        .heatmap-grid {
-            display: grid;
-            grid-template-columns: 40px repeat(24, 1fr);
-            gap: 2px;
-            font-size: 0.8em;
-        }
-        
-        .heatmap-cell {
-            aspect-ratio: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 3px;
-            min-width: 25px;
-        }
-        
-        .heatmap-label {
-            font-weight: bold;
-            color: #4CAF50;
-            display: flex;
-            align-items: center;
-            justify-content: right;
-            padding-right: 5px;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 50px;
-            font-size: 1.5em;
-            color: #4CAF50;
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 0.5; }
-            50% { opacity: 1; }
-            100% { opacity: 0.5; }
-        }
-        
-        .loading {
-            animation: pulse 1.5s infinite;
-        }
-    </style>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/analytics.css">
 </head>
 <body>
-    <h1>FactDari Analytics Dashboard</h1>
-    
-    <div class="stats-grid" id="statsGrid">
-        <div class="stat-card">
-            <h3>Total Facts</h3>
-            <div class="value" id="totalFacts">-</div>
-        </div>
-        <div class="stat-card">
-            <h3>Facts Viewed Today</h3>
-            <div class="value" id="factsViewedToday">-</div>
-        </div>
-        <div class="stat-card">
-            <h3>Current Streak</h3>
-            <div class="value" id="currentStreak">-</div>
-        </div>
-        <div class="stat-card">
-            <h3>Total Categories</h3>
-            <div class="value" id="totalCategories">-</div>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading Analytics...</div>
+        <div class="loading-progress" style="width: 200px; height: 4px; background: rgba(59, 130, 246, 0.2); border-radius: 2px; margin-top: 16px;">
+            <div style="height: 100%; background: #3b82f6; border-radius: 2px; animation: progress 2s ease-in-out infinite;"></div>
         </div>
     </div>
     
-    <div class="dashboard">
-        <div class="chart-container">
-            <h2>Category Distribution</h2>
-            <canvas id="categoryChart"></canvas>
-        </div>
-        
-        <div class="chart-container">
-            <h2>Review Status</h2>
-            <canvas id="reviewStatusChart"></canvas>
-        </div>
-        
-        <div class="chart-container full-width">
-            <h2>Facts Viewed Per Day (Last 30 Days)</h2>
-            <canvas id="reviewsPerDayChart"></canvas>
-        </div>
-        
-        <div class="chart-container">
-            <h2>Most Reviewed Facts</h2>
-            <div class="table-container">
-                <table id="mostReviewedTable">
-                    <thead>
-                        <tr>
-                            <th>Fact</th>
-                            <th>Category</th>
-                            <th>Reviews</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+    <style>
+        @keyframes progress {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+    </style>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Navigation Bar -->
+        <nav class="navbar" role="navigation" aria-label="Main navigation">
+            <div class="nav-container">
+                <div class="nav-brand">
+                    <h1 class="brand-title">
+                        <span class="brand-fact">Fact</span><span class="brand-dari">Dari</span>
+                        <span class="brand-analytics">Analytics</span>
+                    </h1>
+                </div>
+                <div class="gamification-stats">
+                    <div class="stat-item" title="Your current level">
+                        <span class="stat-icon">🏆</span>
+                        <span class="stat-value" id="nav-level-value">Lv 1</span>
+                        <span class="stat-label">Level</span>
+                    </div>
+                    <div class="stat-item" title="XP and progress to next level">
+                        <span class="stat-icon">⚡</span>
+                        <span class="stat-value" id="nav-xp-value">6 (94→)</span>
+                        <span class="stat-label">XP (to next)</span>
+                    </div>
+                    <div class="stat-item" title="Achievements unlocked">
+                        <span class="stat-icon">🥇</span>
+                        <span class="stat-value" id="nav-achievements-count">0/80</span>
+                        <span class="stat-label">Achievements</span>
+                    </div>
+                </div>
+                <div class="nav-actions">
+                    <div class="auto-refresh-timer" title="Data automatically refreshes every 5 minutes">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        Auto-refresh in <span id="countdown">5m 0s</span>
+                    </div>
+                    <button id="refresh-btn" class="btn btn-secondary" aria-label="Refresh data" title="Refresh data (Ctrl+R)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
             </div>
-        </div>
-        
-        <div class="chart-container">
-            <h2>Least Reviewed Facts</h2>
-            <div class="table-container">
-                <table id="leastReviewedTable">
-                    <thead>
-                        <tr>
-                            <th>Fact</th>
-                            <th>Category</th>
-                            <th>Reviews</th>
-                            <th>Days Since</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+        </nav>
+
+        <!-- Main Container -->
+        <div class="container">
+            <!-- Key Metrics Section -->
+            <section class="metrics-section" aria-label="Key metrics">
+                <div class="metrics-grid">
+                    <article class="metric-card" title="Total number of facts in your collection">
+                        <div class="metric-icon">📚</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="total-cards">0</div>
+                            <div class="metric-label">Total Facts</div>
+                        </div>
+                    </article>
+                    
+                    <article class="metric-card" title="Number of facts viewed today">
+                        <div class="metric-icon">👁️</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="due-today">0</div>
+                            <div class="metric-label">Viewed Today</div>
+                        </div>
+                    </article>
+                    
+                    <article class="metric-card" title="Current consecutive days of reviewing facts">
+                        <div class="metric-icon">🔥</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="mastered-cards">0</div>
+                            <div class="metric-label">Review Streak</div>
+                        </div>
+                    </article>
+                    
+                    <article class="metric-card" title="Number of active fact categories">
+                        <div class="metric-icon">📊</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="active-categories">0</div>
+                            <div class="metric-label">Categories</div>
+                        </div>
+                    </article>
+                    
+                    <article class="metric-card" title="Number of facts added to favorites">
+                        <div class="metric-icon">⭐</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="favorites-count">0</div>
+                            <div class="metric-label">Favorites</div>
+                        </div>
+                    </article>
+                    
+                    <article class="metric-card" title="Number of facts marked as known">
+                        <div class="metric-icon">✅</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="known-facts-count">0</div>
+                            <div class="metric-label">Known Facts</div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- Tab Navigation -->
+            <nav class="tabs" role="tablist" aria-label="Analytics tabs">
+                <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true" aria-controls="overview-tab" title="Press Ctrl+1">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="9" y1="9" x2="15" y2="9"/>
+                        <line x1="9" y1="15" x2="15" y2="15"/>
+                    </svg>
+                    Overview
+                </button>
+                <button class="tab-btn" data-tab="progress" role="tab" aria-selected="false" aria-controls="progress-tab" title="Press Ctrl+2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                        <line x1="12" y1="20" x2="12" y2="10"/>
+                        <line x1="18" y1="20" x2="18" y2="4"/>
+                        <line x1="6" y1="20" x2="6" y2="16"/>
+                    </svg>
+                    Progress
+                </button>
+                <button class="tab-btn" data-tab="insights" role="tab" aria-selected="false" aria-controls="insights-tab" title="Press Ctrl+3">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                        <path d="M11 8v6M8 11h6"/>
+                    </svg>
+                    Insights
+                </button>
+                <button class="tab-btn" data-tab="sessions" role="tab" aria-selected="false" aria-controls="sessions-tab" title="Press Ctrl+4">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Session Analytics
+                </button>
+                <button class="tab-btn" data-tab="achievements" role="tab" aria-selected="false" aria-controls="achievements-tab" title="Press Ctrl+5">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                        <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/>
+                        <path d="M17 5h3a2 2 0 0 1-2 2h-1M7 5H4a2 2 0 0 0 2 2h1"/>
+                    </svg>
+                    Achievements
+                </button>
+            </nav>
+
+            <!-- Tab Contents -->
+            <div class="tab-contents">
+                <!-- Overview Tab -->
+                <section id="overview-tab" class="tab-content active" role="tabpanel">
+                    <div class="charts-grid">
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Category Distribution</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="category-distribution" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="category-distribution"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Distribution of facts across different categories
+                            </div>
+                        </article>
+
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Favorite Categories</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="favorite-categories" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="favorite-categories"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Distribution of favorite facts by category
+                            </div>
+                        </article>
+
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Known Categories</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="known-categories" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="known-categories"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Distribution of known facts by category
+                            </div>
+                        </article>
+
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Categories Viewed Today</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="categories-viewed-today" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="categories-viewed-today"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Categories of facts reviewed today
+                            </div>
+                        </article>
+
+                        <!-- New Overview Charts -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Knowledge Progress</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="known-vs-unknown" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="known-vs-unknown"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Ratio of known vs unknown facts
+                            </div>
+                        </article>
+
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Weekly Review Pattern</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="weekly-pattern" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="weekly-pattern"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Review activity by day of week
+                            </div>
+                        </article>
+
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Peak Review Hours</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="top-hours" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="top-hours"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Your top 5 most active hours
+                            </div>
+                        </article>
+
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Category Growth Trend</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="growth-trend" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="growth-trend"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Facts added per category over time
+                            </div>
+                        </article>
+                        
+                    </div>
+                </section>
+
+                <!-- Progress Tab -->
+                <section id="progress-tab" class="tab-content" role="tabpanel">
+                    <div class="charts-grid">
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Facts Added Timeline</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="facts-timeline" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="facts-timeline"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Timeline of when facts were added
+                            </div>
+                        </article>
+
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Category Reviews</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="category-reviews" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="category-reviews"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Total reviews per category
+                            </div>
+                        </article>
+
+                        <!-- New Monthly Progress Chart -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Monthly Progress Overview</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="monthly-progress" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="monthly-progress"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Monthly reviews, unique facts, and active days (last 6 months)
+                            </div>
+                        </article>
+
+                    </div>
+                </section>
+
+                <!-- Insights Tab -->
+                <section id="insights-tab" class="tab-content" role="tabpanel">
+                    <div class="charts-grid">
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Most Reviewed Facts</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="most-reviewed-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="most-reviewed-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Fact</th>
+                                                <th>Category</th>
+                                                <th>Reviews</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Top 10 most frequently reviewed facts<br>
+                                <span style="font-size: 12px; color: var(--primary); font-weight: 500;">Click expand ⤢ to see the full list</span>
+                            </div>
+                        </article>
+
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Least Reviewed Facts</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="least-reviewed-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="least-reviewed-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Fact</th>
+                                                <th>Category</th>
+                                                <th>Reviews</th>
+                                                <th>Days Since</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Top 10 Least Reviewed Facts<br>
+                                <span style="font-size: 12px; color: var(--primary); font-weight: 500;">Click expand ⤢ to see the full list</span>
+                            </div>
+                        </article>
+
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>All Favorite Facts</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="favorite-facts-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="favorite-facts-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Fact</th>
+                                                <th>Category</th>
+                                                <th>Reviews</th>
+                                                <th>Days Since</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Random 10 Favorite Facts<br>
+                                <span style="font-size: 12px; color: var(--primary); font-weight: 500;">Click expand ⤢ to see all favorites</span>
+                            </div>
+                        </article>
+
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>All Known Facts</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="known-facts-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="known-facts-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Fact</th>
+                                                <th>Category</th>
+                                                <th>Reviews</th>
+                                                <th>Days Since</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Random 10 Known Facts<br>
+                                <span style="font-size: 12px; color: var(--primary); font-weight: 500;">Click expand ⤢ to see all known facts</span>
+                            </div>
+                        </article>
+
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Review Activity Heatmap</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="review-heatmap-chart" aria-label="Expand heatmap">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container full-width">
+                                <div id="review-heatmap"></div>
+                            </div>
+                            <div class="chart-description">
+                                Your review patterns over the last 7 days
+                            </div>
+                        </article>
+
+                        <!-- Move Reviews Per Day to the end and span full width -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Reviews Per Day</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="reviews-per-day" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container full-width">
+                                <canvas id="reviews-per-day"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Daily review activity over the last 30 days
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- Session Analytics Tab -->
+                <section id="sessions-tab" class="tab-content" role="tabpanel">
+                    <!-- Session Metrics Section -->
+                    <section class="metrics-section" aria-label="Session metrics">
+                        <div class="metrics-grid">
+                            <article class="metric-card" title="Average duration of review sessions">
+                                <div class="metric-icon">⏱️</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="avg-session-duration">--</div>
+                                    <div class="metric-label">Average Session</div>
+                                </div>
+                            </article>
+                            
+                            <article class="metric-card" title="Total time spent reviewing">
+                                <div class="metric-icon">⏳</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="total-session-time">--</div>
+                                    <div class="metric-label">Total Time</div>
+                                </div>
+                            </article>
+                            
+                            <article class="metric-card" title="Longest review session">
+                                <div class="metric-icon">🏁</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="max-session-duration">--</div>
+                                    <div class="metric-label">Longest Session</div>
+                                </div>
+                            </article>
+                            
+                            <article class="metric-card" title="Total number of review sessions">
+                                <div class="metric-icon">📈</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="total-sessions">--</div>
+                                    <div class="metric-label">Total Sessions</div>
+                                </div>
+                            </article>
+                            
+                            <article class="metric-card" title="Average facts reviewed per session">
+                                <div class="metric-icon">📊</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="avg-facts-per-session">--</div>
+                                    <div class="metric-label">Avg Facts/Session</div>
+                                </div>
+                            </article>
+                            
+                            <article class="metric-card" title="Best review efficiency (facts per minute)">
+                                <div class="metric-icon">⚡</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="best-efficiency">--</div>
+                                    <div class="metric-label">Best Efficiency</div>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+
+                    <div class="charts-grid">
+
+                        <!-- Session Duration Distribution -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Session Duration Distribution</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="session-duration-distribution" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="session-duration-distribution"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                How long your sessions typically last
+                            </div>
+                        </article>
+
+                        <!-- Review Time Stats -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Review Time Per Fact</h3>
+                            </header>
+                            <div class="chart-container">
+                                <div class="review-time-stats">
+                                    <div class="time-stat">
+                                        <span class="time-label">Average:</span>
+                                        <span class="time-value" id="avg-review-time">--</span>
+                                    </div>
+                                    <div class="time-stat">
+                                        <span class="time-label">Fastest:</span>
+                                        <span class="time-value" id="min-review-time">--</span>
+                                    </div>
+                                    <div class="time-stat">
+                                        <span class="time-label">Slowest:</span>
+                                        <span class="time-value" id="max-review-time">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Time spent reviewing individual facts
+                            </div>
+                        </article>
+
+                        <!-- Daily Session Duration Trend -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Daily Session Duration Trend</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="daily-session-duration" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="daily-session-duration"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Session duration patterns over the last 30 days
+                            </div>
+                        </article>
+
+                        <!-- Category Review Time -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Average Review Time by Category</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="category-review-time" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="category-review-time"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Which categories take longer to review
+                            </div>
+                        </article>
+
+                        <!-- Session Efficiency Table -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Session Efficiency Analysis</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="session-efficiency-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="session-efficiency-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Start Time</th>
+                                                <th>Duration (min)</th>
+                                                <th>Unique Facts</th>
+                                                <th>Total Reviews</th>
+                                                <th>Facts/min</th>
+                                                <th>Reviews/min</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Detailed efficiency metrics for recent sessions
+                            </div>
+                        </article>
+
+                        <!-- Recent Sessions Table -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Recent Sessions</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="sessions-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="sessions-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Start Time</th>
+                                                <th>Duration (s)</th>
+                                                <th>Views</th>
+                                                <th>Distinct Facts</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Last 20 review sessions summary
+                            </div>
+                        </article>
+
+                        <!-- Recent Card Reviews Table -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Last 50 Card Reviews</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="recent-reviews-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="recent-reviews-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Session Start</th>
+                                                <th>Review Time</th>
+                                                <th>Category</th>
+                                                <th>Fact</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Ordered by latest session start. Expand to view last 500.
+                            </div>
+                        </article>
+
+                        <!-- Timeout Analysis -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Session Timeout Analysis</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="timeout-analysis" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="timeout-analysis"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Track session timeouts and inactivity patterns
+                            </div>
+                        </article>
+
+                        <!-- Session Actions Chart -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Session Actions (Add / Edit / Delete)</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="session-actions-chart" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="session-actions-chart"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Added / Edited / Deleted counts per recent session
+                            </div>
+                        </article>
+
+                        <!-- Session Actions Table -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Recent Session Actions</h3>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="session-actions-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Start Time</th>
+                                                <th>Added</th>
+                                                <th>Edited</th>
+                                                <th>Deleted</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Last 20 sessions action counts
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- Achievements Tab -->
+                <section id="achievements-tab" class="tab-content" role="tabpanel">
+                    <div class="charts-grid">
+
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Recent Achievements</h3>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="achievements-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>When</th>
+                                                <th>Achievement</th>
+                                                <th>Reward</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                10 most recently unlocked achievements
+                            </div>
+                        </article>
+
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>All Achievements</h3>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="all-achievements-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Status</th>
+                                                <th>Name</th>
+                                                <th>Category</th>
+                                                <th>Progress</th>
+                                                <th>Reward</th>
+                                                <th>Unlocked At</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                All achievements with current progress
+                            </div>
+                        </article>
+                    </div>
+                </section>
             </div>
-        </div>
-        
-        <div class="chart-container full-width">
-            <h2>Facts Added Over Time</h2>
-            <canvas id="factsTimelineChart"></canvas>
-        </div>
-        
-        <div class="chart-container full-width">
-            <h2>Review Activity Heatmap (Last 7 Days)</h2>
-            <div class="heatmap-container" id="heatmapContainer"></div>
-        </div>
-        
-        <div class="chart-container full-width">
-            <h2>Category Review Distribution</h2>
-            <canvas id="categoryReviewsChart"></canvas>
         </div>
     </div>
-    
-    <script>
-        // Chart.js default configuration
-        Chart.defaults.color = 'white';
-        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
-        Chart.defaults.font.family = 'Trebuchet MS';
-        
-        // Fetch and display data
-        async function loadDashboard() {
-            try {
-                const response = await fetch('/api/chart-data');
-                const data = await response.json();
-                
-                // Update stats
-                updateStats(data);
-                
-                // Create charts
-                createCategoryChart(data.category_distribution);
-                createReviewStatusChart(data.review_status);
-                createReviewsPerDayChart(data.reviews_per_day);
-                createFactsTimelineChart(data.facts_added_timeline);
-                createCategoryReviewsChart(data.category_reviews);
-                createHeatmap(data.review_heatmap);
-                
-                // Populate tables
-                populateMostReviewedTable(data.most_reviewed_facts);
-                populateLeastReviewedTable(data.least_reviewed_facts);
-                
-            } catch (error) {
-                console.error('Error loading dashboard:', error);
-            }
-        }
-        
-        function updateStats(data) {
-            // Calculate totals from the data
-            const totalFacts = data.category_distribution.data.reduce((a, b) => a + b, 0);
-            const totalCategories = data.category_distribution.labels.length;
-            
-            document.getElementById('totalFacts').textContent = totalFacts;
-            document.getElementById('totalCategories').textContent = totalCategories;
-            
-            // Get today's facts viewed
-            if (data.reviews_per_day && data.reviews_per_day.labels.length > 0) {
-                const todayData = data.reviews_per_day.datasets[0].data;
-                const todayViewed = todayData[todayData.length - 1] || 0;
-                document.getElementById('factsViewedToday').textContent = todayViewed;
-            }
-            
-            // Update streak
-            if (data.review_streak) {
-                document.getElementById('currentStreak').textContent = 
-                    data.review_streak.current_streak + ' days';
-            }
-        }
-        
-        function createCategoryChart(data) {
-            const ctx = document.getElementById('categoryChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: data.labels,
-                    datasets: [{
-                        data: data.data,
-                        backgroundColor: [
-                            '#4CAF50', '#2196F3', '#FFC107', '#F44336', '#9C27B0',
-                            '#00BCD4', '#FF9800', '#795548', '#607D8B', '#E91E63'
-                        ]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
-        }
-        
-        function createReviewStatusChart(data) {
-            const ctx = document.getElementById('reviewStatusChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: data.labels,
-                    datasets: [{
-                        data: data.data,
-                        backgroundColor: [
-                            '#F44336', '#FFC107', '#4CAF50', '#2196F3', '#9C27B0'
-                        ]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
-        }
-        
-        function createReviewsPerDayChart(data) {
-            const ctx = document.getElementById('reviewsPerDayChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: data,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        }
-        
-        function createFactsTimelineChart(data) {
-            const ctx = document.getElementById('factsTimelineChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'bar',
-                data: data,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        }
-        
-        function createCategoryReviewsChart(data) {
-            const ctx = document.getElementById('categoryReviewsChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'bar',
-                data: data,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    indexAxis: 'y',
-                    scales: {
-                        x: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        }
-        
-        function createHeatmap(data) {
-            const container = document.getElementById('heatmapContainer');
-            const grid = document.createElement('div');
-            grid.className = 'heatmap-grid';
-            
-            // Add empty cell for top-left corner
-            grid.innerHTML = '<div></div>';
-            
-            // Add hour labels
-            for (let hour = 0; hour < 24; hour++) {
-                const label = document.createElement('div');
-                label.className = 'heatmap-label';
-                label.textContent = hour;
-                grid.appendChild(label);
-            }
-            
-            // Add data rows
-            data.days.forEach((day, dayIndex) => {
-                // Add day label
-                const dayLabel = document.createElement('div');
-                dayLabel.className = 'heatmap-label';
-                dayLabel.textContent = day.substr(0, 3);
-                grid.appendChild(dayLabel);
-                
-                // Add hour cells
-                for (let hour = 0; hour < 24; hour++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'heatmap-cell';
-                    const value = data.data[dayIndex][hour] || 0;
-                    const intensity = Math.min(value / 10, 1); // Normalize to 0-1
-                    cell.style.background = `rgba(76, 175, 80, ${intensity})`;
-                    cell.title = `${day} ${hour}:00 - ${value} reviews`;
-                    if (value > 0) {
-                        cell.textContent = value;
-                    }
-                    grid.appendChild(cell);
-                }
-            });
-            
-            container.appendChild(grid);
-        }
-        
-        function populateMostReviewedTable(facts) {
-            const tbody = document.querySelector('#mostReviewedTable tbody');
-            facts.forEach(fact => {
-                const row = tbody.insertRow();
-                row.insertCell(0).textContent = fact.Content.substring(0, 50) + '...';
-                row.insertCell(1).textContent = fact.CategoryName;
-                row.insertCell(2).textContent = fact.ReviewCount;
-            });
-        }
-        
-        function populateLeastReviewedTable(facts) {
-            const tbody = document.querySelector('#leastReviewedTable tbody');
-            facts.forEach(fact => {
-                const row = tbody.insertRow();
-                row.insertCell(0).textContent = fact.Content.substring(0, 40) + '...';
-                row.insertCell(1).textContent = fact.CategoryName;
-                row.insertCell(2).textContent = fact.ReviewCount;
-                row.insertCell(3).textContent = fact.DaysSinceReview || 'N/A';
-            });
-        }
-        
-        // Load dashboard on page load
-        window.addEventListener('DOMContentLoaded', loadDashboard);
-    </script>
+
+    <!-- Modal for expanded charts -->
+    <div id="chart-modal" class="modal" role="dialog" aria-modal="true" aria-label="Expanded view">
+        <div class="modal-content">
+            <button class="modal-close" aria-label="Close modal">&times;</button>
+            <div class="modal-chart-container">
+                <canvas id="modal-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom JavaScript -->
+    <script src="/static/js/analytics.js"></script>
 </body>
 </html>

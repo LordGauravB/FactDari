@@ -1,6 +1,5 @@
 # config.py
 import os
-from pathlib import Path
 
 # Base directory where the application is installed
 # Use environment variable if provided, otherwise use relative path
@@ -9,29 +8,60 @@ BASE_DIR = os.environ.get('FACTDARI_BASE_DIR', os.path.dirname(os.path.abspath(_
 # Resource paths - allow override via environment variables
 RESOURCES_DIR = os.environ.get('FACTDARI_RESOURCES_DIR', os.path.join(BASE_DIR, "Resources"))
 ICONS_DIR = os.environ.get('FACTDARI_ICONS_DIR', os.path.join(RESOURCES_DIR, "application_icons"))
-APPLICATION_IMAGES_DIR = os.environ.get('FACTDARI_APPLICATION_IMAGES_DIR', os.path.join(RESOURCES_DIR, "application_images"))
 
-# Analytics app path
-ANALYTICS_APP = os.environ.get('FACTDARI_ANALYTICS_APP', os.path.join(BASE_DIR, "analytics_factdari.py"))
 
 # Database configuration
 DB_CONFIG = {
-    'server': os.environ.get('FACTDARI_DB_SERVER', 'GAURAVS_DESKTOP\\SQLEXPRESS'),
+    'server': os.environ.get('FACTDARI_DB_SERVER', 'localhost\\SQLEXPRESS'),
     'database': os.environ.get('FACTDARI_DB_NAME', 'FactDari'),
-    'trusted_connection': os.environ.get('FACTDARI_DB_TRUSTED', 'yes')
+    'trusted_connection': os.environ.get('FACTDARI_DB_TRUSTED', 'yes'),
+    # Optional ODBC driver override. Examples: 'ODBC Driver 18 for SQL Server', 'ODBC Driver 17 for SQL Server'
+    'driver': os.environ.get('FACTDARI_DB_DRIVER', 'SQL Server'),
+}
+
+# Idle timeout behavior (inactivity)
+# Seconds before considering the user idle (default: 300s = 5 minutes)
+IDLE_TIMEOUT_SECONDS = int(os.environ.get('FACTDARI_IDLE_TIMEOUT_SECONDS', '300'))
+# If true, also end the session when idle; otherwise just finalize current view
+IDLE_END_SESSION = os.environ.get('FACTDARI_IDLE_END_SESSION', 'true').lower() in ('1', 'true', 'yes', 'y')
+# If true, auto-navigate to Home on idle timeout (only if ending session)
+IDLE_NAVIGATE_HOME = os.environ.get('FACTDARI_IDLE_NAVIGATE_HOME', 'true').lower() in ('1', 'true', 'yes', 'y')
+
+# XP rewards and tuning (can be overridden via env vars)
+XP_CONFIG = {
+    # Base XP for review and time-based bonus
+    'review_base_xp': int(os.environ.get('FACTDARI_XP_REVIEW_BASE', '1')),
+    # Bonus XP: +1 for each N seconds after grace
+    'review_bonus_step_seconds': int(os.environ.get('FACTDARI_XP_REVIEW_BONUS_STEP_SECONDS', '5')),
+    # Grace before timing bonus starts
+    'review_grace_seconds': int(os.environ.get('FACTDARI_XP_REVIEW_GRACE_SECONDS', '2')),
+    # Max bonus increments added to base
+    'review_bonus_cap': int(os.environ.get('FACTDARI_XP_REVIEW_BONUS_CAP', '5')),
+
+    # Action XP
+    'xp_favorite': int(os.environ.get('FACTDARI_XP_FAVORITE', '1')),
+    'xp_known': int(os.environ.get('FACTDARI_XP_KNOWN', '10')),
+    'xp_add': int(os.environ.get('FACTDARI_XP_ADD', '2')),
+    'xp_edit': int(os.environ.get('FACTDARI_XP_EDIT', '1')),
+    'xp_delete': int(os.environ.get('FACTDARI_XP_DELETE', '0')),
+
+    # Daily check-in for streaks
+    'xp_daily_checkin': int(os.environ.get('FACTDARI_XP_DAILY_CHECKIN', '2')),
 }
 
 # UI Configuration
 UI_CONFIG = {
     # Window dimensions
-    'window_width': 510,
+    'window_width': 535,
     'window_height': 380,
     'window_static_pos': "-1927+7",
     'popup_position': "-1923+400",
     'popup_add_card_size': "496x400",
     'popup_edit_card_size': "496x520",
-    'popup_categories_size': "400x510",
+    'popup_categories_size': "400x520",
     'popup_info_size': "420x480",
+    # Dedicated width for the Achievements popup (slightly wider)
+    'popup_achievements_size': os.environ.get('FACTDARI_POPUP_ACHIEVEMENTS_SIZE', "518x480"),
     'popup_confirm_size': "360x180",
     'popup_rename_size': "420x200",
     'corner_radius': 15,
@@ -47,6 +77,9 @@ UI_CONFIG = {
     'yellow_color': "#FFC107",
     'gray_color': "#607D8B",
     'status_color': "#b66d20",
+    # Brand colors (for desktop widget branding)
+    'brand_fact_color': os.environ.get('FACTDARI_BRAND_FACT_COLOR', "#34d399"),
+    'brand_dari_color': os.environ.get('FACTDARI_BRAND_DARI_COLOR', "#38bdf8"),
     
     # Fonts
     'font_family': "Trebuchet MS",
@@ -57,45 +90,19 @@ UI_CONFIG = {
     'stats_font_size': 9
 }
 
-# Chart.js Configuration - NEW SECTION
-CHART_CONFIG = {
-    # Chart colors
-    'colors': [
-        '#4CAF50', '#2196F3', '#FFC107', '#F44336', '#9C27B0', 
-        '#00BCD4', '#FF9800', '#795548', '#607D8B', '#E91E63'
-    ],
-    
-    # Font settings
-    'font_family': "Trebuchet MS",
-    'axis_title_size': 16,      # Larger font for axis titles
-    'axis_tick_size': 14,       # Larger font for axis tick labels
-    'legend_font_size': 14,     # Font size for chart legends
-    'tooltip_title_size': 14,   # Font size for tooltip titles
-    'tooltip_body_size': 13,    # Font size for tooltip content
-    
-    # Other chart settings
-    'point_radius': 5,
-    'hover_point_radius': 7,
-    'line_thickness': 2,
-    'grid_color': 'rgba(255, 255, 255, 0.1)',
-    'text_color': 'white'
-}
 
 # Helper functions
-def get_image_path(image_name):
-    """Get path to application images"""
-    return os.path.join(APPLICATION_IMAGES_DIR, image_name)
-
 def get_icon_path(icon_name):
     """Get path to application icons"""
     return os.path.join(ICONS_DIR, icon_name)
 
 def get_connection_string():
+    driver = DB_CONFIG.get('driver', 'SQL Server')
     return (
-        r'DRIVER={SQL Server};'
-        f"SERVER={DB_CONFIG['server']};"
-        f"DATABASE={DB_CONFIG['database']};"
-        f"Trusted_Connection={DB_CONFIG['trusted_connection']};"
+        "DRIVER={%s};" % driver
+        + f"SERVER={DB_CONFIG['server']};"
+        + f"DATABASE={DB_CONFIG['database']};"
+        + f"Trusted_Connection={DB_CONFIG['trusted_connection']};"
     )
 
 def get_font(font_type):
@@ -113,37 +120,23 @@ def get_font(font_type):
     else:
         return (UI_CONFIG['font_family'], UI_CONFIG['normal_font_size'])
 
-# NEW: Get chart configuration as JSON for JavaScript
-def get_chart_config_js():
-    """Return chart configuration as JavaScript code"""
-    js_code = """
-// Chart configuration from Python config
-const CHART_CONFIG = {
-    colors: %s,
-    fontFamily: "%s",
-    axisTitleSize: %d,
-    axisTickSize: %d,
-    legendFontSize: %d,
-    tooltipTitleSize: %d,
-    tooltipBodySize: %d,
-    pointRadius: %d,
-    hoverPointRadius: %d,
-    lineThickness: %d,
-    gridColor: '%s',
-    textColor: '%s'
-};
-""" % (
-        CHART_CONFIG['colors'],
-        CHART_CONFIG['font_family'],
-        CHART_CONFIG['axis_title_size'],
-        CHART_CONFIG['axis_tick_size'],
-        CHART_CONFIG['legend_font_size'],
-        CHART_CONFIG['tooltip_title_size'],
-        CHART_CONFIG['tooltip_body_size'],
-        CHART_CONFIG['point_radius'],
-        CHART_CONFIG['hover_point_radius'],
-        CHART_CONFIG['line_thickness'],
-        CHART_CONFIG['grid_color'],
-        CHART_CONFIG['text_color']
-    )
-    return js_code
+# (no chart config helpers are needed; Chart.js is configured in the template)
+
+# Leveling configuration (makes Level 100 total XP adjustable and early band sizes tunable)
+LEVELING_CONFIG = {
+    # Total XP required to reach Level 100 (used to fit constant and final steps)
+    'total_xp_l100': int(os.environ.get('FACTDARI_LEVEL_TOTAL_XP_L100', '1000000')),
+
+    # Early bands (inclusive end levels and per-level step sizes)
+    'band1_end': int(os.environ.get('FACTDARI_LEVEL_BAND1_END', '4')),
+    'band1_step': int(os.environ.get('FACTDARI_LEVEL_BAND1_STEP', '100')),
+    'band2_end': int(os.environ.get('FACTDARI_LEVEL_BAND2_END', '9')),
+    'band2_step': int(os.environ.get('FACTDARI_LEVEL_BAND2_STEP', '500')),
+    'band3_end': int(os.environ.get('FACTDARI_LEVEL_BAND3_END', '14')),
+    'band3_step': int(os.environ.get('FACTDARI_LEVEL_BAND3_STEP', '1000')),
+    'band4_end': int(os.environ.get('FACTDARI_LEVEL_BAND4_END', '19')),
+    'band4_step': int(os.environ.get('FACTDARI_LEVEL_BAND4_STEP', '5000')),
+
+    # End of the constant step band (start is band4_end + 1; final step is at level 99)
+    'const_end': int(os.environ.get('FACTDARI_LEVEL_CONST_END', '98')),
+}

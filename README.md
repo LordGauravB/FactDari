@@ -1,95 +1,182 @@
-# MemoDari
+# FactDari
 
-A feature-rich desktop widget application for learning through flashcards, powered by the Free Spaced Repetition System (FSRS) algorithm. MemoDari can be configured to launch at startup, making it seamlessly integrate into your daily routine.
+A lightweight desktop widget application for displaying and managing facts, designed to help you learn and review information throughout your day. FactDari sits on your desktop and provides quick access to categorized facts with built-in analytics tracking.
 
 ## Features
 
-- **Smart Flashcard Learning**: Implements FSRS algorithm for optimized learning schedules
-- **Rich Analytics Dashboard**: Track your learning progress with detailed visualizations
-- **Category & Tag Management**: Organize your cards for better recall
-- **Customizable Interface**: Dark theme with persistent window positioning
-- **Text-to-Speech**: Audio support for better learning retention
-- **Difficulty Tracking**: Monitor stability and difficulty for each card
-- **Desktop Widget**: Runs as a desktop widget that can be configured to launch at startup
+- **Desktop Widget Interface**: Minimal, always-accessible widget that stays on your desktop
+- **Category Management**: Organize facts into categories for better organization
+- **Favorites System**: Mark important facts as favorites for quick access
+- **Knowledge Tracking**: Mark facts as "Known" or "Not Known" to track your learning progress
+- **Review Tracking**: Automatically tracks when and how often you review each fact
+- **Text-to-Speech**: Listen to facts with built-in TTS support
+- **Analytics Dashboard**: Web-based analytics to visualize your learning patterns
+- **Gamification**: XP, levels, daily streaks, and unlockable achievements
+- **Navigation Controls**: Easy navigation through facts with previous/next buttons
+- **Search & Filter**: Filter facts by category, favorites, or knowledge status
+- **Dark Theme**: Eye-friendly dark interface with customizable transparency
 
-## Screenshots
+## Key Functionality
 
-1. Main flashcard interface
-   
-   1.1 Home/Landing
-   
-   <p align="center">
-   <img src="Resources/application_images/landing.png" alt="Home Interface">
-   </p>
-   
-   1.2 Learning UI
-   
-   <p align="center">
-   <img src="Resources/application_images/learning.png" alt="Learning Interface">
-   </p>
+### Main Application
+- View random facts or navigate sequentially through your collection
+- Add, edit, and delete facts directly from the widget
+- Mark facts as favorites or known/unknown
+- Category-based filtering
+- Speech synthesis for audio learning
+- Automatic review logging
+- Click the level text to view achievements
 
-2. Analytics dashboard
-   
-   <p align="center">
-   <img src="Resources/application_images/analytics_dashboard.png" alt="Analytics Dashboard">
-   </p>
+### Analytics Dashboard
+- Category distribution charts
+- Daily review activity tracking
+- Most and least reviewed facts
+- Review patterns over time
+- Favorite facts statistics
+- Knowledge progress tracking
+- Interactive charts with Chart.js
 
-
-3. Card management screen
-   
-   3.1 Add Card
-   <p align="center">
-   <img src="Resources/application_images/add_card.png" alt="Add Card">
-   </p>
-   
-   3.2 Edit Card
-   <p align="center">
-   <img src="Resources/application_images/edit_card.png" alt="Edit Card">
-   </p>
-   
-   3.3 Delete Card
-   <p align="center">
-   <img src="Resources/application_images/delete_card.png" alt="Delete Card">
-   </p>
 ## Installation
 
 1. Clone this repository
-2. Install requirements:
+2. Install required Python packages:
    ```
-   pip install -r util/requirements.txt
+   pip install -r util/requirements_factdari.txt
    ```
-3. Configure your database settings in `config.py`
-4. Run the application:
+3. Set up the SQL Server database using the script in `database_setup/factdari_setup.sql`
+4. Configure your database connection in `config.py`
+5. Run the application:
    ```
-   python memodari.py
-   ```
-5. To set up automatic startup, use the VBS script in the util folder
-
-   For Windows users, you can use the included batch script:
-   ```
-   util/MemoDari.bat
+   python factdari.py
    ```
 
 ## Usage
 
-- **Add Flashcards**: Click the '+' button to create new cards
-- **Review Cards**: The application will present cards due for review based on FSRS algorithm
-- **Rate Difficulty**: After reviewing a card, rate how difficult it was to recall
-- **Track Progress**: Use the analytics tab to monitor your learning journey
-wh
+### Main Widget
+- **Home Page**: Shows statistics and quick actions
+- **View Facts**: Click "Show Random Fact" or use navigation arrows
+- **Add Facts**: Click the "+" button to add new facts
+- **Edit/Delete**: Use the edit and delete buttons when viewing a fact
+- **Mark Favorite**: Toggle the star icon to mark/unmark favorites
+- **Mark Known**: Use the checkmark to track your knowledge progress
+- **Filter**: Use the category dropdown to filter facts
+- **Listen**: Click the speaker icon for text-to-speech
+
+### Analytics
+- Run the analytics server:
+  ```
+  python analytics_factdari.py
+  ```
+- Open your browser to `http://localhost:5000`
+- View comprehensive statistics about your fact review patterns
+
+### Startup Configuration
+For Windows users, use the VBS script to configure automatic startup:
+```
+util/RunFactDari.vbs
+```
+
 ## Technical Details
 
-- Built with Python and tkinter for the UI
-- SQL Server database backend
-- Implements the FSRS algorithm for spaced repetition learning
-- Modern UI with responsive design elements
+- **Frontend**: Python tkinter for the desktop widget
+- **Backend**: SQL Server database for fact storage
+- **Analytics**: Flask web server with Chart.js visualizations
+- **Speech**: pyttsx3 for text-to-speech functionality
+- **Configuration**: Centralized config.py for all settings
+- **Gamification**: SQL-backed XP/levels, daily streak tracking, and achievements (see `gamification.py`)
 
-## Future Enhancements
+## Database Schema
 
-- Cloud synchronization
-- Mobile companion app
-- Import/export functionality
-- User accounts for multi-user support
+- **Facts**: Stores fact content, category, review count, and metadata
+- **Categories**: Manages fact categories
+- **ReviewLogs**: Tracks all fact review events
+- **Preferences**: Stores user preferences and settings
+
+## Configuration
+
+Edit `config.py` to customize:
+- Database connection settings
+- Database driver override via `FACTDARI_DB_DRIVER` (e.g., `ODBC Driver 17 for SQL Server`)
+- Window dimensions and positioning
+- Color schemes
+- Font settings
+- UI element sizes
+- Inactivity timeout behavior
+- XP reward tuning
+
+### Inactivity Timeout
+- `FACTDARI_IDLE_TIMEOUT_SECONDS` (default: `300`): seconds of no input before the app considers you idle.
+- `FACTDARI_IDLE_END_SESSION` (default: `true`): when idle, end the active session as timed out. If set to `false`, only the current fact view is finalized as timed out and the session remains open.
+
+### XP Rewards
+- `FACTDARI_XP_REVIEW_BASE` (default: `1`): base XP per completed view
+- `FACTDARI_XP_REVIEW_GRACE_SECONDS` (default: `2`): seconds before counting a view
+- `FACTDARI_XP_REVIEW_BONUS_STEP_SECONDS` (default: `5`): +1 XP per step beyond grace
+- `FACTDARI_XP_REVIEW_BONUS_CAP` (default: `5`): max time-based bonus
+- `FACTDARI_XP_FAVORITE` (default: `1`), `FACTDARI_XP_KNOWN` (default: `10`), `FACTDARI_XP_ADD` (default: `2`), `FACTDARI_XP_EDIT` (default: `1`), `FACTDARI_XP_DELETE` (default: `0`)
+- `FACTDARI_XP_DAILY_CHECKIN` (default: `2`): XP on daily streak check-in
+
+### Leveling Configuration
+- `FACTDARI_LEVEL_TOTAL_XP_L100` (default: `1000000`): total XP to reach Level 100
+- `FACTDARI_LEVEL_BAND1_END` (default: `4`): last level of band 1
+- `FACTDARI_LEVEL_BAND1_STEP` (default: `100`): XP per level for band 1
+- `FACTDARI_LEVEL_BAND2_END` (default: `9`): last level of band 2
+- `FACTDARI_LEVEL_BAND2_STEP` (default: `500`): XP per level for band 2
+- `FACTDARI_LEVEL_BAND3_END` (default: `14`): last level of band 3
+- `FACTDARI_LEVEL_BAND3_STEP` (default: `1000`): XP per level for band 3
+- `FACTDARI_LEVEL_BAND4_END` (default: `19`): last level of band 4
+- `FACTDARI_LEVEL_BAND4_STEP` (default: `5000`): XP per level for band 4
+- `FACTDARI_LEVEL_CONST_END` (default: `98`): end level of the constant step band (start is `BAND4_END+1`; final step is at 99)
+
+## How XP Works
+
+- Per-view reviews: Awards XP when you finish viewing a fact and move away or the view is finalized by inactivity.
+  - Base: +1 XP after a short grace (default 2s).
+  - Time bonus: +1 for each additional step (default 5s) after grace, capped (default +5).
+  - Max per view with defaults: 6 XP (1 base + 5 bonus).
+- Daily check-in: The first time you start a reviewing session on a new day, you gain daily XP (default +2) and the app evaluates streak achievements (3, 7, 14, 30, 60, 90, 180, 365 days).
+- Actions: Small XP for common actions.
+  - Favorite (mark ON): +1 XP (default).
+  - Known (mark ON): +10 XP (default).
+  - Add fact: +2 XP (default).
+  - Edit fact: +1 XP (default).
+  - Delete fact: +0 XP (default).
+  - Note: These award when toggled/triggered; they are not 'first-time only' by default.
+- Achievements: Unlock thresholds grant additional XP automatically across categories (known, favorites, reviews, adds, edits, deletes, streak). If you jump past multiple thresholds, you receive all applicable rewards.
+- Leveling:
+  - Level step sizes are designed to total exactly 1,000,000 XP at Level 100 (configurable via env):
+    - Level 1-4: +100 XP per level (FACTDARI_LEVEL_BAND1_STEP)
+    - Level 5-9: +500 XP per level (FACTDARI_LEVEL_BAND2_STEP)
+    - Level 10-14: +1000 XP per level (FACTDARI_LEVEL_BAND3_STEP)
+    - Level 15-19: +5000 XP per level (FACTDARI_LEVEL_BAND4_STEP)
+    - Level 20-98: constant step automatically fitted so that the total is exactly `FACTDARI_LEVEL_TOTAL_XP_L100`
+    - Level 99->100: final step equals the exact remainder to hit the target total
+  - Level 100 is gated - your stored Level stays at 99 until all achievements are unlocked, even if you meet the XP target.
+
+All values are configurable via environment variables listed in "XP Rewards" above.
+## Making This Repo Public
+
+Before making the repository public:
+
+- Hide local environment folders:
+  - A `.gitignore` has been added to exclude `.venv/`, `__pycache__/`, editor folders, etc. If `.venv/` was already committed, untrack it with:
+    - `git rm -r --cached .venv`
+    - `git commit -m "chore: stop tracking .venv"`
+- Database host defaults:
+  - Default DB server changed to `localhost\SQLEXPRESS`. Set environment variables to point to your own SQL Server if different.
+- Email privacy:
+  - Your past commits may include your email in Git metadata. Consider enabling GitHub email privacy and using your noreply address for future commits.
+- Assets and licenses:
+  - Ensure all images in `Resources/` are yours or properly licensed.
+- Debug mode:
+  - `analytics_factdari.py` runs the Flask app in debug for local use. Do not expose this publicly.
+
+## Requirements
+
+- Python 3.7+
+- SQL Server (or SQL Server Express)
+- Windows OS (for desktop widget functionality)
+- Required Python packages (see requirements_factdari.txt)
 
 ## License
 
@@ -97,4 +184,4 @@ wh
 
 ---
 
-*Note: MemoDari is a mini-project created for educational purposes.*
+*FactDari - Your daily companion for fact-based learning*

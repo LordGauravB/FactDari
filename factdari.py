@@ -10,13 +10,14 @@ import pyttsx3
 import webbrowser
 import subprocess
 import tkinter as tk
-import json
 import random
 import threading
 from ctypes import wintypes
 from PIL import Image, ImageTk
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from tkinter import ttk, simpledialog, messagebox
+from tkinter import font as tkfont
+import gamification
 
 class ToolTip:
     """Lightweight tooltip for Tk widgets."""
@@ -80,6 +81,7 @@ class FactDariApp:
         self.POPUP_EDIT_CARD_SIZE = config.UI_CONFIG['popup_edit_card_size']
         self.POPUP_CATEGORIES_SIZE = config.UI_CONFIG['popup_categories_size']
         self.POPUP_INFO_SIZE = config.UI_CONFIG.get('popup_info_size', "420x480")
+        self.POPUP_ACHIEVEMENTS_SIZE = config.UI_CONFIG.get('popup_achievements_size', self.POPUP_INFO_SIZE)
         self.POPUP_CONFIRM_SIZE = config.UI_CONFIG.get('popup_confirm_size', "360x180")
         self.POPUP_RENAME_SIZE = config.UI_CONFIG.get('popup_rename_size', "420x200")
         self.CORNER_RADIUS = config.UI_CONFIG['corner_radius']
@@ -95,6 +97,9 @@ class FactDariApp:
         self.YELLOW_COLOR = config.UI_CONFIG['yellow_color']
         self.GRAY_COLOR = config.UI_CONFIG['gray_color']
         self.STATUS_COLOR = config.UI_CONFIG['status_color']
+        # Brand colors for welcome page
+        self.BRAND_FACT_COLOR = config.UI_CONFIG.get('brand_fact_color', '#34d399')
+        self.BRAND_DARI_COLOR = config.UI_CONFIG.get('brand_dari_color', '#38bdf8')
         
         # Fonts
         self.TITLE_FONT = config.get_font('title')
@@ -111,15 +116,46 @@ class FactDariApp:
         self.all_facts = []  # Store all facts for navigation
         self.current_fact_index = 0
         self.current_fact_is_favorite = False  # Track if current fact is a favorite
+        self.current_fact_is_easy = False  # Track if current fact is known/easy
         # Speech state
-        self.speech_engine = pyttsx3.init()
+        self.speech_engine = None  # not used for playback; preserved for future config
         self.speaking_thread = None
+        self.active_tts_engine = None  # engine instance used by the current speech thread
+
+        # Timing/session state
+        self.current_session_id = None
+        self.session_start_time = None
+        self.current_fact_start_time = None
+        self.current_review_log_id = None
+        # Timer pause state (exclude non-review time like add/edit/delete dialogs)
+        self.timer_paused = False
+        self.pause_started_at = None
+        # Inactivity tracking
+        self.idle_timeout_seconds = getattr(config, 'IDLE_TIMEOUT_SECONDS', 300)
+        self.idle_end_session = getattr(config, 'IDLE_END_SESSION', True)
+        self.idle_navigate_home = getattr(config, 'IDLE_NAVIGATE_HOME', True)
+        self.last_activity_time = datetime.now()
+        self.idle_triggered = False
         
         # Create main window
         self.root = tk.Tk()
         self.root.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
         self.root.overrideredirect(True)
         self.root.configure(bg=self.BG_COLOR)
+
+        # Ensure DB schema supports sessions + durations
+        try:
+            self.ensure_schema()
+        except Exception as _:
+            # Non-fatal: app can still run without migrations
+            pass
+        
+        # Initialize gamification helper (profile + achievements)
+        try:
+            self.gamify = gamification.Gamification(self.CONN_STR)
+            self.gamify.ensure_profile()
+        except Exception:
+            self.gamify = None
         
         # Set up UI elements
         self.setup_ui()
@@ -136,18 +172,32 @@ class FactDariApp:
         self.set_static_position()
         self.update_coordinates()
         self.root.after(250, self.update_ui)
-        
+
         # Show the home page
         self.show_home_page()
+
+        # Ensure we close any active session at process exit
+        try:
+            atexit.register(self.end_active_session)
+        except Exception:
+            pass
     
     def load_categories(self):
         """Load categories for the dropdown"""
         query = "SELECT DISTINCT CategoryName FROM Categories WHERE IsActive = 1 ORDER BY CategoryName"
         categories = self.fetch_query(query)
-        category_names = [category[0] for category in categories] if categories else []
-        category_names.insert(0, "All Categories")  # Add All Categories option
-        category_names.insert(1, "Favorites")  # Add Favorites option
-        return category_names
+        base_categories = [category[0] for category in categories] if categories else []
+
+        # Build header filters deterministically
+        header = ["All Categories", "Favorites"]
+        try:
+            has_is_easy = self.column_exists('Facts', 'IsEasy')
+        except Exception:
+            has_is_easy = False
+        if has_is_easy:
+            header += ["Known", "Not Known"]
+        header += ["Not Favorite"]
+        return header + base_categories
 
     def setup_ui(self):
         """Set up all UI elements"""
@@ -199,11 +249,45 @@ class FactDariApp:
         # Fact display
         self.fact_frame = tk.Frame(self.content_frame, bg=self.BG_COLOR)
         self.fact_frame.pack(side="top", fill="both", expand=True, pady=5)
-        
+
         # Add top padding to push content down
         self.padding_frame = tk.Frame(self.fact_frame, bg=self.BG_COLOR, height=30)
         self.padding_frame.pack(side="top", fill="x")
-        
+
+        # Brand header for Home (Fact light green, Dari sky blue)
+        self.brand_frame = tk.Frame(self.fact_frame, bg=self.BG_COLOR)
+        # Render the entire header on a single Canvas for perfect baseline alignment
+        brand_font = tkfont.Font(
+            family=self.LARGE_FONT[0],
+            size=self.LARGE_FONT[1],
+            weight=('bold' if len(self.LARGE_FONT) > 2 else 'normal')
+        )
+        prefix_text = "Welcome to "
+        fact_text = "Fact"
+        dari_text = "Dari"
+        w_prefix = brand_font.measure(prefix_text)
+        w_fact = brand_font.measure(fact_text)
+        w_dari = brand_font.measure(dari_text)
+        total_width = w_prefix + w_fact + w_dari
+        line_height = brand_font.metrics('linespace')
+        self.brand_canvas = tk.Canvas(
+            self.brand_frame,
+            bg=self.BG_COLOR,
+            highlightthickness=0,
+            bd=0,
+            width=total_width,
+            height=line_height
+        )
+        # Draw all segments aligned to top-left so they share the same baseline
+        x = 0
+        y = 0
+        self.brand_canvas.create_text(x, y, text=prefix_text, anchor='nw', fill=self.TEXT_COLOR, font=brand_font)
+        x += w_prefix
+        self.brand_canvas.create_text(x, y, text=fact_text, anchor='nw', fill=self.BRAND_FACT_COLOR, font=brand_font)
+        x += w_fact
+        self.brand_canvas.create_text(x, y, text=dari_text, anchor='nw', fill=self.BRAND_DARI_COLOR, font=brand_font)
+        self.brand_canvas.pack(side='left', padx=0)
+
         self.fact_label = tk.Label(self.fact_frame, text="Welcome to FactDari!", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
                                   font=self.LARGE_FONT, wraplength=450, justify="center")
         self.fact_label.pack(side="top", fill="both", expand=True, padx=10, pady=10)
@@ -285,7 +369,14 @@ class FactDariApp:
         self.graph_button = tk.Button(self.fact_frame, image=self.graph_icon, bg=self.BG_COLOR, command=self.show_analytics, 
                                 cursor="hand2", borderwidth=0, highlightthickness=0)
         self.graph_button.place(relx=1.0, rely=0, anchor="ne", x=-30, y=5)
-        
+
+        # Add easy/known button (left of the star)
+        self.easy_button = tk.Button(self.fact_frame, image=self.easy_icon, bg=self.BG_COLOR, command=self.toggle_easy,
+                                cursor="hand2", borderwidth=0, highlightthickness=0)
+        # Temporarily assign icon after loading icons
+        # Will be placed/hidden depending on current screen
+        self.easy_button.place(relx=1.0, rely=0, anchor="ne", x=-80, y=5)
+
         # Add star/favorite button (leftmost of the top-right icons)
         self.star_button = tk.Button(self.fact_frame, image=self.white_star_icon, bg=self.BG_COLOR, command=self.toggle_favorite, 
                                 cursor="hand2", borderwidth=0, highlightthickness=0)
@@ -295,6 +386,16 @@ class FactDariApp:
         self.info_button = tk.Button(self.fact_frame, image=self.info_icon, bg=self.BG_COLOR, command=self.show_shortcuts_window,
                                 cursor="hand2", borderwidth=0, highlightthickness=0)
         # Initially not placed; placed when showing home page
+
+        # Level label: show next to Home icon (top-left), clickable for Achievements
+        self.level_label = tk.Label(self.fact_frame, text="Level 1 - 0 XP", fg=self.GREEN_COLOR, bg=self.BG_COLOR,
+                                    font=self.STATS_FONT, cursor="hand2")
+        # Place to the right of the Home icon (20px wide) with padding
+        self.level_label.place(x=32, y=7)
+        try:
+            self.level_label.bind("<Button-1>", lambda e: self.show_achievements_window())
+        except Exception:
+            pass
         
         # Bottom stats frame
         self.stats_frame = tk.Frame(self.root, bg=self.BG_COLOR)
@@ -333,6 +434,12 @@ class FactDariApp:
         self.white_star_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("White-Star.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.gold_star_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("Gold-Star.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.info_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("info.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        # Easy/known icons
+        self.easy_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("easy.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        self.easy_gold_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("easy-gold.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        # Apply default to button if it exists
+        if hasattr(self, 'easy_button') and self.easy_button:
+            self.easy_button.config(image=self.easy_icon)
     
     def bind_events(self):
         """Bind all event handlers"""
@@ -342,6 +449,9 @@ class FactDariApp:
         self.root.bind("<FocusOut>", lambda event: self.root.attributes('-alpha', 0.7))
         self.root.bind("<s>", self.set_static_position)
         self.category_dropdown.bind("<<ComboboxSelected>>", self.on_category_change)
+        # Global input to detect activity
+        self.root.bind_all('<Any-KeyPress>', lambda e: self.record_activity())
+        self.root.bind_all('<Button>', lambda e: self.record_activity())
         
         # Keyboard shortcuts for navigation and actions
         self.root.bind("<Left>", lambda e: self.show_previous_fact())
@@ -356,6 +466,7 @@ class FactDariApp:
         self.root.bind("g", lambda e: self.show_analytics())
         self.root.bind("c", lambda e: self.manage_categories())
         self.root.bind("f", lambda e: self.toggle_favorite())  # Shortcut for favorite
+        self.root.bind("k", lambda e: self.toggle_easy())  # Shortcut for known/easy
     
     def apply_rounded_corners(self, radius=None):
         """Apply rounded corners to the window"""
@@ -375,13 +486,15 @@ class FactDariApp:
             ToolTip(self.home_button, "Home (h)")
             ToolTip(self.speaker_button, "Speak text")
             ToolTip(self.star_button, "Toggle favorite (f)")
+            ToolTip(self.easy_button, "Mark as known (k)")
             ToolTip(self.graph_button, "Analytics (g)")
             ToolTip(self.info_button, "Show shortcuts")
             ToolTip(self.add_icon_button, "Add fact (a)")
             ToolTip(self.edit_icon_button, "Edit fact (e)")
             ToolTip(self.delete_icon_button, "Delete fact (d)")
-            ToolTip(self.prev_button, "Previous (←)")
-            ToolTip(self.next_button, "Next (→)")
+            ToolTip(self.prev_button, "Previous (<-)")
+            ToolTip(self.next_button, "Next (->)")
+            ToolTip(self.level_label, "Click for achievements")
         except Exception:
             pass
 
@@ -421,6 +534,102 @@ class FactDariApp:
         row("Static Position", "s")
 
         tk.Button(win, text="Close", command=win.destroy, bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5).pack(pady=10)
+
+    def show_achievements_window(self):
+        """Display achievements, status, and progress."""
+        if not getattr(self, 'gamify', None):
+            try:
+                self.status_label.config(text="Gamification unavailable", fg=self.STATUS_COLOR)
+                self.clear_status_after_delay(2000)
+            except Exception:
+                pass
+            return
+        win = tk.Toplevel(self.root)
+        win.title("Achievements")
+        try:
+            win.geometry(f"{self.POPUP_ACHIEVEMENTS_SIZE}{self.POPUP_POSITION}")
+        except Exception:
+            win.geometry(self.POPUP_ACHIEVEMENTS_SIZE)
+        win.configure(bg=self.BG_COLOR)
+
+        header = tk.Label(win, text="Achievements", fg=self.TEXT_COLOR, bg=self.BG_COLOR, font=self.TITLE_FONT)
+        header.pack(pady=(10, 4))
+        sub = tk.Label(win, text="Click a column to resize. New (unseen) unlocks show green.", fg=self.STATUS_COLOR, bg=self.BG_COLOR, font=self.SMALL_FONT)
+        sub.pack()
+
+        # Treeview for achievements (with scrollbars so all columns are accessible even on small widths)
+        cols = ("Status", "Name", "Category", "Progress", "Reward")
+        table_frame = tk.Frame(win, bg=self.BG_COLOR)
+        table_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        # Use grid to position tree + scrollbars
+        try:
+            table_frame.grid_rowconfigure(0, weight=1)
+            table_frame.grid_columnconfigure(0, weight=1)
+        except Exception:
+            pass
+        tree = ttk.Treeview(table_frame, columns=cols, show='headings', height=16)
+        for c, w in (("Status", 80), ("Name", 220), ("Category", 90), ("Progress", 120), ("Reward", 70)):
+            tree.heading(c, text=c)
+            tree.column(c, width=w, anchor='w')
+        # Scrollbars
+        vsb = ttk.Scrollbar(table_frame, orient='vertical', command=tree.yview)
+        hsb = ttk.Scrollbar(table_frame, orient='horizontal', command=tree.xview)
+        tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        # Layout
+        try:
+            tree.grid(row=0, column=0, sticky='nsew')
+            vsb.grid(row=0, column=1, sticky='ns')
+            hsb.grid(row=1, column=0, sticky='ew')
+        except Exception:
+            # Fallback to pack if grid unavailable for any reason
+            tree.pack(fill='both', expand=True)
+            vsb.pack(side='right', fill='y')
+            hsb.pack(side='bottom', fill='x')
+
+        # Fetch and populate
+        try:
+            data = self.gamify.get_achievements_with_status()
+        except Exception:
+            data = []
+        for row in data:
+            unlocked = row.get('Unlocked')
+            notified = bool(row.get('Notified'))
+            name = row.get('Name')
+            category = row.get('Category')
+            threshold = int(row.get('Threshold', 0))
+            reward = int(row.get('RewardXP', 0))
+            progress = int(row.get('ProgressCurrent', 0))
+            status_text = "Unlocked" if unlocked else "Locked"
+            prog_text = f"{min(progress, threshold)}/{threshold}"
+            vals = (status_text, name, category, prog_text, f"{reward} XP")
+            iid = tree.insert('', 'end', values=vals)
+            # Color only new (unseen) unlocks
+            try:
+                if unlocked and not notified:
+                    tree.item(iid, tags=('new_unlock',))
+            except Exception:
+                pass
+        try:
+            tree.tag_configure('new_unlock', foreground=self.GREEN_COLOR)
+        except Exception:
+            pass
+
+        # Buttons
+        btns = tk.Frame(win, bg=self.BG_COLOR)
+        btns.pack(pady=(0, 10))
+
+        def mark_seen():
+            try:
+                self.gamify.mark_all_unnotified_as_notified()
+                self.status_label.config(text="Marked new unlocks as seen", fg=self.STATUS_COLOR)
+                self.clear_status_after_delay(2000)
+            except Exception:
+                pass
+
+        tk.Button(btns, text="Mark New Unlocks Seen", command=mark_seen,
+                  bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5).pack(side='left', padx=6)
+        tk.Button(btns, text="Close", command=win.destroy,
+                  bg=self.GRAY_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5).pack(side='left', padx=6)
 
     def confirm_dialog(self, title, message, ok_text="OK", cancel_text="Cancel"):
         """Custom modal confirmation dialog positioned via UI config. Returns True/False."""
@@ -516,6 +725,36 @@ class FactDariApp:
         except Exception as e:
             print(f"Database error in fetch_query: {e}")
             return []
+
+    def table_exists(self, table_name):
+        """Check if a table exists in the database (SQL Server)."""
+        try:
+            rows = self.fetch_query(
+                """
+                SELECT 1
+                FROM sys.tables
+                WHERE Name = ? AND schema_id = SCHEMA_ID('dbo')
+                """,
+                (table_name,)
+            )
+            return bool(rows)
+        except Exception:
+            return False
+
+    def column_exists(self, table_name, column_name):
+        """Check if a column exists in the given table (SQL Server)."""
+        try:
+            rows = self.fetch_query(
+                """
+                SELECT 1
+                FROM sys.columns
+                WHERE Name = ? AND Object_ID = OBJECT_ID(?)
+                """,
+                (column_name, f"dbo.{table_name}")
+            )
+            return bool(rows)
+        except Exception:
+            return False
     
     def execute_update(self, query, params=None):
         """Execute an UPDATE/INSERT/DELETE query with no return value"""
@@ -531,6 +770,293 @@ class FactDariApp:
         except Exception as e:
             print(f"Database error in execute_update: {e}")
             return False
+
+    def execute_insert_return_id(self, query, params=None):
+        """Execute an INSERT with OUTPUT ... RETURNING pattern and return the new ID."""
+        try:
+            with pyodbc.connect(self.CONN_STR) as conn:
+                with conn.cursor() as cursor:
+                    if params:
+                        cursor.execute(query, params)
+                    else:
+                        cursor.execute(query)
+                    row = cursor.fetchone()
+                    conn.commit()
+                    return row[0] if row else None
+        except Exception as e:
+            print(f"Database error in execute_insert_return_id: {e}")
+            return None
+
+    def ensure_schema(self):
+        """Create missing tables/columns for sessions and per-view durations."""
+        ddl = """
+        /* Create ReviewSessions if missing */
+        IF OBJECT_ID('dbo.ReviewSessions','U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.ReviewSessions (
+                SessionID INT IDENTITY(1,1) PRIMARY KEY,
+                StartTime DATETIME NOT NULL,
+                EndTime DATETIME NULL,
+                DurationSeconds INT NULL,
+                TimedOut BIT NOT NULL CONSTRAINT DF_ReviewSessions_TimedOut DEFAULT 0
+            );
+        END;
+
+        /* Ensure ReviewLogs table exists */
+        IF OBJECT_ID('dbo.ReviewLogs','U') IS NULL
+        BEGIN
+            -- Create minimal ReviewLogs table if missing (defensive)
+            CREATE TABLE dbo.ReviewLogs (
+                ReviewLogID INT IDENTITY(1,1) PRIMARY KEY,
+                FactID INT NULL,
+                ReviewDate DATETIME NOT NULL
+            );
+        END;
+        
+        /* Ensure SessionDuration column exists for per-view timing */
+        IF COL_LENGTH('dbo.ReviewLogs','SessionDuration') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD SessionDuration INT NULL;
+        END;
+        /* Ensure per-view TimedOut flag exists */
+        IF COL_LENGTH('dbo.ReviewLogs','TimedOut') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD TimedOut BIT NOT NULL CONSTRAINT DF_ReviewLogs_TimedOut DEFAULT 0;
+        END;
+        /* Ensure session-level TimedOut flag exists */
+        IF COL_LENGTH('dbo.ReviewSessions','TimedOut') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewSessions ADD TimedOut BIT NOT NULL CONSTRAINT DF_ReviewSessions_TimedOut DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.ReviewLogs','SessionID') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD SessionID INT NULL;
+        END;
+        IF OBJECT_ID('dbo.FK_ReviewLogs_ReviewSessions','F') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs
+            ADD CONSTRAINT FK_ReviewLogs_ReviewSessions
+            FOREIGN KEY (SessionID) REFERENCES dbo.ReviewSessions(SessionID);
+        END;
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.indexes 
+            WHERE name = 'IX_ReviewLogs_SessionID' AND object_id = OBJECT_ID('dbo.ReviewLogs')
+        )
+        BEGIN
+            CREATE INDEX IX_ReviewLogs_SessionID ON dbo.ReviewLogs(SessionID);
+        END;
+
+        /* Add action tracking columns to ReviewLogs */
+        IF COL_LENGTH('dbo.ReviewLogs','Action') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD Action NVARCHAR(16) NOT NULL CONSTRAINT DF_ReviewLogs_Action DEFAULT 'view';
+        END;
+        IF COL_LENGTH('dbo.ReviewLogs','FactEdited') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD FactEdited BIT NOT NULL CONSTRAINT DF_ReviewLogs_FactEdited DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.ReviewLogs','FactDeleted') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD FactDeleted BIT NOT NULL CONSTRAINT DF_ReviewLogs_FactDeleted DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.ReviewLogs','FactContentSnapshot') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD FactContentSnapshot NVARCHAR(MAX) NULL;
+        END;
+        IF COL_LENGTH('dbo.ReviewLogs','CategoryIDSnapshot') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ADD CategoryIDSnapshot INT NULL;
+        END;
+
+        /* Add per-session action counters */
+        IF COL_LENGTH('dbo.ReviewSessions','FactsAdded') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewSessions ADD FactsAdded INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsAdded DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.ReviewSessions','FactsEdited') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewSessions ADD FactsEdited INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsEdited DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.ReviewSessions','FactsDeleted') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewSessions ADD FactsDeleted INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsDeleted DEFAULT 0;
+        END;
+
+        /* Ensure FK from ReviewLogs(FactID) to Facts is ON DELETE SET NULL (to preserve logs for deleted cards) */
+        IF EXISTS (
+            SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ReviewLogs_Facts'
+        )
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs DROP CONSTRAINT FK_ReviewLogs_Facts;
+        END;
+        /* Make FactID nullable to support SET NULL */
+        IF EXISTS (
+            SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ReviewLogs') AND name = 'FactID' AND is_nullable = 0
+        )
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs ALTER COLUMN FactID INT NULL;
+        END;
+        /* Recreate FK with SET NULL if not exists */
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ReviewLogs_Facts'
+        )
+        BEGIN
+            ALTER TABLE dbo.ReviewLogs WITH NOCHECK
+            ADD CONSTRAINT FK_ReviewLogs_Facts FOREIGN KEY (FactID)
+            REFERENCES dbo.Facts(FactID) ON DELETE SET NULL;
+        END;
+
+        /* Gamification core tables */
+        IF OBJECT_ID('dbo.GamificationProfile','U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.GamificationProfile (
+                ProfileID INT IDENTITY(1,1) PRIMARY KEY,
+                XP INT NOT NULL CONSTRAINT DF_GamificationProfile_XP DEFAULT 0,
+                Level INT NOT NULL CONSTRAINT DF_GamificationProfile_Level DEFAULT 1,
+                TotalReviews INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalReviews DEFAULT 0,
+                TotalKnown INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalKnown DEFAULT 0,
+                TotalFavorites INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalFavorites DEFAULT 0,
+                TotalAdds INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAdds DEFAULT 0,
+                TotalEdits INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalEdits DEFAULT 0,
+                TotalDeletes INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalDeletes DEFAULT 0,
+                CurrentStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_CurrentStreak DEFAULT 0,
+                LongestStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_LongestStreak DEFAULT 0,
+                LastCheckinDate DATE NULL
+            );
+        END;
+
+        IF OBJECT_ID('dbo.Achievements','U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.Achievements (
+                AchievementID INT IDENTITY(1,1) PRIMARY KEY,
+                Code NVARCHAR(64) NOT NULL UNIQUE,
+                Name NVARCHAR(200) NOT NULL,
+                Category NVARCHAR(32) NOT NULL,
+                Threshold INT NOT NULL,
+                RewardXP INT NOT NULL,
+                IsHidden BIT NOT NULL CONSTRAINT DF_Achievements_IsHidden DEFAULT 0,
+                CreatedDate DATETIME NOT NULL CONSTRAINT DF_Achievements_CreatedDate DEFAULT GETDATE()
+            );
+        END;
+
+        IF OBJECT_ID('dbo.AchievementUnlocks','U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.AchievementUnlocks (
+                UnlockID INT IDENTITY(1,1) PRIMARY KEY,
+                AchievementID INT NOT NULL
+                    CONSTRAINT FK_AchievementUnlocks_Achievements
+                    REFERENCES dbo.Achievements(AchievementID),
+                UnlockDate DATETIME NOT NULL CONSTRAINT DF_AchievementUnlocks_UnlockDate DEFAULT GETDATE(),
+                Notified BIT NOT NULL CONSTRAINT DF_AchievementUnlocks_Notified DEFAULT 0
+            );
+            CREATE UNIQUE INDEX UX_AchievementUnlocks_AchievementID ON dbo.AchievementUnlocks(AchievementID);
+        END;
+
+        /* Seed Achievements (insert any missing by Code) */
+            ;WITH Seeds (Code, Name, Category, Threshold, RewardXP) AS (
+                SELECT 'KNOWN_5','Know 5 facts','known',5,10 UNION ALL
+                SELECT 'KNOWN_10','Know 10 facts','known',10,15 UNION ALL
+                SELECT 'KNOWN_50','Know 50 facts','known',50,25 UNION ALL
+                SELECT 'KNOWN_100','Know 100 facts','known',100,50 UNION ALL
+                SELECT 'KNOWN_300','Know 300 facts','known',300,100 UNION ALL
+                SELECT 'KNOWN_500','Know 500 facts','known',500,150 UNION ALL
+                SELECT 'KNOWN_1000','Know 1000 facts','known',1000,250 UNION ALL
+                SELECT 'KNOWN_5000','Know 5000 facts','known',5000,600 UNION ALL
+                SELECT 'KNOWN_10000','Know 10000 facts','known',10000,1000 UNION ALL
+                SELECT 'KNOWN_30000','Know 30000 facts','known',30000,2500 UNION ALL
+                SELECT 'KNOWN_50000','Know 50000 facts','known',50000,4000 UNION ALL
+                SELECT 'KNOWN_100000','Know 100000 facts','known',100000,7000 UNION ALL
+
+                SELECT 'FAV_5','Favorite 5 facts','favorites',5,5 UNION ALL
+                SELECT 'FAV_10','Favorite 10 facts','favorites',10,10 UNION ALL
+                SELECT 'FAV_50','Favorite 50 facts','favorites',50,20 UNION ALL
+                SELECT 'FAV_100','Favorite 100 facts','favorites',100,40 UNION ALL
+                SELECT 'FAV_300','Favorite 300 facts','favorites',300,80 UNION ALL
+                SELECT 'FAV_500','Favorite 500 facts','favorites',500,120 UNION ALL
+                SELECT 'FAV_1000','Favorite 1000 facts','favorites',1000,200 UNION ALL
+                SELECT 'FAV_5000','Favorite 5000 facts','favorites',5000,500 UNION ALL
+                SELECT 'FAV_10000','Favorite 10000 facts','favorites',10000,900 UNION ALL
+                SELECT 'FAV_30000','Favorite 30000 facts','favorites',30000,2200 UNION ALL
+                SELECT 'FAV_50000','Favorite 50000 facts','favorites',50000,3500 UNION ALL
+                SELECT 'FAV_100000','Favorite 100000 facts','favorites',100000,6000 UNION ALL
+
+                SELECT 'REV_5','Review 5 times','reviews',5,10 UNION ALL
+                SELECT 'REV_10','Review 10 times','reviews',10,15 UNION ALL
+                SELECT 'REV_50','Review 50 times','reviews',50,25 UNION ALL
+                SELECT 'REV_100','Review 100 times','reviews',100,50 UNION ALL
+                SELECT 'REV_300','Review 300 times','reviews',300,100 UNION ALL
+                SELECT 'REV_500','Review 500 times','reviews',500,150 UNION ALL
+                SELECT 'REV_1000','Review 1000 times','reviews',1000,250 UNION ALL
+                SELECT 'REV_5000','Review 5000 times','reviews',5000,600 UNION ALL
+                SELECT 'REV_10000','Review 10000 times','reviews',10000,1000 UNION ALL
+                SELECT 'REV_30000','Review 30000 times','reviews',30000,2500 UNION ALL
+                SELECT 'REV_50000','Review 50000 times','reviews',50000,4000 UNION ALL
+                SELECT 'REV_100000','Review 100000 times','reviews',100000,7000 UNION ALL
+
+                SELECT 'ADD_5','Add 5 facts','adds',5,10 UNION ALL
+                SELECT 'ADD_10','Add 10 facts','adds',10,15 UNION ALL
+                SELECT 'ADD_50','Add 50 facts','adds',50,25 UNION ALL
+                SELECT 'ADD_100','Add 100 facts','adds',100,50 UNION ALL
+                SELECT 'ADD_300','Add 300 facts','adds',300,100 UNION ALL
+                SELECT 'ADD_500','Add 500 facts','adds',500,150 UNION ALL
+                SELECT 'ADD_1000','Add 1000 facts','adds',1000,250 UNION ALL
+                SELECT 'ADD_5000','Add 5000 facts','adds',5000,600 UNION ALL
+                SELECT 'ADD_10000','Add 10000 facts','adds',10000,1000 UNION ALL
+                SELECT 'ADD_30000','Add 30000 facts','adds',30000,2500 UNION ALL
+                SELECT 'ADD_50000','Add 50000 facts','adds',50000,4000 UNION ALL
+                SELECT 'ADD_100000','Add 100000 facts','adds',100000,7000 UNION ALL
+
+                SELECT 'EDIT_5','Edit 5 facts','edits',5,10 UNION ALL
+                SELECT 'EDIT_10','Edit 10 facts','edits',10,15 UNION ALL
+                SELECT 'EDIT_50','Edit 50 facts','edits',50,25 UNION ALL
+                SELECT 'EDIT_100','Edit 100 facts','edits',100,50 UNION ALL
+                SELECT 'EDIT_300','Edit 300 facts','edits',300,100 UNION ALL
+                SELECT 'EDIT_500','Edit 500 facts','edits',500,150 UNION ALL
+                SELECT 'EDIT_1000','Edit 1000 facts','edits',1000,250 UNION ALL
+                SELECT 'EDIT_5000','Edit 5000 facts','edits',5000,600 UNION ALL
+                SELECT 'EDIT_10000','Edit 10000 facts','edits',10000,1000 UNION ALL
+                SELECT 'EDIT_30000','Edit 30000 facts','edits',30000,2500 UNION ALL
+                SELECT 'EDIT_50000','Edit 50000 facts','edits',50000,4000 UNION ALL
+                SELECT 'EDIT_100000','Edit 100000 facts','edits',100000,7000 UNION ALL
+
+                SELECT 'DEL_5','Delete 5 facts','deletes',5,10 UNION ALL
+                SELECT 'DEL_10','Delete 10 facts','deletes',10,15 UNION ALL
+                SELECT 'DEL_50','Delete 50 facts','deletes',50,25 UNION ALL
+                SELECT 'DEL_100','Delete 100 facts','deletes',100,50 UNION ALL
+                SELECT 'DEL_300','Delete 300 facts','deletes',300,100 UNION ALL
+                SELECT 'DEL_500','Delete 500 facts','deletes',500,150 UNION ALL
+                SELECT 'DEL_1000','Delete 1000 facts','deletes',1000,250 UNION ALL
+                SELECT 'DEL_5000','Delete 5000 facts','deletes',5000,600 UNION ALL
+                SELECT 'DEL_10000','Delete 10000 facts','deletes',10000,1000 UNION ALL
+                SELECT 'DEL_30000','Delete 30000 facts','deletes',30000,2500 UNION ALL
+                SELECT 'DEL_50000','Delete 50000 facts','deletes',50000,4000 UNION ALL
+                SELECT 'DEL_100000','Delete 100000 facts','deletes',100000,7000 UNION ALL
+
+                /* Streaks */
+                SELECT 'STREAK_3','3-day review streak','streak',3,10 UNION ALL
+                SELECT 'STREAK_7','7-day review streak','streak',7,20 UNION ALL
+                SELECT 'STREAK_14','14-day review streak','streak',14,35 UNION ALL
+                SELECT 'STREAK_30','30-day review streak','streak',30,75 UNION ALL
+                SELECT 'STREAK_60','60-day review streak','streak',60,150 UNION ALL
+                SELECT 'STREAK_90','90-day review streak','streak',90,250 UNION ALL
+                SELECT 'STREAK_180','180-day review streak','streak',180,500 UNION ALL
+                SELECT 'STREAK_365','365-day review streak','streak',365,1000
+            )
+            INSERT INTO dbo.Achievements (Code, Name, Category, Threshold, RewardXP, IsHidden, CreatedDate)
+            SELECT s.Code, s.Name, s.Category, s.Threshold, s.RewardXP, 0, GETDATE()
+            FROM Seeds s
+            LEFT JOIN dbo.Achievements a ON a.Code = s.Code
+            WHERE a.AchievementID IS NULL;
+        
+
+        /* Ensure a single GamificationProfile row exists */
+        IF NOT EXISTS (SELECT 1 FROM dbo.GamificationProfile)
+        BEGIN
+            INSERT INTO dbo.GamificationProfile (XP, Level)
+            VALUES (0, 1);
+        END;
+        """
+        self.execute_update(ddl)
     
     def count_facts(self):
         """Count total facts in the database"""
@@ -540,13 +1066,35 @@ class FactDariApp:
     def get_facts_viewed_today(self):
         """Get count of unique facts viewed today"""
         today = datetime.now().strftime('%Y-%m-%d')
+        # Count only actual view actions (exclude add/edit/delete logs)
         query = """
-        SELECT COUNT(DISTINCT FactID) 
-        FROM ReviewLogs 
+        SELECT COUNT(DISTINCT FactID)
+        FROM ReviewLogs
         WHERE CONVERT(date, ReviewDate) = CONVERT(date, ?)
+          AND (Action IS NULL OR Action = 'view')
         """
         result = self.fetch_query(query, (today,))
         return result[0][0] if result and len(result) > 0 else 0
+
+    def update_level_progress(self):
+        """Update level label from gamification profile with next-level hint."""
+        try:
+            if not hasattr(self, 'gamify') or not self.gamify:
+                return
+            prog = self.gamify.get_level_progress()
+            level = prog.get('level', 1)
+            xp = prog.get('xp', 0)
+            to_next = prog.get('xp_to_next', 0)
+            if level >= 100:
+                self.level_label.config(text=f"Level {level} - {xp} XP (MAX)")
+            else:
+                # If progress shows no XP to next but level < 100, it's gated by achievements
+                if int(to_next or 0) <= 0:
+                    self.level_label.config(text=f"Level {level} - {xp} XP (achievements required)")
+                else:
+                    self.level_label.config(text=f"Level {level} - {xp} XP ({to_next} to next)")
+        except Exception:
+            pass
     
     def update_ui(self):
         """Update UI elements periodically"""
@@ -554,6 +1102,19 @@ class FactDariApp:
         if not self.is_home_page:
             self.update_fact_count()
             self.update_review_stats()
+            # Update gamification progress
+            try:
+                self.update_level_progress()
+            except Exception:
+                pass
+            # Check inactivity only while in reviewing mode
+            try:
+                if self.current_session_id and not getattr(self, 'timer_paused', False):
+                    idle_seconds = int((datetime.now() - self.last_activity_time).total_seconds())
+                    if not self.idle_triggered and idle_seconds >= int(self.idle_timeout_seconds):
+                        self.handle_idle_timeout()
+            except Exception:
+                pass
         self.root.after(100, self.update_ui)
     
     def update_fact_count(self):
@@ -603,31 +1164,52 @@ class FactDariApp:
         
         def _worker():
             try:
-                self.speech_engine.stop()
-                self.speech_engine.say(text)
-                self.speech_engine.runAndWait()
+                # Initialize a fresh engine inside the worker to avoid reuse issues
+                engine = pyttsx3.init()
+                # Expose this engine so stop_speaking can interrupt it
+                self.active_tts_engine = engine
+                engine.say(text)
+                engine.runAndWait()
             except Exception:
                 pass
             finally:
+                try:
+                    # Clear active engine reference
+                    self.active_tts_engine = None
+                except Exception:
+                    pass
                 # Re-enable on UI thread
                 self.root.after(0, lambda: self.speaker_button.config(state="normal"))
-        
+
         self.speaking_thread = threading.Thread(target=_worker, daemon=True)
         self.speaking_thread.start()
 
     def stop_speaking(self):
         """Stop any ongoing speech immediately."""
         try:
-            if self.speaking_thread and self.speaking_thread.is_alive():
+            # Signal the active engine (if any) to stop
+            if getattr(self, 'active_tts_engine', None) is not None:
                 try:
-                    self.speech_engine.stop()
+                    self.active_tts_engine.stop()
                 except Exception:
                     pass
+                finally:
+                    # Do not reuse this engine
+                    self.active_tts_engine = None
+            # If a worker thread exists, let it wind down
+            if self.speaking_thread and self.speaking_thread.is_alive():
                 # Allow thread to wind down
                 try:
-                    self.speaking_thread.join(timeout=0.2)
+                    self.speaking_thread.join(timeout=1.0)
                 except Exception:
                     pass
+            # Ensure UI button is enabled even if thread ended unexpectedly
+            try:
+                self.speaker_button.config(state="normal")
+            except Exception:
+                pass
+            # Clear reference
+            self.speaking_thread = None
         except Exception:
             pass
     
@@ -673,29 +1255,92 @@ class FactDariApp:
         """Load all facts for the current category"""
         category = self.category_var.get()
         
+        has_is_easy = self.column_exists('Facts', 'IsEasy')
         if category == "All Categories":
-            query = """
-                SELECT FactID, Content, IsFavorite
-                FROM Facts
-                ORDER BY NEWID()
-            """
+            if has_is_easy:
+                query = """
+                    SELECT FactID, Content, IsFavorite, IsEasy
+                    FROM Facts
+                    ORDER BY NEWID()
+                """
+            else:
+                query = """
+                    SELECT FactID, Content, IsFavorite
+                    FROM Facts
+                    ORDER BY NEWID()
+                """
             facts = self.fetch_query(query)
         elif category == "Favorites":
-            query = """
-                SELECT FactID, Content, IsFavorite
-                FROM Facts
-                WHERE IsFavorite = 1
-                ORDER BY NEWID()
-            """
+            if has_is_easy:
+                query = """
+                    SELECT FactID, Content, IsFavorite, IsEasy
+                    FROM Facts
+                    WHERE IsFavorite = 1
+                    ORDER BY NEWID()
+                """
+            else:
+                query = """
+                    SELECT FactID, Content, IsFavorite
+                    FROM Facts
+                    WHERE IsFavorite = 1
+                    ORDER BY NEWID()
+                """
+            facts = self.fetch_query(query)
+        elif category == "Known":
+            if has_is_easy:
+                query = """
+                    SELECT FactID, Content, IsFavorite, IsEasy
+                    FROM Facts
+                    WHERE IsEasy = 1
+                    ORDER BY NEWID()
+                """
+                facts = self.fetch_query(query)
+            else:
+                facts = []
+        elif category == "Not Known":
+            if has_is_easy:
+                query = """
+                    SELECT FactID, Content, IsFavorite, IsEasy
+                    FROM Facts
+                    WHERE IsEasy = 0
+                    ORDER BY NEWID()
+                """
+                facts = self.fetch_query(query)
+            else:
+                facts = []
+        elif category == "Not Favorite":
+            if has_is_easy:
+                query = """
+                    SELECT FactID, Content, IsFavorite, IsEasy
+                    FROM Facts
+                    WHERE IsFavorite = 0
+                    ORDER BY NEWID()
+                """
+            else:
+                query = """
+                    SELECT FactID, Content, IsFavorite
+                    FROM Facts
+                    WHERE IsFavorite = 0
+                    ORDER BY NEWID()
+                """
             facts = self.fetch_query(query)
         else:
-            query = """
-                SELECT f.FactID, f.Content, f.IsFavorite
-                FROM Facts f
-                JOIN Categories c ON f.CategoryID = c.CategoryID
-                WHERE c.CategoryName = ?
-                ORDER BY NEWID()
-            """
+            if has_is_easy:
+                query = """
+                    SELECT f.FactID, f.Content, f.IsFavorite, f.IsEasy
+                    FROM Facts f
+                    JOIN Categories c ON f.CategoryID = c.CategoryID
+                    WHERE c.CategoryName = ?
+                    ORDER BY NEWID()
+                """
+            else:
+                query = """
+                    SELECT f.FactID, f.Content, f.IsFavorite
+                    FROM Facts f
+                    JOIN Categories c ON f.CategoryID = c.CategoryID
+                    WHERE c.CategoryName = ?
+                    ORDER BY NEWID()
+                """
             facts = self.fetch_query(query, (category,))
         
         self.all_facts = facts if facts else []
@@ -747,6 +1392,8 @@ class FactDariApp:
                                   font=(self.NORMAL_FONT[0], 12))
             self.current_fact_id = None
             self.star_button.config(image=self.white_star_icon)
+            if hasattr(self, 'easy_button'):
+                self.easy_button.config(image=self.easy_icon)
             # Disable navigation buttons when no facts
             self.prev_button.config(state="disabled", bg=self.GRAY_COLOR)
             self.next_button.config(state="disabled", bg=self.GRAY_COLOR)
@@ -769,12 +1416,18 @@ class FactDariApp:
         self.current_fact_id = fact[0]
         content = fact[1]
         self.current_fact_is_favorite = fact[2] if len(fact) > 2 else False
+        self.current_fact_is_easy = fact[3] if len(fact) > 3 else False
         
         # Update star icon based on favorite status
         if self.current_fact_is_favorite:
             self.star_button.config(image=self.gold_star_icon)
         else:
             self.star_button.config(image=self.white_star_icon)
+        # Update easy icon
+        if self.current_fact_is_easy:
+            self.easy_button.config(image=self.easy_gold_icon)
+        else:
+            self.easy_button.config(image=self.easy_icon)
         
         # Display the fact
         self.fact_label.config(text=content, font=(self.NORMAL_FONT[0], self.adjust_font_size(content)))
@@ -791,7 +1444,32 @@ class FactDariApp:
     
     def track_fact_view(self, fact_id):
         """Track that a fact has been viewed"""
-        # Update the fact's view count and last viewed date
+        now = datetime.now()
+        self.record_activity()
+
+        # 1) Finalize previous view's duration if any
+        try:
+            if self.current_review_log_id and self.current_fact_start_time:
+                elapsed = int((now - self.current_fact_start_time).total_seconds())
+                if elapsed < 0:
+                    elapsed = 0
+                self.execute_update(
+                    """
+                    UPDATE ReviewLogs
+                    SET SessionDuration = ?
+                    WHERE ReviewLogID = ?
+                    """,
+                    (elapsed, self.current_review_log_id)
+                )
+                # Award XP for the just-finished view
+                try:
+                    self._award_for_elapsed(elapsed)
+                except Exception:
+                    pass
+        except Exception as _:
+            pass
+
+        # 2) Update the fact's view count and last viewed date
         self.execute_update("""
             UPDATE Facts 
             SET TotalViews = TotalViews + 1,
@@ -799,12 +1477,177 @@ class FactDariApp:
                 LastViewedDate = GETDATE()
             WHERE FactID = ?
         """, (fact_id,))
-        
-        # Log the review
-        self.execute_update("""
-            INSERT INTO ReviewLogs (FactID, ReviewDate)
-            VALUES (?, GETDATE())
-        """, (fact_id,))
+
+        # 3) Start a new view log and remember its ID + start time
+        try:
+            # Ensure we have a session
+            if not self.current_session_id:
+                self.start_new_session()
+
+            new_id = self.execute_insert_return_id(
+                """
+                INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID)
+                OUTPUT INSERTED.ReviewLogID
+                VALUES (?, GETDATE(), ?)
+                """,
+                (fact_id, self.current_session_id)
+            )
+            self.current_review_log_id = new_id
+            self.current_fact_start_time = now
+        except Exception as _:
+            # If we couldn't insert with SessionID for some reason, fall back to basic insert
+            self.execute_update(
+                """
+                INSERT INTO ReviewLogs (FactID, ReviewDate)
+                VALUES (?, GETDATE())
+                """,
+                (fact_id,)
+            )
+            self.current_review_log_id = None
+            self.current_fact_start_time = now
+
+    def pause_review_timer(self):
+        """Pause the current review timer (exclude time until resumed)."""
+        try:
+            if self.current_fact_start_time and not self.timer_paused:
+                self.pause_started_at = datetime.now()
+                self.timer_paused = True
+        except Exception:
+            pass
+
+    def resume_review_timer(self):
+        """Resume the review timer, shifting the start time forward by the paused duration."""
+        try:
+            if self.timer_paused:
+                if self.current_fact_start_time and self.pause_started_at:
+                    delta = datetime.now() - self.pause_started_at
+                    # Shift start forward to exclude paused duration
+                    self.current_fact_start_time = self.current_fact_start_time + delta
+                self.pause_started_at = None
+                self.timer_paused = False
+        except Exception:
+            pass
+
+    def finalize_current_fact_view(self, timed_out=False):
+        """Finalize timing for the current fact view, if active.
+        If timed_out=True, also mark the log as ended due to inactivity.
+        """
+        try:
+            if self.current_review_log_id and self.current_fact_start_time:
+                elapsed = int((datetime.now() - self.current_fact_start_time).total_seconds())
+                if elapsed < 0:
+                    elapsed = 0
+                # Try to update with TimedOut flag if column exists
+                updated = self.execute_update(
+                    """
+                    UPDATE ReviewLogs
+                    SET SessionDuration = ?, TimedOut = ?
+                    WHERE ReviewLogID = ?
+                    """,
+                    (elapsed, 1 if timed_out else 0, self.current_review_log_id)
+                )
+                if not updated:
+                    # Fallback without TimedOut if migration hasn't applied
+                    self.execute_update(
+                        """
+                        UPDATE ReviewLogs
+                        SET SessionDuration = ?
+                        WHERE ReviewLogID = ?
+                        """,
+                        (elapsed, self.current_review_log_id)
+                    )
+                # Award XP
+                try:
+                    self._award_for_elapsed(elapsed)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        finally:
+            self.current_review_log_id = None
+            self.current_fact_start_time = None
+
+    def start_new_session(self):
+        """Start a new reviewing session and store SessionID."""
+        # End any existing session first
+        self.end_active_session()
+        # Reset per-session duplicate guard so single-card categories track one view per session
+        try:
+            self._last_tracked_fact = None
+        except Exception:
+            pass
+        self.session_start_time = datetime.now()
+        session_id = self.execute_insert_return_id(
+            """
+            INSERT INTO ReviewSessions (StartTime)
+            OUTPUT INSERTED.SessionID
+            VALUES (GETDATE())
+            """
+        )
+        self.current_session_id = session_id
+        # Daily streak check-in and possible achievements
+        try:
+            if getattr(self, 'gamify', None):
+                result = self.gamify.daily_checkin()
+                unlocked = result.get('unlocked', []) if isinstance(result, dict) else []
+                prof = result.get('profile', {}) if isinstance(result, dict) else {}
+                if prof and isinstance(prof, dict):
+                    streak = prof.get('CurrentStreak', None)
+                    if streak:
+                        try:
+                            self.status_label.config(text=f"Daily streak: {int(streak)} day(s)", fg=self.STATUS_COLOR)
+                            self.clear_status_after_delay(2500)
+                        except Exception:
+                            pass
+                if unlocked:
+                    codes = [x.get('Code') for x in unlocked if x.get('Code')]
+                    try:
+                        self.gamify.mark_unlocked_notified_by_codes(codes)
+                    except Exception:
+                        pass
+                    try:
+                        self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                        self.clear_status_after_delay(2500)
+                    except Exception:
+                        pass
+                # Refresh level display
+                self.update_level_progress()
+        except Exception:
+            pass
+
+    def end_active_session(self, timed_out=False):
+        """End the active reviewing session, if any. If timed_out=True, marks session TimedOut."""
+        try:
+            # Finalize any ongoing fact view first
+            self.finalize_current_fact_view(timed_out=False)
+
+            if self.current_session_id:
+                updated = self.execute_update(
+                    """
+                    UPDATE ReviewSessions
+                    SET EndTime = GETDATE(),
+                        DurationSeconds = DATEDIFF(second, StartTime, GETDATE()),
+                        TimedOut = ?
+                    WHERE SessionID = ?
+                    """,
+                    (1 if timed_out else 0, self.current_session_id)
+                )
+                if not updated:
+                    # Fallback without TimedOut if migration hasn't applied yet
+                    self.execute_update(
+                        """
+                        UPDATE ReviewSessions
+                        SET EndTime = GETDATE(),
+                            DurationSeconds = DATEDIFF(second, StartTime, GETDATE())
+                        WHERE SessionID = ?
+                        """,
+                        (self.current_session_id,)
+                    )
+        except Exception as e:
+            print(f"Error ending session: {e}")
+        finally:
+            self.current_session_id = None
+            self.session_start_time = None
     
     def toggle_favorite(self):
         """Toggle the favorite status of the current fact"""
@@ -843,14 +1686,108 @@ class FactDariApp:
                 self.all_facts[self.current_fact_index] = tuple(fact)
             
             self.clear_status_after_delay(2000)
+            # Gamification: award on favorite and unlock using current favorites count
+            try:
+                if new_status and getattr(self, 'gamify', None):
+                    # Increment lifetime counter
+                    _ = self.gamify.increment_counter('TotalFavorites', 1)
+                    # Compute current number of favorites from Facts
+                    try:
+                        rows = self.fetch_query("SELECT COUNT(*) FROM Facts WHERE IsFavorite = 1")
+                        current_fav_count = int(rows[0][0]) if rows else 0
+                    except Exception:
+                        current_fav_count = 0
+                    unlocked = self.gamify.unlock_achievements_if_needed('favorites', current_fav_count)
+                    # XP for favoriting
+                    fav_xp = int(config.XP_CONFIG.get('xp_favorite', 1))
+                    if fav_xp:
+                        self.gamify.award_xp(fav_xp)
+                    if unlocked:
+                        self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                        self.clear_status_after_delay(2500)
+                        try:
+                            self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                        except Exception:
+                            pass
+                    self.update_level_progress()
+            except Exception:
+                pass
+
+    def toggle_easy(self):
+        """Toggle the 'known/easy' status of the current fact"""
+        if not self.current_fact_id:
+            return
+        if not self.column_exists('Facts', 'IsEasy'):
+            self.status_label.config(text="Please update DB to latest (IsEasy column)", fg=self.STATUS_COLOR)
+            self.clear_status_after_delay(3000)
+            return
+        new_status = not self.current_fact_is_easy
+        success = self.execute_update("""
+            UPDATE Facts
+            SET IsEasy = ?
+            WHERE FactID = ?
+        """, (1 if new_status else 0, self.current_fact_id))
+        if success:
+            self.current_fact_is_easy = new_status
+            if new_status:
+                self.easy_button.config(image=self.easy_gold_icon)
+                self.status_label.config(text="Marked as known!", fg=self.GREEN_COLOR)
+            else:
+                self.easy_button.config(image=self.easy_icon)
+                self.status_label.config(text="Marked as not known", fg=self.STATUS_COLOR)
+            # Update in-memory list
+            if self.all_facts and self.current_fact_index < len(self.all_facts):
+                fact = list(self.all_facts[self.current_fact_index])
+                # Ensure list length
+                while len(fact) < 4:
+                    fact.append(False)
+                fact[3] = new_status
+                self.all_facts[self.current_fact_index] = tuple(fact)
+            self.clear_status_after_delay(2000)
+            # Gamification: award when marking known, unlock using current known count
+            try:
+                if new_status and getattr(self, 'gamify', None):
+                    # Increment lifetime counter
+                    _ = self.gamify.increment_counter('TotalKnown', 1)
+                    # Compute current known facts from Facts
+                    try:
+                        rows = self.fetch_query("SELECT COUNT(*) FROM Facts WHERE IsEasy = 1")
+                        current_known_count = int(rows[0][0]) if rows else 0
+                    except Exception:
+                        current_known_count = 0
+                    unlocked = self.gamify.unlock_achievements_if_needed('known', current_known_count)
+                    known_xp = int(config.XP_CONFIG.get('xp_known', 10))
+                    if known_xp:
+                        self.gamify.award_xp(known_xp)
+                    if unlocked:
+                        self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                        self.clear_status_after_delay(2500)
+                        try:
+                            self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                        except Exception:
+                            pass
+                    self.update_level_progress()
+            except Exception:
+                pass
     
     def add_new_fact(self):
         """Add a new fact to the database"""
+        # Pause review timer while user is adding a card
+        self.pause_review_timer()
         # Create a popup window
         add_window = tk.Toplevel(self.root)
         add_window.title("Add New Fact")
         add_window.geometry(f"{self.POPUP_ADD_CARD_SIZE}{self.POPUP_POSITION}")
         add_window.configure(bg=self.BG_COLOR)
+        
+        # On close, resume timer then destroy
+        def on_close_add():
+            try:
+                self.resume_review_timer()
+            except Exception:
+                pass
+            add_window.destroy()
+        add_window.protocol("WM_DELETE_WINDOW", on_close_add)
         
         # Get categories for dropdown
         categories = self.fetch_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
@@ -893,7 +1830,7 @@ class FactDariApp:
         content_text = tk.Text(content_frame, height=8, width=40, font=self.NORMAL_FONT)
         content_text.pack(fill="x", padx=5, pady=5)
         
-        def save_fact():
+        def save_fact(close_after=True):
             category = cat_var.get()
             content = content_text.get("1.0", "end-1c").strip()
             
@@ -911,42 +1848,117 @@ class FactDariApp:
                 
             category_id = cat_result[0][0]
             
-            # Insert the new fact
-            success = self.execute_update(
+            # Duplicate check using the same normalization as ContentKey
+            try:
+                dup = self.fetch_query(
+                    """
+                    SELECT TOP 1 FactID
+                    FROM dbo.Facts
+                    WHERE ContentKey = CAST(LOWER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(?, CHAR(13), ' '), CHAR(10), ' '), CHAR(9), ' ')))) AS NVARCHAR(450))
+                    """,
+                    (content,)
+                )
+            except Exception:
+                dup = []
+            if dup:
+                self.status_label.config(text="Fact Already Exists!", fg=self.RED_COLOR)
+                self.clear_status_after_delay(3000)
+                return
+
+            # Insert the new fact and get its ID
+            new_fact_id = self.execute_insert_return_id(
                 """
-                INSERT INTO Facts (CategoryID, Content, DateAdded, ReviewCount, TotalViews, IsFavorite) 
+                INSERT INTO Facts (CategoryID, Content, DateAdded, ReviewCount, TotalViews, IsFavorite)
+                OUTPUT INSERTED.FactID
                 VALUES (?, ?, GETDATE(), 0, 0, 0)
-                """, 
+                """,
                 (category_id, content)
             )
             
-            if success:
-                add_window.destroy()
+            if new_fact_id:
                 self.status_label.config(text="New fact added successfully!", fg=self.GREEN_COLOR)
                 self.clear_status_after_delay(3000)
                 self.update_fact_count()
-                # Reload facts if we're in viewing mode
-                if not self.is_home_page:
-                    self.load_all_facts()
-                    if self.all_facts:
-                        self.current_fact_index = len(self.all_facts) - 1
-                        self.display_current_fact()
+                # Log the add action in current session (if any)
+                try:
+                    if self.current_session_id:
+                        self.execute_update(
+                            """
+                            UPDATE ReviewSessions SET FactsAdded = ISNULL(FactsAdded,0) + 1 WHERE SessionID = ?
+                            """,
+                            (self.current_session_id,)
+                        )
+                        self.execute_update(
+                            """
+                            INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactContentSnapshot, CategoryIDSnapshot)
+                            VALUES (?, GETDATE(), ?, 0, 'add', ?, ?)
+                            """,
+                            (new_fact_id, self.current_session_id, content, category_id)
+                        )
+                except Exception:
+                    pass
+                # Gamification: count add
+                try:
+                    if getattr(self, 'gamify', None):
+                        total = self.gamify.increment_counter('TotalAdds', 1)
+                        unlocked = self.gamify.unlock_achievements_if_needed('adds', total)
+                        add_xp = int(config.XP_CONFIG.get('xp_add', 2))
+                        if add_xp:
+                            self.gamify.award_xp(add_xp)
+                        if unlocked:
+                            self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                            self.clear_status_after_delay(2500)
+                            try:
+                                self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                            except Exception:
+                                pass
+                        self.update_level_progress()
+                except Exception:
+                    pass
+                # Do not reshuffle or navigate. Stay on current card.
+                # Counts and analytics are updated separately via update_fact_count().
+
+                # Either close or reset for adding another
+                if close_after:
+                    # Resume timer on close
+                    try:
+                        self.resume_review_timer()
+                    except Exception:
+                        pass
+                    add_window.destroy()
+                else:
+                    # Keep window open: clear text and focus for next entry
+                    content_text.delete('1.0', tk.END)
+                    try:
+                        content_text.focus_set()
+                    except Exception:
+                        pass
             else:
                 self.status_label.config(text="Error adding new fact!", fg=self.RED_COLOR)
                 self.clear_status_after_delay(3000)
         
-        # Save button
-        save_button = tk.Button(add_window, text="Save Fact", bg=self.GREEN_COLOR, fg=self.TEXT_COLOR, 
-                              command=save_fact, cursor="hand2", borderwidth=0, 
-                              highlightthickness=0, padx=10, pady=5,
-                              font=(self.NORMAL_FONT[0], self.NORMAL_FONT[1], 'bold'))
-        save_button.pack(pady=20)
+        # Buttons row
+        btn_row = tk.Frame(add_window, bg=self.BG_COLOR)
+        btn_row.pack(pady=20)
+        save_close_btn = tk.Button(btn_row, text="Save & Close", bg=self.GREEN_COLOR, fg=self.TEXT_COLOR,
+                                    command=lambda: save_fact(True), cursor="hand2", borderwidth=0,
+                                    highlightthickness=0, padx=10, pady=5,
+                                    font=(self.NORMAL_FONT[0], self.NORMAL_FONT[1], 'bold'))
+        save_close_btn.pack(side='left', padx=6)
+        add_another_btn = tk.Button(btn_row, text="Save & Add Another", bg=self.BLUE_COLOR, fg=self.TEXT_COLOR,
+                                    command=lambda: save_fact(False), cursor="hand2", borderwidth=0,
+                                    highlightthickness=0, padx=10, pady=5,
+                                    font=(self.NORMAL_FONT[0], self.NORMAL_FONT[1], 'bold'))
+        add_another_btn.pack(side='left', padx=6)
     
     def edit_current_fact(self):
         """Edit the current fact"""
         if not self.current_fact_id:
             return
         
+        # Pause timer while editing
+        self.pause_review_timer()
+
         # Get current fact data
         query = """
         SELECT f.Content, c.CategoryName
@@ -968,6 +1980,15 @@ class FactDariApp:
         edit_window.title("Edit Fact")
         edit_window.geometry(f"{self.POPUP_EDIT_CARD_SIZE}{self.POPUP_POSITION}")
         edit_window.configure(bg=self.BG_COLOR)
+
+        # Resume timer when window is closed via [X]
+        def on_close_edit():
+            try:
+                self.resume_review_timer()
+            except Exception:
+                pass
+            edit_window.destroy()
+        edit_window.protocol("WM_DELETE_WINDOW", on_close_edit)
         
         # Get categories for dropdown
         categories = self.fetch_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
@@ -1037,9 +2058,48 @@ class FactDariApp:
             )
             
             if success:
+                # Resume timer upon closing edit
+                try:
+                    self.resume_review_timer()
+                except Exception:
+                    pass
                 edit_window.destroy()
                 self.status_label.config(text="Fact updated successfully!", fg=self.GREEN_COLOR)
                 self.clear_status_after_delay(3000)
+                # Log the edit action in current session (if any)
+                try:
+                    if self.current_session_id:
+                        self.execute_update(
+                            "UPDATE ReviewSessions SET FactsEdited = ISNULL(FactsEdited,0) + 1 WHERE SessionID = ?",
+                            (self.current_session_id,)
+                        )
+                        self.execute_update(
+                            """
+                            INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactEdited, FactContentSnapshot, CategoryIDSnapshot)
+                            VALUES (?, GETDATE(), ?, 0, 'edit', 1, ?, ?)
+                            """,
+                            (self.current_fact_id, self.current_session_id, content, category_id)
+                        )
+                except Exception:
+                    pass
+                # Gamification: count edit
+                try:
+                    if getattr(self, 'gamify', None):
+                        total = self.gamify.increment_counter('TotalEdits', 1)
+                        unlocked = self.gamify.unlock_achievements_if_needed('edits', total)
+                        edit_xp = int(config.XP_CONFIG.get('xp_edit', 1))
+                        if edit_xp:
+                            self.gamify.award_xp(edit_xp)
+                        if unlocked:
+                            self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                            self.clear_status_after_delay(2500)
+                            try:
+                                self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                            except Exception:
+                                pass
+                        self.update_level_progress()
+                except Exception:
+                    pass
                 
                 # Update the current display
                 self.fact_label.config(text=content, font=(self.NORMAL_FONT[0], self.adjust_font_size(content)))
@@ -1062,31 +2122,112 @@ class FactDariApp:
         if not self.current_fact_id:
             return
         
-        # Ask for confirmation
-        if self.confirm_dialog("Confirm Delete", "Are you sure you want to delete this fact?"):
-            # Delete related tags and review logs first to satisfy FK constraints
-            self.execute_update("DELETE FROM FactTags WHERE FactID = ?", (self.current_fact_id,))
-            self.execute_update("DELETE FROM ReviewLogs WHERE FactID = ?", (self.current_fact_id,))
-            
-            # Delete the fact
-            success = self.execute_update("DELETE FROM Facts WHERE FactID = ?", (self.current_fact_id,))
-            if success:
-                self.status_label.config(text="Fact deleted!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
-                self.update_fact_count()
-                
-                # Remove from our list and show next fact
-                if self.all_facts and self.current_fact_index < len(self.all_facts):
-                    self.all_facts.pop(self.current_fact_index)
-                    if self.all_facts:
-                        self.current_fact_index = self.current_fact_index % len(self.all_facts)
-                        self.display_current_fact()
-                    else:
-                        self.fact_label.config(text="No facts found. Add some facts first!")
-                        self.current_fact_id = None
-            else:
-                self.status_label.config(text="Error deleting fact!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
+        # Pause during confirmation and deletion flow
+        self.pause_review_timer()
+        try:
+            # Ask for confirmation
+            if self.confirm_dialog("Confirm Delete", "Are you sure you want to delete this fact?"):
+                # Capture snapshot before delete
+                try:
+                    row = self.fetch_query(
+                        "SELECT Content, CategoryID FROM Facts WHERE FactID = ?",
+                        (self.current_fact_id,)
+                    )
+                    content_snapshot = row[0][0] if row else None
+                    category_snapshot = row[0][1] if row else None
+                except Exception:
+                    content_snapshot = None
+                    category_snapshot = None
+
+                # Log the delete action in ReviewLogs (before deleting the Fact)
+                try:
+                    if self.current_session_id:
+                        self.execute_update(
+                            """
+                            INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactDeleted, FactContentSnapshot, CategoryIDSnapshot)
+                            VALUES (?, GETDATE(), ?, 0, 'delete', 1, ?, ?)
+                            """,
+                            (self.current_fact_id, self.current_session_id, content_snapshot, category_snapshot)
+                        )
+                        # Increment session counter
+                        self.execute_update(
+                            "UPDATE ReviewSessions SET FactsDeleted = ISNULL(FactsDeleted,0) + 1 WHERE SessionID = ?",
+                            (self.current_session_id,)
+                        )
+                except Exception:
+                    pass
+
+                # Delete the fact
+                success = self.execute_update("DELETE FROM Facts WHERE FactID = ?", (self.current_fact_id,))
+                if success:
+                    self.status_label.config(text="Fact deleted!", fg=self.RED_COLOR)
+                    self.clear_status_after_delay(3000)
+                    self.update_fact_count()
+                    # Gamification: count delete
+                    try:
+                        if getattr(self, 'gamify', None):
+                            total = self.gamify.increment_counter('TotalDeletes', 1)
+                            unlocked = self.gamify.unlock_achievements_if_needed('deletes', total)
+                            del_xp = int(config.XP_CONFIG.get('xp_delete', 0))
+                            if del_xp:
+                                self.gamify.award_xp(del_xp)
+                            if unlocked:
+                                self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                                self.clear_status_after_delay(2500)
+                                try:
+                                    self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                                except Exception:
+                                    pass
+                            self.update_level_progress()
+                    except Exception:
+                        pass
+                    
+                    # Remove from our list and show next fact
+                    if self.all_facts and self.current_fact_index < len(self.all_facts):
+                        self.all_facts.pop(self.current_fact_index)
+                        if self.all_facts:
+                            self.current_fact_index = self.current_fact_index % len(self.all_facts)
+                            self.display_current_fact()
+                        else:
+                            self.fact_label.config(text="No facts found. Add some facts first!")
+                            self.current_fact_id = None
+                else:
+                    self.status_label.config(text="Error deleting fact!", fg=self.RED_COLOR)
+                    self.clear_status_after_delay(3000)
+        finally:
+            # Always resume after delete flow
+            self.resume_review_timer()
+    def _award_for_elapsed(self, elapsed_seconds: int):
+        """Award XP and review counters for a completed view."""
+        if not getattr(self, 'gamify', None):
+            return
+        # Only count reviews after grace period
+        try:
+            grace = int(config.XP_CONFIG.get('review_grace_seconds', 2))
+        except Exception:
+            grace = 2
+        if elapsed_seconds < grace:
+            return
+        # Base XP + time bonus
+        base_xp = int(config.XP_CONFIG.get('review_base_xp', 1))
+        step = max(1, int(config.XP_CONFIG.get('review_bonus_step_seconds', 5)))
+        cap = int(config.XP_CONFIG.get('review_bonus_cap', 5))
+        extra = (max(0, elapsed_seconds - grace)) // step
+        xp = base_xp + min(cap, int(extra))
+        total = self.gamify.increment_counter('TotalReviews', 1)
+        unlocked = self.gamify.unlock_achievements_if_needed('reviews', total)
+        self.gamify.award_xp(int(xp))
+        if unlocked:
+            try:
+                self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                self.clear_status_after_delay(2500)
+            except Exception:
+                pass
+            try:
+                self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+            except Exception:
+                pass
+        self.update_level_progress()
     
     def manage_categories(self):
         """Open a window to manage categories"""
@@ -1094,8 +2235,8 @@ class FactDariApp:
         cat_window = self._create_category_window()
         
         # Create the UI components
-        add_frame, new_cat_entry = self._create_add_category_ui(cat_window)
-        list_frame, cat_listbox, refresh_category_list = self._create_category_list_ui(cat_window)
+        self._create_add_category_ui(cat_window)
+        _, cat_listbox, refresh_category_list = self._create_category_list_ui(cat_window)
         self._create_category_action_buttons(cat_window, cat_listbox, refresh_category_list)
         
         # Initialize the category list
@@ -1134,7 +2275,7 @@ class FactDariApp:
                             cursor="hand2", borderwidth=0, highlightthickness=0, padx=10)
         add_button.pack(side="left", padx=5)
         
-        return add_frame, new_cat_entry
+        # No return needed; widgets are attached to the parent and remain alive
     
     def _add_category(self, entry_widget):
         """Handle adding a new category"""
@@ -1227,7 +2368,7 @@ class FactDariApp:
         
         # Extract category ID from selection text
         cat_text = cat_listbox.get(selection[0])
-        cat_id = int(cat_text.split("ID: ")[1].strip(")"))
+        cat_id = int(cat_text.split("ID: ")[1].rstrip(")"))
         
         # Get current name
         cat_result = self.fetch_query("SELECT CategoryName FROM Categories WHERE CategoryID = ?", (cat_id,))
@@ -1272,7 +2413,7 @@ class FactDariApp:
         
         # Extract category ID from selection text
         cat_text = cat_listbox.get(selection[0])
-        cat_id = int(cat_text.split("ID: ")[1].strip(")"))
+        cat_id = int(cat_text.split("ID: ")[1].rstrip(")"))
         cat_name = cat_text.split(" (ID:")[0]
         
         # Check if category has facts
@@ -1300,13 +2441,11 @@ class FactDariApp:
         success = self.execute_update("""
             BEGIN TRANSACTION;
             
-            DELETE FROM FactTags WHERE FactID IN (SELECT FactID FROM Facts WHERE CategoryID = ?);
-            DELETE FROM ReviewLogs WHERE FactID IN (SELECT FactID FROM Facts WHERE CategoryID = ?);
             DELETE FROM Facts WHERE CategoryID = ?;
             DELETE FROM Categories WHERE CategoryID = ?;
             
             COMMIT TRANSACTION;
-        """, (cat_id, cat_id, cat_id, cat_id))
+        """, (cat_id, cat_id))
         
         if success:
             refresh_callback()
@@ -1355,6 +2494,8 @@ class FactDariApp:
     
     def show_home_page(self):
         """Show the home page with welcome message and start button"""
+        # End any active reviewing session and finalize current view
+        self.end_active_session()
         self.is_home_page = True
         
         # Hide all fact-related UI elements
@@ -1369,28 +2510,52 @@ class FactDariApp:
             # Stop any ongoing speech and hide speaker on home
             self.stop_speaking()
             self.star_button.place_forget()
+            # Hide easy button on home page
+            try:
+                self.easy_button.place_forget()
+            except Exception:
+                pass
+            # Hide level label on home page
+            try:
+                self.level_label.place_forget()
+            except Exception:
+                pass
             self.info_button.place(relx=1.0, rely=0, anchor="ne", x=-55, y=5)
             # Hide speaker on home page
             self.speaker_button.place_forget()
         except Exception:
             pass
-        
-        # Update the welcome message
-        self.fact_label.config(text="Welcome to FactDari!\n\nYour Simple Fact Viewer", 
-                             font=self.LARGE_FONT,
-                             wraplength=450, justify="center")
-        
-        # Show the slogan
-        self.slogan_label.config(text="Review and remember facts effortlessly")
-        self.slogan_label.pack(side="top", pady=5)
-        
-        # Show the start reviewing button
-        self.start_button.pack(pady=20)
-        
-        # Update status to shortcut hint (ASCII)
-        self.status_label.config(text="Shortcuts: Prev = Left/p, Next = Right/n/Space", fg=self.STATUS_COLOR)
 
-        # Normalize ASCII shortcuts hint
+        # Show brand header centered horizontally near the top
+        try:
+            self.brand_frame.place(relx=0.5, rely=0.3, anchor='center')
+        except Exception:
+            try:
+                self.brand_frame.pack(side='top', pady=(10, 0))
+            except Exception:
+                pass
+        # Hide the large fact label on Home to avoid overlaying the brand header
+        try:
+            self.fact_label.pack_forget()
+        except Exception:
+            pass
+        
+        # Show the slogan centered under the brand (optional)
+        self.slogan_label.config(text="Review and remember facts effortlessly")
+        try:
+            # Move a bit further down from the header
+            self.slogan_label.place(relx=0.5, rely=0.55, anchor='center')
+        except Exception:
+            self.slogan_label.pack(side="top", pady=5)
+        
+        # Show the start reviewing button centered
+        try:
+            # Move a bit further down to create spacing
+            self.start_button.place(relx=0.5, rely=0.72, anchor='center')
+        except Exception:
+            self.start_button.pack(pady=20)
+        
+        # Update status to shortcut hint
         self.status_label.config(text="Shortcuts: Prev = Left/p, Next = Right/n/Space", fg=self.STATUS_COLOR)
 
         # Apply rounded corners again after UI changes
@@ -1400,43 +2565,117 @@ class FactDariApp:
     def start_reviewing(self):
         """Switch from home page to fact viewing interface"""
         self.is_home_page = False
-        
+        self.record_activity()
+
+        # Start a new reviewing session
+        try:
+            self.start_new_session()
+        except Exception as _:
+            pass
+
         # Hide home page elements
-        self.slogan_label.pack_forget()
-        self.start_button.pack_forget()
+        try:
+            self.slogan_label.place_forget()
+        except Exception:
+            try:
+                self.slogan_label.pack_forget()
+            except Exception:
+                pass
+        try:
+            self.start_button.place_forget()
+        except Exception:
+            try:
+                self.start_button.pack_forget()
+            except Exception:
+                pass
         
         # Show all fact-related UI elements
         self.category_frame.pack(side="right", padx=5, pady=3)
         self.nav_frame.pack(side="top", fill="x", pady=10)
         self.icon_buttons_frame.pack(side="top", fill="x", pady=5)
         self.stats_frame.pack(side="bottom", fill="x", padx=10, pady=3)
+        # Hide brand header when reviewing
+        try:
+            self.brand_frame.pack_forget()
+        except Exception:
+            pass
 
         # Swap back: hide info, show star icon
         try:
             self.info_button.place_forget()
+            # Show easy button before star
+            self.easy_button.place(relx=1.0, rely=0, anchor="ne", x=-80, y=5)
             self.star_button.place(relx=1.0, rely=0, anchor="ne", x=-55, y=5)
             # Show speaker on reviewing page
             self.speaker_button.place(relx=1.0, rely=0, anchor="ne", x=-5, y=5)
+            # Show level label next to Home icon while reviewing
+            self.level_label.place(x=32, y=7)
+            # Hide brand header when reviewing
+            try:
+                self.brand_frame.place_forget()
+            except Exception:
+                try:
+                    self.brand_frame.pack_forget()
+                except Exception:
+                    pass
         except Exception:
             pass
         
         # Load facts and display the first one
         self.load_all_facts()
+        # Re-pack the fact label for reviewing view
+        try:
+            self.fact_label.pack(side="top", fill="both", expand=True, padx=10, pady=10)
+        except Exception:
+            pass
         if self.all_facts:
             self.display_current_fact()
         else:
             self.fact_label.config(text="No facts found. Add some facts first!")
         
         # Show shortcut hints
-        self.status_label.config(text="Shortcuts: ← Previous, → Next, Space Next", fg=self.STATUS_COLOR)
+        self.status_label.config(text="Shortcuts: <- Previous, -> Next, Space Next", fg=self.STATUS_COLOR)
 
         # Apply rounded corners again after UI changes
         self.root.update_idletasks()
         self.apply_rounded_corners()
-    
+
     def run(self):
         """Start the application mainloop"""
         self.root.mainloop()
+
+    # Activity/idle helpers
+    def record_activity(self):
+        """Record user activity and reset idle trigger."""
+        self.last_activity_time = datetime.now()
+        self.idle_triggered = False
+
+    def handle_idle_timeout(self):
+        """Handle inactivity: finalize current view and optionally end session."""
+        self.idle_triggered = True
+        try:
+            # Finalize current fact view as timed out
+            self.finalize_current_fact_view(timed_out=True)
+            if self.idle_end_session:
+                # End the session as timed out
+                self.end_active_session(timed_out=True)
+                # Optionally navigate to Home after ending session
+                if self.idle_navigate_home:
+                    try:
+                        self.show_home_page()
+                    except Exception:
+                        pass
+            # Let the user know
+            try:
+                msg = "Ended due to inactivity"
+                if self.idle_navigate_home and self.idle_end_session:
+                    msg += "; returned to Home"
+                self.status_label.config(text=msg, fg=self.STATUS_COLOR)
+                self.clear_status_after_delay(4000)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
 
 # Usage example

@@ -1,56 +1,84 @@
 erDiagram
     Categories {
         int CategoryID PK
-        nvarchar(100) CategoryName
-        nvarchar(255) Description
+        nvarchar CategoryName "UNIQUE"
+        nvarchar Description
         bit IsActive
         datetime CreatedDate
     }
-    
-    Tags {
-        int TagID PK
-        nvarchar(100) TagName
-    }
-    
-    FactCards {
-        int FactCardID PK
+
+    Facts {
+        int FactID PK
         int CategoryID FK
-        nvarchar(MAX) Question
-        nvarchar(MAX) Answer
-        date NextReviewDate
-        int CurrentInterval
-        float Mastery
+        nvarchar Content
         date DateAdded
-        date LastReviewDate
-        float Stability
-        float Difficulty
-        int State
-        int Lapses
-        int ViewCount
+        datetime LastViewedDate
+        int ReviewCount
+        int TotalViews
+        bit IsFavorite
+        bit IsEasy
     }
-    
-    FactCardTags {
-        int FactCardTagID PK
-        int FactCardID FK
-        int TagID FK
+
+    ReviewSessions {
+        int SessionID PK
+        datetime StartTime
+        datetime EndTime
+        int DurationSeconds
+        bit TimedOut
+        int FactsAdded
+        int FactsEdited
+        int FactsDeleted
     }
-    
+
     ReviewLogs {
         int ReviewLogID PK
-        int FactCardID FK
+        int FactID FK
         datetime ReviewDate
-        int UserRating
-        int IntervalBeforeReview
-        int IntervalAfterReview
-        float StabilityBefore
-        float StabilityAfter
-        float DifficultyBefore
-        float DifficultyAfter
-        int Rating
-        int Interval
+        int SessionDuration
+        int SessionID FK
+        bit TimedOut
+        nvarchar Action
+        bit FactEdited
+        bit FactDeleted
+        nvarchar FactContentSnapshot
+        int CategoryIDSnapshot
     }
-    
-    Categories ||--o{ FactCards : "has"
-    FactCards ||--o{ FactCardTags : "has"
-    Tags ||--o{ FactCardTags : "has"
-    FactCards ||--o{ ReviewLogs : "has"
+
+    GamificationProfile {
+        int ProfileID PK
+        int XP
+        int Level
+        int TotalReviews
+        int TotalKnown
+        int TotalFavorites
+        int TotalAdds
+        int TotalEdits
+        int TotalDeletes
+        int CurrentStreak
+        int LongestStreak
+        date LastCheckinDate
+    }
+
+    Achievements {
+        int AchievementID PK
+        nvarchar Code "UNIQUE"
+        nvarchar Name
+        nvarchar Category
+        int Threshold
+        int RewardXP
+        bit IsHidden
+        datetime CreatedDate
+    }
+
+    AchievementUnlocks {
+        int UnlockID PK
+        int AchievementID FK
+        datetime UnlockDate
+        bit Notified
+    }
+
+    %% Relationships
+    Categories ||--o{ Facts : contains
+    Facts ||--o{ ReviewLogs : logs
+    ReviewSessions ||--o{ ReviewLogs : tracks
+    Achievements ||--o| AchievementUnlocks : unlocks
