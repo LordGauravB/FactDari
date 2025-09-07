@@ -70,6 +70,80 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - Open your browser to `http://localhost:5000`
 - View comprehensive statistics about your fact review patterns
 
+## Screenshots
+
+Below are sample screenshots of the desktop widget and the analytics dashboard. Image files live in `Resources/application_images`.
+
+### Desktop Widget
+
+- Home Page
+  
+  ![Home Page](Resources/application_images/Home_Page.png)
+  
+  A compact welcome screen with brand header, quick stats (e.g., total facts, seen today), and a clear “Start Reviewing” call‑to‑action.
+
+- Main Fact Window
+  
+  ![Main Fact Window](Resources/application_images/Main_Fact_Window.png)
+  
+  The primary viewing interface showing a random fact with previous/next navigation, favorite and known toggles, text‑to‑speech, category filter, and live stats.
+
+- Keyboard Shortcuts
+  
+  ![Keyboard Shortcuts](Resources/application_images/Keyboard_Shortcuts_Window.png)
+  
+  A quick reference to keyboard controls (e.g., ←/→ for navigation, Space for next, A/E/D for add/edit/delete, F for favorite, K for known).
+
+- Add New Fact
+  
+  ![Add New Fact](Resources/application_images/Add_New_Fact_Window.png)
+  
+  Dialog to add a new fact with category selection and content box. Includes duplicate prevention and “Save & Add Another” for rapid entry.
+
+- Update Fact
+  
+  ![Update Fact](Resources/application_images/Update_Fact_Window.png)
+  
+  Edit an existing fact’s text or category. Editing is paused from timing; upon close, the review timer resumes.
+
+- Delete Fact Confirmation
+  
+  ![Delete Fact](Resources/application_images/Delete_Fact_Window.png)
+  
+  Confirmation prompt before deleting a fact. The app logs a delete action snapshot and updates session counters.
+
+### Analytics Dashboard
+
+- Overview
+  
+  ![Analytics Overview](Resources/application_images/Analytics_Page_Overview.png)
+  
+  High‑level summary: category distribution, daily review activity, favorites/known totals, and quick KPIs for a fast health check.
+
+- Insights
+  
+  ![Analytics Insights](Resources/application_images/Analytics_Page_Insights.png)
+  
+  Deeper patterns: weekly review radar, top review hours, known vs. unknown ratio, and category growth to spot trends.
+
+- Session
+  
+  ![Analytics Session](Resources/application_images/Analytics_Page_Session.png)
+  
+  Session analytics: duration stats, duration distribution, facts/reviews per minute, recent sessions, and last card reviews.
+
+- Progress
+  
+  ![Analytics Progress](Resources/application_images/Analytics_Page_Progress.png)
+  
+  Progress over time: monthly reviews/unique facts/active days with a combined chart, and facts‑added timeline for growth.
+
+- Achievements
+  
+  ![Analytics Achievements](Resources/application_images/Analytics_Page_Achievements.png)
+  
+  Achievement catalog with unlock status, thresholds, rewards, and recent unlocks—mirrors in‑app achievements UI.
+
 ### Startup Configuration
 For Windows users, use the VBS script to configure automatic startup:
 ```
