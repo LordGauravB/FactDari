@@ -95,15 +95,19 @@ def chart_data():
         
         # Facts added over time
         'factsAddedOverTime': fetch_query("""
-            SELECT 
-                CONVERT(varchar, DateAdded, 23) as Date,
-                COUNT(FactID) as FactsAdded
-            FROM Facts
-            GROUP BY CONVERT(varchar, DateAdded, 23)
-            ORDER BY CONVERT(varchar, DateAdded, 23)
+            SELECT Date, FactsAdded
+            FROM (
+                SELECT TOP 10 
+                    CONVERT(varchar, DateAdded, 23) as Date,
+                    COUNT(FactID) as FactsAdded
+                FROM Facts
+                GROUP BY CONVERT(varchar, DateAdded, 23)
+                ORDER BY CONVERT(varchar, DateAdded, 23) DESC
+            ) as RecentDates
+            ORDER BY Date ASC
         """),
         
-        # Review frequency heatmap data (last 7 days, by hour)
+        # Review frequency heatmap data (last 30 days, by hour)
         'reviewHeatmap': fetch_query("""
             SET DATEFIRST 7; -- Ensure Sunday=1 for consistent weekday mapping
             SELECT 
@@ -114,7 +118,7 @@ def chart_data():
             WHERE ReviewDate >= ? AND (Action IS NULL OR Action = 'view')
             GROUP BY DATEPART(hour, ReviewDate), DATEPART(weekday, ReviewDate)
             ORDER BY DATEPART(weekday, ReviewDate), DATEPART(hour, ReviewDate)
-        """, (seven_days_ago,)),
+        """, (thirty_days_ago,)),
         
         # Category distribution for favorite cards
         'favoriteCategoryDistribution': fetch_query("""
@@ -348,7 +352,7 @@ def chart_data():
         """, (thirty_days_ago,)),
         
         'sessionEfficiency': fetch_query("""
-            SELECT TOP 20
+            SELECT TOP 100
                 s.SessionID,
                 s.StartTime,
                 s.DurationSeconds,
@@ -371,6 +375,7 @@ def chart_data():
             ORDER BY s.SessionID DESC
         """),
         
+        # Session Timeout Analysis (last 30 days)
         'timeoutAnalysis': fetch_query("""
             SELECT 
                 CONVERT(varchar, ReviewDate, 23) as Date,
@@ -407,32 +412,30 @@ def chart_data():
                 COUNT(*) as ReviewCount,
                 COUNT(DISTINCT FactID) as UniqueFactsCount
             FROM ReviewLogs
-            WHERE ReviewDate >= ? AND (Action IS NULL OR Action = 'view')
+            WHERE (Action IS NULL OR Action = 'view')
             GROUP BY DATEPART(weekday, ReviewDate)
             ORDER BY DATEPART(weekday, ReviewDate)
-        """, (seven_days_ago,)),
+        """),
         
         'topReviewHours': fetch_query("""
             SELECT TOP 5
                 DATEPART(hour, ReviewDate) as Hour,
                 COUNT(*) as ReviewCount
             FROM ReviewLogs
-            WHERE ReviewDate >= ? AND (Action IS NULL OR Action = 'view')
+            WHERE (Action IS NULL OR Action = 'view')
             GROUP BY DATEPART(hour, ReviewDate)
             ORDER BY COUNT(*) DESC
-        """, (thirty_days_ago,)),
+        """),
         
         'categoryGrowthTrend': fetch_query("""
             SELECT 
                 c.CategoryName,
-                COUNT(CASE WHEN f.DateAdded >= DATEADD(day, -7, GETDATE()) THEN 1 END) as LastWeek,
-                COUNT(CASE WHEN f.DateAdded >= DATEADD(day, -30, GETDATE()) THEN 1 END) as LastMonth,
-                COUNT(*) as AllTime
+                COUNT(f.FactID) as AllTime
             FROM Categories c
             LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
             GROUP BY c.CategoryName
             HAVING COUNT(*) > 0
-            ORDER BY COUNT(CASE WHEN f.DateAdded >= DATEADD(day, -7, GETDATE()) THEN 1 END) DESC
+            ORDER BY COUNT(f.FactID) DESC
         """),
         
         # New chart for Progress tab
@@ -688,9 +691,9 @@ def chart_data():
 
     # removed avg per-view duration series
 
-    # Add recent session summaries (last 20 sessions)
+    # Add recent session summaries (last 100 sessions)
     recent_sessions = fetch_query("""
-        SELECT TOP 20
+        SELECT TOP 100
             s.SessionID,
             s.StartTime,
             s.EndTime,
@@ -743,7 +746,7 @@ def chart_data():
 
     # Session actions (Add/Edit/Delete) per recent sessions
     session_actions_rows = fetch_query("""
-        SELECT TOP 20
+        SELECT TOP 100
             s.SessionID,
             s.StartTime,
             ISNULL(s.FactsAdded, 0) AS FactsAdded,
@@ -1103,27 +1106,18 @@ def format_top_hours(data):
 def format_growth_trend(data):
     """Format category growth trend"""
     categories = []
-    last_week = []
-    last_month = []
+    all_time = []
     
     for row in data[:8]:  # Top 8 categories
         categories.append(row.get('CategoryName', ''))
-        last_week.append(row.get('LastWeek', 0))
-        last_month.append(row.get('LastMonth', 0))
+        all_time.append(row.get('AllTime', 0))
     
     return {
         'labels': categories,
         'datasets': [
             {
-                'label': 'Last 7 Days',
-                'data': last_week,
-                'backgroundColor': '#f59e0b',
-                'borderColor': '#d97706',
-                'borderWidth': 1
-            },
-            {
-                'label': 'Last 30 Days',
-                'data': last_month,
+                'label': 'Total Facts (Lifetime)',
+                'data': all_time,
                 'backgroundColor': '#3b82f6',
                 'borderColor': '#2563eb',
                 'borderWidth': 1
