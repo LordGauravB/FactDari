@@ -1,0 +1,7 @@
+Get-Item Env:FACTDARI_TOGETHER_API_KEY
+$env:FACTDARI_TOGETHER_API_KEY = "GG" - Don't use
+setx FACTDARI_TOGETHER_API_KEY "GG"
+Get-ChildItem Env: | Sort-Object Name
+Get-ItemProperty HKCU:\Environment | Select FACTDARI_TOGETHER_API_KEY
+# or
+[Environment]::GetEnvironmentVariable("FACTDARI_TOGETHER_API_KEY","User")

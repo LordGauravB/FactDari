@@ -182,26 +182,22 @@ class Gamification:
                     except Exception:
                         last = None
 
-                # Determine new streak
-                new_streak = int(prof.get('CurrentStreak', 0) or 0)
-                longest = int(prof.get('LongestStreak', 0) or 0)
+                # Derive streak from actual review activity (authoritative)
+                log_current, log_longest, log_last = self._calculate_streak_from_logs(cur)
+                new_streak = log_current
+                longest = log_longest
                 changed = False
 
-                if last == today:
-                    # Already checked in today
-                    pass
-                else:
-                    if last == today - timedelta(days=1):
-                        new_streak = new_streak + 1 if new_streak > 0 else 1
-                    else:
-                        new_streak = 1
-                    longest = max(longest, new_streak)
+                if log_last:
+                    # Persist derived values
                     cur.execute(
                         "UPDATE GamificationProfile SET CurrentStreak = ?, LongestStreak = ?, LastCheckinDate = ?",
-                        (int(new_streak), int(longest), today)
+                        (int(new_streak), int(longest), log_last)
                     )
                     conn.commit()
-                    changed = True
+                    # Award daily XP only once per new day
+                    if last != today and log_last == today:
+                        changed = True
 
                 # Award daily check-in XP (only when day advanced or first time)
                 if changed:
@@ -216,8 +212,61 @@ class Gamification:
                 # Return updated profile snapshot
                 prof['CurrentStreak'] = new_streak
                 prof['LongestStreak'] = longest
-                prof['LastCheckinDate'] = today if changed else last
+                prof['LastCheckinDate'] = log_last
                 return {'profile': prof, 'unlocked': unlocked}
+
+    def _calculate_streak_from_logs(self, cur):
+        """Compute current and longest streak from ReviewLogs (view/null actions only)."""
+        try:
+            cur.execute(
+                """
+                SELECT DISTINCT CONVERT(date, ReviewDate) as ReviewDay
+                FROM ReviewLogs
+                WHERE (Action IS NULL OR Action = 'view')
+                ORDER BY ReviewDay DESC
+                """
+            )
+            rows = cur.fetchall()
+        except Exception:
+            return 0, 0, None
+
+        dates = []
+        for r in rows:
+            d = r[0]
+            if isinstance(d, datetime):
+                d = d.date()
+            elif not isinstance(d, date):
+                try:
+                    d = datetime.strptime(str(d), '%Y-%m-%d').date()
+                except Exception:
+                    continue
+            dates.append(d)
+
+        if not dates:
+            return 0, 0, None
+
+        today = date.today()
+        longest = 1
+        run = 1
+        for i in range(1, len(dates)):
+            if dates[i] == dates[i-1] - timedelta(days=1):
+                run += 1
+            else:
+                run = 1
+            if run > longest:
+                longest = run
+
+        current = 0
+        if dates[0] in (today, today - timedelta(days=1)):
+            current = 1
+            for i in range(1, len(dates)):
+                if dates[i] == dates[i-1] - timedelta(days=1):
+                    current += 1
+                else:
+                    break
+
+        last_review = dates[0]
+        return current, longest, last_review
 
     def get_level_progress(self) -> dict:
         """Return progress metrics using stored Level (with gating) and current XP.

@@ -12,6 +12,7 @@ import subprocess
 import tkinter as tk
 import random
 import threading
+import requests
 from ctypes import wintypes
 from PIL import Image, ImageTk
 from datetime import datetime, timedelta
@@ -370,6 +371,18 @@ class FactDariApp:
                                 cursor="hand2", borderwidth=0, highlightthickness=0)
         self.graph_button.place(relx=1.0, rely=0, anchor="ne", x=-30, y=5)
 
+        # AI explain button (placed before Mark as Known)
+        self.ai_button = tk.Button(
+            self.fact_frame,
+            image=self.ai_icon,
+            bg=self.BG_COLOR,
+            command=self.explain_fact_with_ai,
+            cursor="hand2",
+            borderwidth=0,
+            highlightthickness=0
+        )
+        self.ai_button.place(relx=1.0, rely=0, anchor="ne", x=-105, y=5)
+
         # Add easy/known button (left of the star)
         self.easy_button = tk.Button(self.fact_frame, image=self.easy_icon, bg=self.BG_COLOR, command=self.toggle_easy,
                                 cursor="hand2", borderwidth=0, highlightthickness=0)
@@ -431,6 +444,12 @@ class FactDariApp:
         self.edit_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("edit.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.delete_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("delete.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.graph_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("graph.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        try:
+            self.ai_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("AI.png")).resize((20, 20), Image.Resampling.LANCZOS))
+            if hasattr(self, 'ai_button') and self.ai_button:
+                self.ai_button.config(image=self.ai_icon)
+        except Exception:
+            self.ai_icon = None
         self.white_star_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("White-Star.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.gold_star_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("Gold-Star.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.info_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("info.png")).resize((20, 20), Image.Resampling.LANCZOS))
@@ -487,6 +506,7 @@ class FactDariApp:
             ToolTip(self.speaker_button, "Speak text")
             ToolTip(self.star_button, "Toggle favorite (f)")
             ToolTip(self.easy_button, "Mark as known (k)")
+            ToolTip(self.ai_button, "AI explain fact")
             ToolTip(self.graph_button, "Analytics (g)")
             ToolTip(self.info_button, "Show shortcuts")
             ToolTip(self.add_icon_button, "Add fact (a)")
@@ -1183,6 +1203,117 @@ class FactDariApp:
 
         self.speaking_thread = threading.Thread(target=_worker, daemon=True)
         self.speaking_thread.start()
+
+    def explain_fact_with_ai(self):
+        """Open a popup and ask Together AI to explain the current fact in simple words."""
+        if self.is_home_page or not self.current_fact_id:
+            return
+
+        fact_text = (self.fact_label.cget("text") or "").strip()
+        if not fact_text:
+            self.status_label.config(text="No fact to explain", fg=self.RED_COLOR)
+            self.clear_status_after_delay(3000)
+            return
+
+        api_key = config.get_together_api_key()
+        if not api_key:
+            messagebox.showerror("API Key Missing", "Set FACTDARI_TOGETHER_API_KEY or TOGETHER_API_KEY environment variable.")
+            return
+
+        # Pause session timer while popup is open
+        self.pause_review_timer()
+
+        win = tk.Toplevel(self.root)
+        win.title("AI Fact Explanation")
+        try:
+            win.geometry(f"{self.POPUP_EDIT_CARD_SIZE}{self.POPUP_POSITION}")
+        except Exception:
+            win.geometry(self.POPUP_EDIT_CARD_SIZE)
+        win.configure(bg=self.BG_COLOR)
+
+        def on_close():
+            try:
+                self.resume_review_timer()
+            except Exception:
+                pass
+            win.destroy()
+
+        win.protocol("WM_DELETE_WINDOW", on_close)
+
+        tk.Label(win, text="AI Explanation", fg=self.TEXT_COLOR, bg=self.BG_COLOR, font=self.TITLE_FONT).pack(pady=10)
+
+        fact_frame = tk.Frame(win, bg=self.BG_COLOR)
+        fact_frame.pack(fill="both", expand=False, padx=20, pady=5)
+        tk.Label(fact_frame, text="Fact", fg=self.TEXT_COLOR, bg=self.BG_COLOR, font=self.NORMAL_FONT).pack(anchor="w")
+        fact_box = tk.Text(fact_frame, height=4, wrap="word", font=self.NORMAL_FONT, bg=self.LISTBOX_BG_COLOR, fg=self.TEXT_COLOR, bd=0)
+        fact_box.insert("1.0", fact_text)
+        fact_box.config(state="disabled")
+        fact_box.pack(fill="both", expand=True, pady=4)
+
+        explain_frame = tk.Frame(win, bg=self.BG_COLOR)
+        explain_frame.pack(fill="both", expand=True, padx=20, pady=5)
+        tk.Label(explain_frame, text="AI Explanation", fg=self.TEXT_COLOR, bg=self.BG_COLOR, font=self.NORMAL_FONT).pack(anchor="w")
+        explain_box = tk.Text(explain_frame, height=8, wrap="word", font=self.NORMAL_FONT, bg=self.LISTBOX_BG_COLOR, fg=self.TEXT_COLOR, bd=0)
+        explain_box.insert("1.0", "Fetching explanation...")
+        explain_box.config(state="disabled")
+        explain_box.pack(fill="both", expand=True, pady=4)
+
+        def update_text(text):
+            explain_box.config(state="normal")
+            explain_box.delete("1.0", "end")
+            explain_box.insert("1.0", text.strip())
+            explain_box.config(state="disabled")
+
+        def worker():
+            # Disable button so you can't click it twice while waiting
+            self.root.after(0, lambda: self.ai_button.config(state="disabled")) 
+            
+            result = self._call_together_ai(fact_text, api_key)
+            
+            self.root.after(0, lambda: update_text(result))
+            # Re-enable button
+            self.root.after(0, lambda: self.ai_button.config(state="normal"))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _call_together_ai(self, fact_text: str, api_key: str) -> str:
+        """Call Together AI to explain a fact; returns plain text explanation."""
+        try:
+            payload = {
+                "model": "deepseek-ai/DeepSeek-V3.1",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You explain short facts clearly in simple language. Keep it concise: 2 short paragraphs max."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Explain this fact in simple words and briefly elaborate:\n\n{fact_text}"
+                    }
+                ],
+                "max_tokens": 320,
+                "temperature": 0.35,
+            }
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            resp = requests.post(
+                "https://api.together.xyz/v1/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=30
+            )
+            if resp.status_code != 200:
+                return f"Error from AI ({resp.status_code}): {resp.text}"
+            data = resp.json()
+            choices = data.get("choices") or []
+            if not choices:
+                return "No explanation returned."
+            message = choices[0].get("message", {}).get("content", "")
+            return message.strip() or "No explanation returned."
+        except Exception as exc:
+            return f"Failed to fetch explanation: {exc}"
 
     def stop_speaking(self):
         """Stop any ongoing speech immediately."""
@@ -2533,6 +2664,10 @@ class FactDariApp:
                 self.easy_button.place_forget()
             except Exception:
                 pass
+            try:
+                self.ai_button.place_forget()
+            except Exception:
+                pass
             # Hide level label on home page
             try:
                 self.level_label.place_forget()
@@ -2622,6 +2757,7 @@ class FactDariApp:
         try:
             self.info_button.place_forget()
             # Show easy button before star
+            self.ai_button.place(relx=1.0, rely=0, anchor="ne", x=-105, y=5)
             self.easy_button.place(relx=1.0, rely=0, anchor="ne", x=-80, y=5)
             self.star_button.place(relx=1.0, rely=0, anchor="ne", x=-55, y=5)
             # Show speaker on reviewing page

@@ -133,6 +133,14 @@ def get_font(font_type):
     else:
         return (UI_CONFIG['font_family'], UI_CONFIG['normal_font_size'])
 
+def get_together_api_key():
+    """Fetch Together AI API key from environment."""
+    return (
+        os.environ.get('FACTDARI_TOGETHER_API_KEY')
+        or os.environ.get('TOGETHER_API_KEY')
+        or os.environ.get('TOGETHER_API_TOKEN')
+    )
+
 # (no chart config helpers are needed; Chart.js is configured in the template)
 
 # Leveling configuration (makes Level 100 total XP adjustable and early band sizes tunable)
