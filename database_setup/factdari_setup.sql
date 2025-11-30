@@ -11,6 +11,7 @@ USE FactDari;
 GO
 
 -- Step 3: Drop tables if they exist (order matters due to FKs)
+IF OBJECT_ID('AIUsageLogs', 'U') IS NOT NULL DROP TABLE AIUsageLogs;
 IF OBJECT_ID('AchievementUnlocks', 'U') IS NOT NULL DROP TABLE AchievementUnlocks;
 IF OBJECT_ID('Achievements', 'U') IS NOT NULL DROP TABLE Achievements;
 IF OBJECT_ID('GamificationProfile', 'U') IS NOT NULL DROP TABLE GamificationProfile;
@@ -78,7 +79,28 @@ CREATE TABLE ReviewLogs (
         REFERENCES ReviewSessions(SessionID)
 );
 
--- Step 8: Create GamificationProfile table (for user stats and XP/level tracking)
+-- Step 8: Create AIUsageLogs table to track AI spend per fact/session
+CREATE TABLE AIUsageLogs (
+    AIUsageID INT IDENTITY(1,1) PRIMARY KEY,
+    FactID INT NULL,
+    SessionID INT NULL,
+    OperationType NVARCHAR(32) NOT NULL CONSTRAINT DF_AIUsageLogs_OperationType DEFAULT 'EXPLANATION', -- EXPLANATION | TRANSLATION | IMAGE_GEN | etc.
+    ModelName NVARCHAR(200) NULL,
+    Provider NVARCHAR(100) NULL,
+    InputTokens INT NULL,
+    OutputTokens INT NULL,
+    TotalTokens AS (ISNULL(InputTokens, 0) + ISNULL(OutputTokens, 0)) PERSISTED,
+    Cost DECIMAL(19,9) NULL, -- store USD equivalent cost for the call
+    CurrencyCode CHAR(3) NOT NULL CONSTRAINT DF_AIUsageLogs_CurrencyCode DEFAULT 'USD',
+    LatencyMs INT NULL,
+    CreatedAt DATETIME NOT NULL CONSTRAINT DF_AIUsageLogs_CreatedAt DEFAULT GETDATE(),
+    CONSTRAINT FK_AIUsageLogs_Facts FOREIGN KEY (FactID)
+        REFERENCES Facts(FactID) ON DELETE SET NULL,
+    CONSTRAINT FK_AIUsageLogs_ReviewSessions FOREIGN KEY (SessionID)
+        REFERENCES ReviewSessions(SessionID) ON DELETE SET NULL
+);
+
+-- Step 9: Create GamificationProfile table (for user stats and XP/level tracking)
 CREATE TABLE GamificationProfile (
     ProfileID INT IDENTITY(1,1) PRIMARY KEY,
     XP INT NOT NULL CONSTRAINT DF_GamificationProfile_XP DEFAULT 0,
@@ -89,12 +111,14 @@ CREATE TABLE GamificationProfile (
     TotalAdds INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAdds DEFAULT 0,
     TotalEdits INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalEdits DEFAULT 0,
     TotalDeletes INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalDeletes DEFAULT 0,
+    TotalAITokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAITokens DEFAULT 0,
+    TotalAICost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalAICost DEFAULT 0,
     CurrentStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_CurrentStreak DEFAULT 0,
     LongestStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_LongestStreak DEFAULT 0,
     LastCheckinDate DATE NULL
 );
 
--- Step 9: Create Achievements table (catalog of all possible achievements)
+-- Step 10: Create Achievements table (catalog of all possible achievements)
 CREATE TABLE Achievements (
     AchievementID INT IDENTITY(1,1) PRIMARY KEY,
     Code NVARCHAR(64) NOT NULL UNIQUE,
@@ -106,7 +130,7 @@ CREATE TABLE Achievements (
     CreatedDate DATETIME NOT NULL CONSTRAINT DF_Achievements_CreatedDate DEFAULT GETDATE()
 );
 
--- Step 10: Create AchievementUnlocks table (tracks which achievements have been earned)
+-- Step 11: Create AchievementUnlocks table (tracks which achievements have been earned)
 CREATE TABLE AchievementUnlocks (
     UnlockID INT IDENTITY(1,1) PRIMARY KEY,
     AchievementID INT NOT NULL
@@ -125,6 +149,9 @@ CREATE INDEX IX_Facts_LastViewedDate ON Facts(LastViewedDate);
 CREATE INDEX IX_ReviewLogs_FactID ON ReviewLogs(FactID);
 CREATE INDEX IX_ReviewLogs_ReviewDate ON ReviewLogs(ReviewDate);
 CREATE INDEX IX_ReviewLogs_SessionID ON ReviewLogs(SessionID);
+CREATE INDEX IX_AIUsageLogs_FactID ON AIUsageLogs(FactID);
+CREATE INDEX IX_AIUsageLogs_SessionID ON AIUsageLogs(SessionID);
+CREATE INDEX IX_AIUsageLogs_CreatedAt ON AIUsageLogs(CreatedAt);
 GO
 
 /* Add a normalized, persisted computed column for duplicate prevention */
@@ -153,7 +180,7 @@ BEGIN
 END
 GO
 
--- Step 11: Insert expanded categories
+-- Step 12: Insert expanded categories
 INSERT INTO Categories (CategoryName, Description)
 VALUES
 ('General Knowledge', 'Broad facts and trivia across domains'),
@@ -174,7 +201,7 @@ VALUES
 ('DIY', 'Everyday home hacks: cleaning, organizing, minor fixes');
 GO
 
--- Step 12: Cache category IDs for readable inserts
+-- Step 13: Cache category IDs for readable inserts
 DECLARE
   @Cat_General INT = (SELECT CategoryID FROM Categories WHERE CategoryName='General Knowledge'),
   @Cat_Science INT = (SELECT CategoryID FROM Categories WHERE CategoryName='Science'),
@@ -194,7 +221,7 @@ DECLARE
   @Cat_DIY INT = (SELECT CategoryID FROM dbo.Categories WHERE CategoryName = 'DIY');
 
 
--- Step 13:  Insert Facts
+-- Step 14:  Insert Facts
 INSERT INTO Facts (CategoryID, Content, DateAdded, LastViewedDate, ReviewCount, TotalViews)
 VALUES
 (@Cat_General, N'Ada Lovelace''s 1843 notes described a general-purpose algorithm for Babbage''s engine — she''s often called the first computer programmer.', GETDATE(), NULL, 0, 0),
@@ -1199,12 +1226,12 @@ VALUES
 (@Cat_Science, N'If you could compress the Earth to the size of a marble, it would become a black hole due to its immense density.', GETDATE(), NULL, 0, 0);
 GO
 
--- Step 14: Initialize GamificationProfile with a single row
+-- Step 15: Initialize GamificationProfile with a single row
 INSERT INTO GamificationProfile (XP, Level)
 VALUES (0, 1);
 GO
 
--- Step 15: Insert achievement definitions
+-- Step 16: Insert achievement definitions
 ;WITH Seeds (Code, Name, Category, Threshold, RewardXP) AS (
     -- Known facts achievements
     SELECT 'KNOWN_5','Know 5 facts','known',5,10 UNION ALL
@@ -1301,11 +1328,12 @@ LEFT JOIN Achievements a ON a.Code = s.Code
 WHERE a.AchievementID IS NULL;
 GO
 
--- Step 16: Verify the setup
+-- Step 17: Verify the setup
 SELECT 'Categories' AS TableName, COUNT(*) AS RecordCount FROM Categories
 UNION ALL SELECT 'Facts', COUNT(*) FROM Facts
 UNION ALL SELECT 'ReviewLogs', COUNT(*) FROM ReviewLogs
 UNION ALL SELECT 'ReviewSessions', COUNT(*) FROM ReviewSessions
+UNION ALL SELECT 'AIUsageLogs', COUNT(*) FROM AIUsageLogs
 UNION ALL SELECT 'GamificationProfile', COUNT(*) FROM GamificationProfile
 UNION ALL SELECT 'Achievements', COUNT(*) FROM Achievements
 UNION ALL SELECT 'AchievementUnlocks', COUNT(*) FROM AchievementUnlocks;

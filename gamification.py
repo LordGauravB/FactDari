@@ -19,7 +19,8 @@ class Gamification:
                 cur.execute(
                     """
                     SELECT TOP 1 ProfileID, XP, Level, TotalReviews, TotalKnown, TotalFavorites,
-                           TotalAdds, TotalEdits, TotalDeletes, CurrentStreak, LongestStreak, LastCheckinDate
+                           TotalAdds, TotalEdits, TotalDeletes, TotalAITokens, TotalAICost,
+                           CurrentStreak, LongestStreak, LastCheckinDate
                     FROM GamificationProfile
                     ORDER BY ProfileID
                     """
@@ -32,7 +33,8 @@ class Gamification:
                     cur.execute(
                         """
                         SELECT TOP 1 ProfileID, XP, Level, TotalReviews, TotalKnown, TotalFavorites,
-                               TotalAdds, TotalEdits, TotalDeletes, CurrentStreak, LongestStreak, LastCheckinDate
+                               TotalAdds, TotalEdits, TotalDeletes, TotalAITokens, TotalAICost,
+                               CurrentStreak, LongestStreak, LastCheckinDate
                         FROM GamificationProfile
                         ORDER BY ProfileID
                         """
@@ -67,6 +69,42 @@ class Gamification:
                 conn.commit()
                 cur.execute(f"SELECT {field} FROM GamificationProfile WHERE ProfileID = ?", (pid,))
                 return int(cur.fetchone()[0])
+
+    def add_ai_usage(self, total_tokens: int = 0, cost: float = 0.0) -> dict:
+        """Accumulate AI token/cost totals on the profile."""
+        try:
+            tokens_val = int(total_tokens or 0)
+        except Exception:
+            tokens_val = 0
+        try:
+            cost_val = float(cost or 0.0)
+        except Exception:
+            cost_val = 0.0
+
+        if tokens_val <= 0 and cost_val <= 0.0:
+            return self.get_profile()
+
+        with pyodbc.connect(self.conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
+                r = cur.fetchone()
+                if not r:
+                    cur.execute("INSERT INTO GamificationProfile (XP, Level) VALUES (0,1)")
+                    conn.commit()
+                    cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
+                    r = cur.fetchone()
+                pid = int(r[0])
+                cur.execute(
+                    """
+                    UPDATE GamificationProfile
+                    SET TotalAITokens = ISNULL(TotalAITokens,0) + ?,
+                        TotalAICost = ISNULL(TotalAICost,0) + ?
+                    WHERE ProfileID = ?
+                    """,
+                    (tokens_val, cost_val, pid)
+                )
+                conn.commit()
+        return self.get_profile()
 
     def award_xp(self, amount: int) -> dict:
         if amount <= 0:
@@ -156,7 +194,8 @@ class Gamification:
                 cur.execute(
                     """
                     SELECT TOP 1 ProfileID, XP, Level, TotalReviews, TotalKnown, TotalFavorites,
-                           TotalAdds, TotalEdits, TotalDeletes, CurrentStreak, LongestStreak, LastCheckinDate
+                           TotalAdds, TotalEdits, TotalDeletes, TotalAITokens, TotalAICost,
+                           CurrentStreak, LongestStreak, LastCheckinDate
                     FROM GamificationProfile
                     ORDER BY ProfileID
                     """

@@ -13,6 +13,7 @@ import tkinter as tk
 import random
 import threading
 import requests
+import time
 from ctypes import wintypes
 from PIL import Image, ImageTk
 from datetime import datetime, timedelta
@@ -108,6 +109,19 @@ class FactDariApp:
         self.SMALL_FONT = config.get_font('small')
         self.LARGE_FONT = config.get_font('large')
         self.STATS_FONT = config.get_font('stats')
+
+        # AI model/pricing (used for logging and cost estimation)
+        self.ai_model = config.AI_PRICING.get('model', "deepseek-ai/DeepSeek-V3.1")
+        self.ai_provider = config.AI_PRICING.get('provider', "together")
+        try:
+            self.ai_prompt_cost_per_1k = float(config.AI_PRICING.get('prompt_cost_per_1k', 0) or 0)
+        except Exception:
+            self.ai_prompt_cost_per_1k = 0.0
+        try:
+            self.ai_completion_cost_per_1k = float(config.AI_PRICING.get('completion_cost_per_1k', 0) or 0)
+        except Exception:
+            self.ai_completion_cost_per_1k = 0.0
+        self.ai_currency = config.AI_PRICING.get('currency', 'USD')
         
         # Instance variables
         self.x_window = 0
@@ -926,6 +940,31 @@ class FactDariApp:
             REFERENCES dbo.Facts(FactID) ON DELETE SET NULL;
         END;
 
+        /* AI usage logging */
+        IF OBJECT_ID('dbo.AIUsageLogs','U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.AIUsageLogs (
+                AIUsageID INT IDENTITY(1,1) PRIMARY KEY,
+                FactID INT NULL,
+                SessionID INT NULL,
+                OperationType NVARCHAR(32) NOT NULL CONSTRAINT DF_AIUsageLogs_OperationType DEFAULT 'EXPLANATION',
+                ModelName NVARCHAR(200) NULL,
+                Provider NVARCHAR(100) NULL,
+                InputTokens INT NULL,
+                OutputTokens INT NULL,
+                TotalTokens AS (ISNULL(InputTokens, 0) + ISNULL(OutputTokens, 0)) PERSISTED,
+                Cost DECIMAL(19,9) NULL,
+                CurrencyCode CHAR(3) NOT NULL CONSTRAINT DF_AIUsageLogs_CurrencyCode DEFAULT 'USD',
+                LatencyMs INT NULL,
+                CreatedAt DATETIME NOT NULL CONSTRAINT DF_AIUsageLogs_CreatedAt DEFAULT GETDATE(),
+                CONSTRAINT FK_AIUsageLogs_Facts FOREIGN KEY (FactID) REFERENCES dbo.Facts(FactID) ON DELETE SET NULL,
+                CONSTRAINT FK_AIUsageLogs_ReviewSessions FOREIGN KEY (SessionID) REFERENCES dbo.ReviewSessions(SessionID) ON DELETE SET NULL
+            );
+            CREATE INDEX IX_AIUsageLogs_FactID ON dbo.AIUsageLogs(FactID);
+            CREATE INDEX IX_AIUsageLogs_SessionID ON dbo.AIUsageLogs(SessionID);
+            CREATE INDEX IX_AIUsageLogs_CreatedAt ON dbo.AIUsageLogs(CreatedAt);
+        END;
+
         /* Gamification core tables */
         IF OBJECT_ID('dbo.GamificationProfile','U') IS NULL
         BEGIN
@@ -939,10 +978,22 @@ class FactDariApp:
                 TotalAdds INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAdds DEFAULT 0,
                 TotalEdits INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalEdits DEFAULT 0,
                 TotalDeletes INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalDeletes DEFAULT 0,
+                TotalAITokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAITokens DEFAULT 0,
+                TotalAICost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalAICost DEFAULT 0,
                 CurrentStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_CurrentStreak DEFAULT 0,
                 LongestStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_LongestStreak DEFAULT 0,
                 LastCheckinDate DATE NULL
             );
+        END;
+
+        /* Backfill AI totals on existing GamificationProfile tables */
+        IF COL_LENGTH('dbo.GamificationProfile','TotalAITokens') IS NULL
+        BEGIN
+            ALTER TABLE dbo.GamificationProfile ADD TotalAITokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAITokens DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.GamificationProfile','TotalAICost') IS NULL
+        BEGIN
+            ALTER TABLE dbo.GamificationProfile ADD TotalAICost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalAICost DEFAULT 0;
         END;
 
         IF OBJECT_ID('dbo.Achievements','U') IS NULL
@@ -1215,6 +1266,8 @@ class FactDariApp:
             self.clear_status_after_delay(3000)
             return
 
+        fact_id = self.current_fact_id
+        session_id = self.current_session_id
         api_key = config.get_together_api_key()
         if not api_key:
             messagebox.showerror("API Key Missing", "Set FACTDARI_TOGETHER_API_KEY or TOGETHER_API_KEY environment variable.")
@@ -1268,19 +1321,30 @@ class FactDariApp:
             # Disable button so you can't click it twice while waiting
             self.root.after(0, lambda: self.ai_button.config(state="disabled")) 
             
-            result = self._call_together_ai(fact_text, api_key)
+            result_text, usage_info = self._call_together_ai(fact_text, api_key)
+
+            try:
+                self._record_ai_usage(usage_info, fact_id=fact_id, session_id=session_id)
+            except Exception as exc:
+                print(f"AI usage logging error: {exc}")
             
-            self.root.after(0, lambda: update_text(result))
+            self.root.after(0, lambda: update_text(result_text))
             # Re-enable button
             self.root.after(0, lambda: self.ai_button.config(state="normal"))
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _call_together_ai(self, fact_text: str, api_key: str) -> str:
-        """Call Together AI to explain a fact; returns plain text explanation."""
+    def _call_together_ai(self, fact_text: str, api_key: str):
+        """Call Together AI to explain a fact; returns (text, usage_info)."""
+        started = time.perf_counter()
+        usage_info = {
+            "operation_type": "EXPLANATION",
+            "model": getattr(self, 'ai_model', "deepseek-ai/DeepSeek-V3.1"),
+            "provider": getattr(self, 'ai_provider', "together"),
+        }
         try:
             payload = {
-                "model": "deepseek-ai/DeepSeek-V3.1",
+                "model": usage_info["model"],
                 "messages": [
                     {
                         "role": "system",
@@ -1304,16 +1368,150 @@ class FactDariApp:
                 headers=headers,
                 timeout=30
             )
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            usage_info["latency_ms"] = latency_ms
             if resp.status_code != 200:
-                return f"Error from AI ({resp.status_code}): {resp.text}"
+                return f"Error from AI ({resp.status_code}): {resp.text}", usage_info
             data = resp.json()
             choices = data.get("choices") or []
             if not choices:
-                return "No explanation returned."
+                return "No explanation returned.", usage_info
             message = choices[0].get("message", {}).get("content", "")
-            return message.strip() or "No explanation returned."
+            raw_usage = data.get("usage") or {}
+            input_tokens = raw_usage.get("prompt_tokens")
+            output_tokens = raw_usage.get("completion_tokens")
+            total_tokens = raw_usage.get("total_tokens")
+            # Fallback computation if total not provided but parts are
+            if total_tokens is None and (input_tokens is not None or output_tokens is not None):
+                total_tokens = int(input_tokens or 0) + int(output_tokens or 0)
+            if total_tokens == 0 and input_tokens is None and output_tokens is None:
+                total_tokens = None
+            usage_info.update({
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": total_tokens,
+            })
+            return message.strip() or "No explanation returned.", usage_info
         except Exception as exc:
-            return f"Failed to fetch explanation: {exc}"
+            try:
+                usage_info["latency_ms"] = int((time.perf_counter() - started) * 1000)
+            except Exception:
+                pass
+            return f"Failed to fetch explanation: {exc}", usage_info
+
+    def _estimate_ai_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
+        """Estimate call cost using configured per-1K token prices."""
+        try:
+            prompt_val = int(prompt_tokens or 0)
+        except Exception:
+            prompt_val = 0
+        try:
+            completion_val = int(completion_tokens or 0)
+        except Exception:
+            completion_val = 0
+        prompt_cost = (prompt_val / 1000.0) * float(getattr(self, 'ai_prompt_cost_per_1k', 0) or 0)
+        completion_cost = (completion_val / 1000.0) * float(getattr(self, 'ai_completion_cost_per_1k', 0) or 0)
+        return round(prompt_cost + completion_cost, 9)
+
+    def _record_ai_usage(self, usage_info: dict, fact_id: int, session_id=None):
+        """Persist AI usage row and roll totals into gamification profile."""
+        if not usage_info:
+            return
+        if fact_id is None:
+            return
+        model_name = usage_info.get("model") or getattr(self, 'ai_model', None)
+        provider = usage_info.get("provider") or getattr(self, 'ai_provider', None)
+        operation_type = usage_info.get("operation_type") or "EXPLANATION"
+        input_tokens = usage_info.get("input_tokens")
+        output_tokens = usage_info.get("output_tokens")
+        total_tokens = usage_info.get("total_tokens")
+
+        try:
+            input_tokens = int(input_tokens) if input_tokens is not None else None
+        except Exception:
+            input_tokens = None
+        try:
+            output_tokens = int(output_tokens) if output_tokens is not None else None
+        except Exception:
+            output_tokens = None
+
+        if total_tokens is not None:
+            try:
+                total_tokens = int(total_tokens)
+            except Exception:
+                total_tokens = None
+
+        if total_tokens is None and (input_tokens is not None or output_tokens is not None):
+            total_tokens = (input_tokens or 0) + (output_tokens or 0)
+
+        cost = usage_info.get("cost")
+        if cost is None and (input_tokens is not None or output_tokens is not None):
+            cost = self._estimate_ai_cost(input_tokens or 0, output_tokens or 0)
+
+        latency_ms = usage_info.get("latency_ms")
+        try:
+            latency_ms = int(latency_ms) if latency_ms is not None else None
+        except Exception:
+            latency_ms = None
+
+        resolved_session_id = session_id if session_id is not None else getattr(self, 'current_session_id', None)
+
+        self._log_ai_usage(
+            fact_id=fact_id,
+            session_id=resolved_session_id,
+            operation_type=operation_type,
+            model_name=model_name,
+            provider=provider,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            cost=cost,
+            latency_ms=latency_ms,
+        )
+
+    def _log_ai_usage(self, fact_id, session_id, operation_type, model_name, provider, input_tokens, output_tokens, total_tokens, cost, latency_ms):
+        """Insert into AIUsageLogs and roll totals into GamificationProfile."""
+        try:
+            cost_val = None if cost is None else round(float(cost), 9)
+        except Exception:
+            cost_val = None
+
+        # Normalize tokens for insert
+        it = input_tokens if input_tokens is None else int(input_tokens)
+        ot = output_tokens if output_tokens is None else int(output_tokens)
+        total_for_profile = total_tokens
+        if total_for_profile is None:
+            total_for_profile = (0 if it is None else it) + (0 if ot is None else ot)
+            if total_for_profile == 0:
+                total_for_profile = None
+
+        try:
+            self.execute_update(
+                """
+                INSERT INTO AIUsageLogs (FactID, SessionID, OperationType, ModelName, Provider, InputTokens, OutputTokens, Cost, CurrencyCode, LatencyMs)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    fact_id,
+                    session_id,
+                    operation_type,
+                    model_name,
+                    provider,
+                    it,
+                    ot,
+                    cost_val,
+                    getattr(self, 'ai_currency', 'USD'),
+                    latency_ms,
+                ),
+            )
+        except Exception as exc:
+            print(f"Database error in _log_ai_usage: {exc}")
+
+        try:
+            if self.gamify and (total_for_profile is not None or (cost_val is not None and cost_val != 0)):
+                self.gamify.add_ai_usage(total_for_profile or 0, cost_val or 0.0)
+        except Exception as exc:
+            print(f"Gamification error in _log_ai_usage: {exc}")
 
     def stop_speaking(self):
         """Stop any ongoing speech immediately."""

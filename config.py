@@ -96,6 +96,28 @@ UI_CONFIG = {
 }
 
 
+def _get_float_env(var_name: str, default: str = "0") -> float:
+    """Safely parse a float from environment variables."""
+    try:
+        return float(os.environ.get(var_name, default))
+    except Exception:
+        try:
+            return float(default)
+        except Exception:
+            return 0.0
+
+
+# AI pricing/configuration (used for cost estimation and logging)
+AI_PRICING = {
+    'provider': os.environ.get('FACTDARI_AI_PROVIDER', 'together'),
+    'model': os.environ.get('FACTDARI_AI_MODEL', 'deepseek-ai/DeepSeek-V3.1'),
+    # Defaults derived from provided pricing per 1M tokens: $0.60 input, $1.70 output
+    'prompt_cost_per_1k': _get_float_env('FACTDARI_AI_PROMPT_COST_PER_1K', '0.0006'),
+    'completion_cost_per_1k': _get_float_env('FACTDARI_AI_COMPLETION_COST_PER_1K', '0.0017'),
+    'currency': os.environ.get('FACTDARI_AI_CURRENCY', 'USD'),
+}
+
+
 # Helper functions
 def get_icon_path(icon_name):
     """Get path to application icons"""
