@@ -229,9 +229,13 @@ class Gamification:
 
                 if log_last:
                     # Persist derived values
+                    last_param = log_last
+                    if isinstance(log_last, (datetime, date)):
+                        # SQL Server accepts ISO date strings; avoid driver date binding issues
+                        last_param = log_last.strftime("%Y-%m-%d")
                     cur.execute(
                         "UPDATE GamificationProfile SET CurrentStreak = ?, LongestStreak = ?, LastCheckinDate = ?",
-                        (int(new_streak), int(longest), log_last)
+                        (int(new_streak), int(longest), last_param)
                     )
                     conn.commit()
                     # Award daily XP only once per new day

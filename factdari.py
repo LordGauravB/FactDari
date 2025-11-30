@@ -1835,6 +1835,27 @@ class FactDariApp:
             self.current_review_log_id = None
             self.current_fact_start_time = now
 
+        # Force a streak check-in now that a log exists for today
+        try:
+            if getattr(self, 'gamify', None):
+                # Calculate new streak based on the log we just inserted
+                result = self.gamify.daily_checkin()
+
+                # Optional: Update UI feedback immediately
+                prof = result.get('profile', {}) if isinstance(result, dict) else {}
+                streak = prof.get('CurrentStreak', 0)
+                if streak and int(streak) > 0:
+                    # Update the status label briefly to show streak is active
+                    if not hasattr(self, '_streak_shown_today'):
+                        self.status_label.config(
+                            text=f"Streak active: {streak} day(s)!",
+                            fg=self.GREEN_COLOR
+                        )
+                        self.clear_status_after_delay(3000)
+                        self._streak_shown_today = True
+        except Exception as e:
+            print(f"Error updating streak: {e}")
+
     def pause_review_timer(self):
         """Pause the current review timer (exclude time until resumed)."""
         try:
