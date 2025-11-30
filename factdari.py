@@ -206,10 +206,10 @@ class FactDariApp:
         # Build header filters deterministically
         header = ["All Categories", "Favorites"]
         try:
-            has_is_easy = self.column_exists('Facts', 'IsEasy')
+            has_profile_state = self.column_exists('ProfileFacts', 'IsEasy')
         except Exception:
-            has_is_easy = False
-        if has_is_easy:
+            has_profile_state = False
+        if has_profile_state:
             header += ["Known", "Not Known"]
         header += ["Not Favorite"]
         return header + base_categories
@@ -821,18 +821,198 @@ class FactDariApp:
             print(f"Database error in execute_insert_return_id: {e}")
             return None
 
+    def get_active_profile_id(self) -> int:
+        """Fetch the current GamificationProfile ID, defaulting to 1."""
+        try:
+            if getattr(self, 'gamify', None):
+                prof = self.gamify.get_profile()
+                pid = prof.get('ProfileID') if isinstance(prof, dict) else None
+                if pid:
+                    return int(pid)
+        except Exception:
+            pass
+        try:
+            rows = self.fetch_query("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
+            if rows and rows[0]:
+                return int(rows[0][0])
+        except Exception:
+            pass
+        return 1
+
     def ensure_schema(self):
         """Create missing tables/columns for sessions and per-view durations."""
         ddl = """
+        /* Create GamificationProfile if missing (user identity) */
+        IF OBJECT_ID('dbo.GamificationProfile','U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.GamificationProfile (
+                ProfileID INT IDENTITY(1,1) PRIMARY KEY,
+                XP INT NOT NULL CONSTRAINT DF_GamificationProfile_XP DEFAULT 0,
+                Level INT NOT NULL CONSTRAINT DF_GamificationProfile_Level DEFAULT 1,
+                TotalReviews INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalReviews DEFAULT 0,
+                TotalKnown INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalKnown DEFAULT 0,
+                TotalFavorites INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalFavorites DEFAULT 0,
+                TotalAdds INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAdds DEFAULT 0,
+                TotalEdits INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalEdits DEFAULT 0,
+                TotalDeletes INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalDeletes DEFAULT 0,
+                TotalAITokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAITokens DEFAULT 0,
+                TotalAICost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalAICost DEFAULT 0,
+                CurrentStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_CurrentStreak DEFAULT 0,
+                LongestStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_LongestStreak DEFAULT 0,
+                LastCheckinDate DATE NULL
+            );
+        END;
+
+        /* Backfill AI totals on existing GamificationProfile tables */
+        IF COL_LENGTH('dbo.GamificationProfile','TotalAITokens') IS NULL
+        BEGIN
+            ALTER TABLE dbo.GamificationProfile ADD TotalAITokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAITokens DEFAULT 0;
+        END;
+        IF COL_LENGTH('dbo.GamificationProfile','TotalAICost') IS NULL
+        BEGIN
+            ALTER TABLE dbo.GamificationProfile ADD TotalAICost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalAICost DEFAULT 0;
+        END;
+
+        /* ProfileFacts: per-profile state for facts (favorites, difficulty, personal counts) */
+        IF OBJECT_ID('dbo.ProfileFacts','U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.ProfileFacts (
+                ProfileFactID INT IDENTITY(1,1) PRIMARY KEY,
+                ProfileID INT NOT NULL
+                    CONSTRAINT FK_ProfileFacts_Profile
+                    REFERENCES dbo.GamificationProfile(ProfileID),
+                FactID INT NOT NULL
+                    CONSTRAINT FK_ProfileFacts_Fact
+                    REFERENCES dbo.Facts(FactID) ON DELETE CASCADE,
+                PersonalReviewCount INT NOT NULL CONSTRAINT DF_ProfileFacts_PersonalReviewCount DEFAULT 0,
+                IsFavorite BIT NOT NULL CONSTRAINT DF_ProfileFacts_IsFavorite DEFAULT 0,
+                IsEasy BIT NOT NULL CONSTRAINT DF_ProfileFacts_IsEasy DEFAULT 0,
+                LastViewedByUser DATETIME NULL,
+                CONSTRAINT UX_ProfileFacts_Profile_Fact UNIQUE (ProfileID, FactID)
+            );
+            CREATE INDEX IX_ProfileFacts_ProfileID ON dbo.ProfileFacts(ProfileID);
+            CREATE INDEX IX_ProfileFacts_FactID ON dbo.ProfileFacts(FactID);
+        END;
+        ELSE
+        BEGIN
+            IF COL_LENGTH('dbo.ProfileFacts','PersonalReviewCount') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProfileFacts ADD PersonalReviewCount INT NOT NULL CONSTRAINT DF_ProfileFacts_PersonalReviewCount DEFAULT 0;
+            END;
+            IF COL_LENGTH('dbo.ProfileFacts','IsFavorite') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProfileFacts ADD IsFavorite BIT NOT NULL CONSTRAINT DF_ProfileFacts_IsFavorite DEFAULT 0;
+            END;
+            IF COL_LENGTH('dbo.ProfileFacts','IsEasy') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProfileFacts ADD IsEasy BIT NOT NULL CONSTRAINT DF_ProfileFacts_IsEasy DEFAULT 0;
+            END;
+            IF COL_LENGTH('dbo.ProfileFacts','LastViewedByUser') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProfileFacts ADD LastViewedByUser DATETIME NULL;
+            END;
+            IF OBJECT_ID('dbo.UX_ProfileFacts_Profile_Fact','UQ') IS NULL
+               AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_ProfileFacts_Profile_Fact' AND object_id = OBJECT_ID('dbo.ProfileFacts'))
+            BEGIN
+                ALTER TABLE dbo.ProfileFacts
+                ADD CONSTRAINT UX_ProfileFacts_Profile_Fact UNIQUE (ProfileID, FactID);
+            END;
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ProfileFacts_ProfileID' AND object_id = OBJECT_ID('dbo.ProfileFacts'))
+            BEGIN
+                CREATE INDEX IX_ProfileFacts_ProfileID ON dbo.ProfileFacts(ProfileID);
+            END;
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ProfileFacts_FactID' AND object_id = OBJECT_ID('dbo.ProfileFacts'))
+            BEGIN
+                CREATE INDEX IX_ProfileFacts_FactID ON dbo.ProfileFacts(FactID);
+            END;
+        END;
+
+        /* Backfill ProfileFacts for default profile using any existing global columns */
+        IF NOT EXISTS (SELECT 1 FROM dbo.ProfileFacts WHERE ProfileID = 1)
+        BEGIN
+            DECLARE @hasFav BIT = CASE WHEN COL_LENGTH('dbo.Facts','IsFavorite') IS NOT NULL THEN 1 ELSE 0 END;
+            DECLARE @hasEasy BIT = CASE WHEN COL_LENGTH('dbo.Facts','IsEasy') IS NOT NULL THEN 1 ELSE 0 END;
+            DECLARE @merge_sql NVARCHAR(MAX) = '
+                MERGE dbo.ProfileFacts AS target
+                USING (
+                    SELECT
+                        1 AS ProfileID,
+                        f.FactID,
+                        0 AS PersonalReviewCount,
+                        ' + CASE WHEN @hasFav = 1 THEN 'ISNULL(f.IsFavorite,0)' ELSE 'CAST(0 AS BIT)' END + ' AS IsFavorite,
+                        ' + CASE WHEN @hasEasy = 1 THEN 'ISNULL(f.IsEasy,0)' ELSE 'CAST(0 AS BIT)' END + ' AS IsEasy,
+                        NULL AS LastViewedByUser
+                    FROM dbo.Facts f
+                ) AS src
+                ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
+                WHEN NOT MATCHED THEN
+                    INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
+                    VALUES (src.ProfileID, src.FactID, src.PersonalReviewCount, src.IsFavorite, src.IsEasy, src.LastViewedByUser);';
+            EXEC(@merge_sql);
+        END;
+
+        /* Drop obsolete ReviewCount column from Facts (now tracked per-profile + TotalViews) */
+        IF COL_LENGTH('dbo.Facts','ReviewCount') IS NOT NULL
+        BEGIN
+            DECLARE @df NVARCHAR(128);
+            SELECT @df = dc.name
+            FROM sys.default_constraints dc
+            JOIN sys.columns c ON c.column_id = dc.parent_column_id AND c.object_id = dc.parent_object_id
+            WHERE dc.parent_object_id = OBJECT_ID('dbo.Facts') AND c.name = 'ReviewCount';
+            IF @df IS NOT NULL 
+            BEGIN
+                DECLARE @cmd_drop_df NVARCHAR(400);
+                SET @cmd_drop_df = 'ALTER TABLE dbo.Facts DROP CONSTRAINT ' + QUOTENAME(@df);
+                EXEC(@cmd_drop_df);
+            END;
+            ALTER TABLE dbo.Facts DROP COLUMN ReviewCount;
+        END;
+        /* Drop obsolete LastViewedDate column from Facts (now per-profile in ProfileFacts) */
+        IF COL_LENGTH('dbo.Facts','LastViewedDate') IS NOT NULL
+        BEGIN
+            DECLARE @df2 NVARCHAR(128);
+            SELECT @df2 = dc.name
+            FROM sys.default_constraints dc
+            JOIN sys.columns c ON c.column_id = dc.parent_column_id AND c.object_id = dc.parent_object_id
+            WHERE dc.parent_object_id = OBJECT_ID('dbo.Facts') AND c.name = 'LastViewedDate';
+            IF @df2 IS NOT NULL 
+            BEGIN
+                DECLARE @cmd_drop_df2 NVARCHAR(400);
+                SET @cmd_drop_df2 = 'ALTER TABLE dbo.Facts DROP CONSTRAINT ' + QUOTENAME(@df2);
+                EXEC(@cmd_drop_df2);
+            END;
+            ALTER TABLE dbo.Facts DROP COLUMN LastViewedDate;
+        END;
+
+        /* Ensure CreatedBy columns on Categories and Facts (default profile 1) */
+        IF COL_LENGTH('dbo.Categories','CreatedBy') IS NULL
+        BEGIN
+            ALTER TABLE dbo.Categories ADD CreatedBy INT NOT NULL CONSTRAINT DF_Categories_CreatedBy DEFAULT 1;
+            UPDATE dbo.Categories SET CreatedBy = 1 WHERE CreatedBy IS NULL;
+            ALTER TABLE dbo.Categories
+            ADD CONSTRAINT FK_Categories_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES dbo.GamificationProfile(ProfileID);
+        END;
+        IF COL_LENGTH('dbo.Facts','CreatedBy') IS NULL
+        BEGIN
+            ALTER TABLE dbo.Facts ADD CreatedBy INT NOT NULL CONSTRAINT DF_Facts_CreatedBy DEFAULT 1;
+            UPDATE dbo.Facts SET CreatedBy = 1 WHERE CreatedBy IS NULL;
+            ALTER TABLE dbo.Facts
+            ADD CONSTRAINT FK_Facts_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES dbo.GamificationProfile(ProfileID);
+        END;
+
         /* Create ReviewSessions if missing */
         IF OBJECT_ID('dbo.ReviewSessions','U') IS NULL
         BEGIN
             CREATE TABLE dbo.ReviewSessions (
                 SessionID INT IDENTITY(1,1) PRIMARY KEY,
+                ProfileID INT NOT NULL CONSTRAINT DF_ReviewSessions_ProfileID DEFAULT 1,
                 StartTime DATETIME NOT NULL,
                 EndTime DATETIME NULL,
                 DurationSeconds INT NULL,
-                TimedOut BIT NOT NULL CONSTRAINT DF_ReviewSessions_TimedOut DEFAULT 0
+                TimedOut BIT NOT NULL CONSTRAINT DF_ReviewSessions_TimedOut DEFAULT 0,
+                FactsAdded INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsAdded DEFAULT 0,
+                FactsEdited INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsEdited DEFAULT 0,
+                FactsDeleted INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsDeleted DEFAULT 0
             );
         END;
 
@@ -916,6 +1096,27 @@ class FactDariApp:
             ALTER TABLE dbo.ReviewSessions ADD FactsDeleted INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsDeleted DEFAULT 0;
         END;
 
+        /* Attach ProfileID to ReviewSessions */
+        IF COL_LENGTH('dbo.ReviewSessions','ProfileID') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewSessions ADD ProfileID INT NULL CONSTRAINT DF_ReviewSessions_ProfileID DEFAULT 1;
+            UPDATE dbo.ReviewSessions SET ProfileID = 1 WHERE ProfileID IS NULL;
+            ALTER TABLE dbo.ReviewSessions ALTER COLUMN ProfileID INT NOT NULL;
+        END;
+        IF OBJECT_ID('dbo.FK_ReviewSessions_Profile','F') IS NULL
+        BEGIN
+            ALTER TABLE dbo.ReviewSessions
+            ADD CONSTRAINT FK_ReviewSessions_Profile
+            FOREIGN KEY (ProfileID) REFERENCES dbo.GamificationProfile(ProfileID);
+        END;
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.indexes 
+            WHERE name = 'IX_ReviewSessions_ProfileID' AND object_id = OBJECT_ID('dbo.ReviewSessions')
+        )
+        BEGIN
+            CREATE INDEX IX_ReviewSessions_ProfileID ON dbo.ReviewSessions(ProfileID);
+        END;
+
         /* Ensure FK from ReviewLogs(FactID) to Facts is ON DELETE SET NULL (to preserve logs for deleted cards) */
         IF EXISTS (
             SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ReviewLogs_Facts'
@@ -947,7 +1148,9 @@ class FactDariApp:
                 AIUsageID INT IDENTITY(1,1) PRIMARY KEY,
                 FactID INT NULL,
                 SessionID INT NULL,
+                ProfileID INT NOT NULL CONSTRAINT DF_AIUsageLogs_ProfileID DEFAULT 1,
                 OperationType NVARCHAR(32) NOT NULL CONSTRAINT DF_AIUsageLogs_OperationType DEFAULT 'EXPLANATION',
+                Status NVARCHAR(16) NOT NULL CONSTRAINT DF_AIUsageLogs_Status DEFAULT 'SUCCESS',
                 ModelName NVARCHAR(200) NULL,
                 Provider NVARCHAR(100) NULL,
                 InputTokens INT NULL,
@@ -958,42 +1161,37 @@ class FactDariApp:
                 LatencyMs INT NULL,
                 CreatedAt DATETIME NOT NULL CONSTRAINT DF_AIUsageLogs_CreatedAt DEFAULT GETDATE(),
                 CONSTRAINT FK_AIUsageLogs_Facts FOREIGN KEY (FactID) REFERENCES dbo.Facts(FactID) ON DELETE SET NULL,
+                CONSTRAINT FK_AIUsageLogs_Profile FOREIGN KEY (ProfileID) REFERENCES dbo.GamificationProfile(ProfileID),
                 CONSTRAINT FK_AIUsageLogs_ReviewSessions FOREIGN KEY (SessionID) REFERENCES dbo.ReviewSessions(SessionID) ON DELETE SET NULL
             );
             CREATE INDEX IX_AIUsageLogs_FactID ON dbo.AIUsageLogs(FactID);
             CREATE INDEX IX_AIUsageLogs_SessionID ON dbo.AIUsageLogs(SessionID);
+            CREATE INDEX IX_AIUsageLogs_ProfileID ON dbo.AIUsageLogs(ProfileID);
             CREATE INDEX IX_AIUsageLogs_CreatedAt ON dbo.AIUsageLogs(CreatedAt);
         END;
-
-        /* Gamification core tables */
-        IF OBJECT_ID('dbo.GamificationProfile','U') IS NULL
+        IF COL_LENGTH('dbo.AIUsageLogs','ProfileID') IS NULL
         BEGIN
-            CREATE TABLE dbo.GamificationProfile (
-                ProfileID INT IDENTITY(1,1) PRIMARY KEY,
-                XP INT NOT NULL CONSTRAINT DF_GamificationProfile_XP DEFAULT 0,
-                Level INT NOT NULL CONSTRAINT DF_GamificationProfile_Level DEFAULT 1,
-                TotalReviews INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalReviews DEFAULT 0,
-                TotalKnown INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalKnown DEFAULT 0,
-                TotalFavorites INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalFavorites DEFAULT 0,
-                TotalAdds INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAdds DEFAULT 0,
-                TotalEdits INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalEdits DEFAULT 0,
-                TotalDeletes INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalDeletes DEFAULT 0,
-                TotalAITokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAITokens DEFAULT 0,
-                TotalAICost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalAICost DEFAULT 0,
-                CurrentStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_CurrentStreak DEFAULT 0,
-                LongestStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_LongestStreak DEFAULT 0,
-                LastCheckinDate DATE NULL
-            );
+            ALTER TABLE dbo.AIUsageLogs ADD ProfileID INT NULL CONSTRAINT DF_AIUsageLogs_ProfileID DEFAULT 1;
+            UPDATE dbo.AIUsageLogs SET ProfileID = 1 WHERE ProfileID IS NULL;
+            ALTER TABLE dbo.AIUsageLogs ALTER COLUMN ProfileID INT NOT NULL;
         END;
-
-        /* Backfill AI totals on existing GamificationProfile tables */
-        IF COL_LENGTH('dbo.GamificationProfile','TotalAITokens') IS NULL
+        IF COL_LENGTH('dbo.AIUsageLogs','Status') IS NULL
         BEGIN
-            ALTER TABLE dbo.GamificationProfile ADD TotalAITokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAITokens DEFAULT 0;
+            ALTER TABLE dbo.AIUsageLogs ADD Status NVARCHAR(16) NULL CONSTRAINT DF_AIUsageLogs_Status DEFAULT 'SUCCESS';
+            UPDATE dbo.AIUsageLogs SET Status = 'SUCCESS' WHERE Status IS NULL;
+            ALTER TABLE dbo.AIUsageLogs ALTER COLUMN Status NVARCHAR(16) NOT NULL;
         END;
-        IF COL_LENGTH('dbo.GamificationProfile','TotalAICost') IS NULL
+        IF OBJECT_ID('dbo.FK_AIUsageLogs_Profile','F') IS NULL
         BEGIN
-            ALTER TABLE dbo.GamificationProfile ADD TotalAICost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalAICost DEFAULT 0;
+            ALTER TABLE dbo.AIUsageLogs
+            ADD CONSTRAINT FK_AIUsageLogs_Profile FOREIGN KEY (ProfileID) REFERENCES dbo.GamificationProfile(ProfileID);
+        END;
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.indexes 
+            WHERE name = 'IX_AIUsageLogs_ProfileID' AND object_id = OBJECT_ID('dbo.AIUsageLogs')
+        )
+        BEGIN
+            CREATE INDEX IX_AIUsageLogs_ProfileID ON dbo.AIUsageLogs(ProfileID);
         END;
 
         IF OBJECT_ID('dbo.Achievements','U') IS NULL
@@ -1005,9 +1203,27 @@ class FactDariApp:
                 Category NVARCHAR(32) NOT NULL,
                 Threshold INT NOT NULL,
                 RewardXP INT NOT NULL,
-                IsHidden BIT NOT NULL CONSTRAINT DF_Achievements_IsHidden DEFAULT 0,
                 CreatedDate DATETIME NOT NULL CONSTRAINT DF_Achievements_CreatedDate DEFAULT GETDATE()
             );
+        END;
+        ELSE
+        BEGIN
+            /* Drop IsHidden if it exists (unused) */
+            IF COL_LENGTH('dbo.Achievements','IsHidden') IS NOT NULL
+            BEGIN
+                DECLARE @df_ach NVARCHAR(128);
+                SELECT @df_ach = dc.name
+                FROM sys.default_constraints dc
+                JOIN sys.columns c ON c.column_id = dc.parent_column_id AND c.object_id = dc.parent_object_id
+                WHERE dc.parent_object_id = OBJECT_ID('dbo.Achievements') AND c.name = 'IsHidden';
+                IF @df_ach IS NOT NULL 
+                BEGIN
+                    DECLARE @cmd_drop_df_ach NVARCHAR(400);
+                    SET @cmd_drop_df_ach = 'ALTER TABLE dbo.Achievements DROP CONSTRAINT ' + QUOTENAME(@df_ach);
+                    EXEC(@cmd_drop_df_ach);
+                END;
+                ALTER TABLE dbo.Achievements DROP COLUMN IsHidden;
+            END;
         END;
 
         IF OBJECT_ID('dbo.AchievementUnlocks','U') IS NULL
@@ -1017,10 +1233,34 @@ class FactDariApp:
                 AchievementID INT NOT NULL
                     CONSTRAINT FK_AchievementUnlocks_Achievements
                     REFERENCES dbo.Achievements(AchievementID),
+                ProfileID INT NOT NULL CONSTRAINT DF_AchievementUnlocks_ProfileID DEFAULT 1,
                 UnlockDate DATETIME NOT NULL CONSTRAINT DF_AchievementUnlocks_UnlockDate DEFAULT GETDATE(),
-                Notified BIT NOT NULL CONSTRAINT DF_AchievementUnlocks_Notified DEFAULT 0
+                Notified BIT NOT NULL CONSTRAINT DF_AchievementUnlocks_Notified DEFAULT 0,
+                CONSTRAINT FK_AchievementUnlocks_Profile FOREIGN KEY (ProfileID) REFERENCES dbo.GamificationProfile(ProfileID)
             );
-            CREATE UNIQUE INDEX UX_AchievementUnlocks_AchievementID ON dbo.AchievementUnlocks(AchievementID);
+            CREATE UNIQUE INDEX UX_AchievementUnlocks_Profile_Achievement ON dbo.AchievementUnlocks(ProfileID, AchievementID);
+        END;
+        ELSE
+        BEGIN
+            IF COL_LENGTH('dbo.AchievementUnlocks','ProfileID') IS NULL
+            BEGIN
+                ALTER TABLE dbo.AchievementUnlocks ADD ProfileID INT NULL CONSTRAINT DF_AchievementUnlocks_ProfileID DEFAULT 1;
+                UPDATE dbo.AchievementUnlocks SET ProfileID = 1 WHERE ProfileID IS NULL;
+                ALTER TABLE dbo.AchievementUnlocks ALTER COLUMN ProfileID INT NOT NULL;
+            END;
+            IF OBJECT_ID('dbo.FK_AchievementUnlocks_Profile','F') IS NULL
+            BEGIN
+                ALTER TABLE dbo.AchievementUnlocks
+                ADD CONSTRAINT FK_AchievementUnlocks_Profile FOREIGN KEY (ProfileID) REFERENCES dbo.GamificationProfile(ProfileID);
+            END;
+            IF EXISTS (SELECT * FROM sys.indexes WHERE name = 'UX_AchievementUnlocks_AchievementID' AND object_id = OBJECT_ID('dbo.AchievementUnlocks'))
+            BEGIN
+                DROP INDEX UX_AchievementUnlocks_AchievementID ON dbo.AchievementUnlocks;
+            END;
+            IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'UX_AchievementUnlocks_Profile_Achievement' AND object_id = OBJECT_ID('dbo.AchievementUnlocks'))
+            BEGIN
+                CREATE UNIQUE INDEX UX_AchievementUnlocks_Profile_Achievement ON dbo.AchievementUnlocks(ProfileID, AchievementID);
+            END;
         END;
 
         /* Seed Achievements (insert any missing by Code) */
@@ -1113,8 +1353,8 @@ class FactDariApp:
                 SELECT 'STREAK_180','180-day review streak','streak',180,500 UNION ALL
                 SELECT 'STREAK_365','365-day review streak','streak',365,1000
             )
-            INSERT INTO dbo.Achievements (Code, Name, Category, Threshold, RewardXP, IsHidden, CreatedDate)
-            SELECT s.Code, s.Name, s.Category, s.Threshold, s.RewardXP, 0, GETDATE()
+            INSERT INTO dbo.Achievements (Code, Name, Category, Threshold, RewardXP, CreatedDate)
+            SELECT s.Code, s.Name, s.Category, s.Threshold, s.RewardXP, GETDATE()
             FROM Seeds s
             LEFT JOIN dbo.Achievements a ON a.Code = s.Code
             WHERE a.AchievementID IS NULL;
@@ -1137,14 +1377,17 @@ class FactDariApp:
     def get_facts_viewed_today(self):
         """Get count of unique facts viewed today"""
         today = datetime.now().strftime('%Y-%m-%d')
+        profile_id = self.get_active_profile_id()
         # Count only actual view actions (exclude add/edit/delete logs)
         query = """
-        SELECT COUNT(DISTINCT FactID)
-        FROM ReviewLogs
-        WHERE CONVERT(date, ReviewDate) = CONVERT(date, ?)
-          AND (Action IS NULL OR Action = 'view')
+        SELECT COUNT(DISTINCT rl.FactID)
+        FROM ReviewLogs rl
+        LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+        WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, ?)
+          AND (rl.Action IS NULL OR rl.Action = 'view')
+          AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
         """
-        result = self.fetch_query(query, (today,))
+        result = self.fetch_query(query, (today, profile_id))
         return result[0][0] if result and len(result) > 0 else 0
 
     def update_level_progress(self):
@@ -1341,6 +1584,7 @@ class FactDariApp:
             "operation_type": "EXPLANATION",
             "model": getattr(self, 'ai_model', "deepseek-ai/DeepSeek-V3.1"),
             "provider": getattr(self, 'ai_provider', "together"),
+            "status": "SUCCESS",
         }
         try:
             payload = {
@@ -1371,10 +1615,12 @@ class FactDariApp:
             latency_ms = int((time.perf_counter() - started) * 1000)
             usage_info["latency_ms"] = latency_ms
             if resp.status_code != 200:
+                usage_info["status"] = "FAILED"
                 return f"Error from AI ({resp.status_code}): {resp.text}", usage_info
             data = resp.json()
             choices = data.get("choices") or []
             if not choices:
+                usage_info["status"] = "FAILED"
                 return "No explanation returned.", usage_info
             message = choices[0].get("message", {}).get("content", "")
             raw_usage = data.get("usage") or {}
@@ -1397,6 +1643,7 @@ class FactDariApp:
                 usage_info["latency_ms"] = int((time.perf_counter() - started) * 1000)
             except Exception:
                 pass
+            usage_info["status"] = "FAILED"
             return f"Failed to fetch explanation: {exc}", usage_info
 
     def _estimate_ai_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
@@ -1454,12 +1701,21 @@ class FactDariApp:
         except Exception:
             latency_ms = None
 
+        status = usage_info.get("status") or "SUCCESS"
+        try:
+            status = str(status).upper()
+        except Exception:
+            status = "SUCCESS"
+        if status not in ("SUCCESS", "FAILED"):
+            status = "SUCCESS"
+
         resolved_session_id = session_id if session_id is not None else getattr(self, 'current_session_id', None)
 
         self._log_ai_usage(
             fact_id=fact_id,
             session_id=resolved_session_id,
             operation_type=operation_type,
+            status=status,
             model_name=model_name,
             provider=provider,
             input_tokens=input_tokens,
@@ -1469,7 +1725,7 @@ class FactDariApp:
             latency_ms=latency_ms,
         )
 
-    def _log_ai_usage(self, fact_id, session_id, operation_type, model_name, provider, input_tokens, output_tokens, total_tokens, cost, latency_ms):
+    def _log_ai_usage(self, fact_id, session_id, operation_type, status, model_name, provider, input_tokens, output_tokens, total_tokens, cost, latency_ms):
         """Insert into AIUsageLogs and roll totals into GamificationProfile."""
         try:
             cost_val = None if cost is None else round(float(cost), 9)
@@ -1485,16 +1741,19 @@ class FactDariApp:
             if total_for_profile == 0:
                 total_for_profile = None
 
+        profile_id = self.get_active_profile_id()
         try:
             self.execute_update(
                 """
-                INSERT INTO AIUsageLogs (FactID, SessionID, OperationType, ModelName, Provider, InputTokens, OutputTokens, Cost, CurrencyCode, LatencyMs)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO AIUsageLogs (FactID, SessionID, ProfileID, OperationType, Status, ModelName, Provider, InputTokens, OutputTokens, Cost, CurrencyCode, LatencyMs)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     fact_id,
                     session_id,
+                    profile_id,
                     operation_type,
+                    status,
                     model_name,
                     provider,
                     it,
@@ -1583,95 +1842,40 @@ class FactDariApp:
     def load_all_facts(self):
         """Load all facts for the current category"""
         category = self.category_var.get()
-        
-        has_is_easy = self.column_exists('Facts', 'IsEasy')
+        profile_id = self.get_active_profile_id()
+        base_select = """
+            SELECT f.FactID,
+                   f.Content,
+                   COALESCE(pf.IsFavorite, 0) AS IsFavorite,
+                   COALESCE(pf.IsEasy, 0) AS IsEasy
+            FROM Facts f
+            LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
+        """
+
+        facts = []
         if category == "All Categories":
-            if has_is_easy:
-                query = """
-                    SELECT FactID, Content, IsFavorite, IsEasy
-                    FROM Facts
-                    ORDER BY NEWID()
-                """
-            else:
-                query = """
-                    SELECT FactID, Content, IsFavorite
-                    FROM Facts
-                    ORDER BY NEWID()
-                """
-            facts = self.fetch_query(query)
+            query = base_select + " ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id,))
         elif category == "Favorites":
-            if has_is_easy:
-                query = """
-                    SELECT FactID, Content, IsFavorite, IsEasy
-                    FROM Facts
-                    WHERE IsFavorite = 1
-                    ORDER BY NEWID()
-                """
-            else:
-                query = """
-                    SELECT FactID, Content, IsFavorite
-                    FROM Facts
-                    WHERE IsFavorite = 1
-                    ORDER BY NEWID()
-                """
-            facts = self.fetch_query(query)
+            query = base_select + " WHERE COALESCE(pf.IsFavorite,0) = 1 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id,))
         elif category == "Known":
-            if has_is_easy:
-                query = """
-                    SELECT FactID, Content, IsFavorite, IsEasy
-                    FROM Facts
-                    WHERE IsEasy = 1
-                    ORDER BY NEWID()
-                """
-                facts = self.fetch_query(query)
-            else:
-                facts = []
+            query = base_select + " WHERE COALESCE(pf.IsEasy,0) = 1 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id,))
         elif category == "Not Known":
-            if has_is_easy:
-                query = """
-                    SELECT FactID, Content, IsFavorite, IsEasy
-                    FROM Facts
-                    WHERE IsEasy = 0
-                    ORDER BY NEWID()
-                """
-                facts = self.fetch_query(query)
-            else:
-                facts = []
+            query = base_select + " WHERE COALESCE(pf.IsEasy,0) = 0 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id,))
         elif category == "Not Favorite":
-            if has_is_easy:
-                query = """
-                    SELECT FactID, Content, IsFavorite, IsEasy
-                    FROM Facts
-                    WHERE IsFavorite = 0
-                    ORDER BY NEWID()
-                """
-            else:
-                query = """
-                    SELECT FactID, Content, IsFavorite
-                    FROM Facts
-                    WHERE IsFavorite = 0
-                    ORDER BY NEWID()
-                """
-            facts = self.fetch_query(query)
+            query = base_select + " WHERE COALESCE(pf.IsFavorite,0) = 0 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id,))
         else:
-            if has_is_easy:
-                query = """
-                    SELECT f.FactID, f.Content, f.IsFavorite, f.IsEasy
-                    FROM Facts f
-                    JOIN Categories c ON f.CategoryID = c.CategoryID
-                    WHERE c.CategoryName = ?
-                    ORDER BY NEWID()
-                """
-            else:
-                query = """
-                    SELECT f.FactID, f.Content, f.IsFavorite
-                    FROM Facts f
-                    JOIN Categories c ON f.CategoryID = c.CategoryID
-                    WHERE c.CategoryName = ?
-                    ORDER BY NEWID()
-                """
-            facts = self.fetch_query(query, (category,))
-        
+            query = base_select + """
+                JOIN Categories c ON f.CategoryID = c.CategoryID
+                WHERE c.CategoryName = ?
+                ORDER BY NEWID()
+            """
+            facts = self.fetch_query(query, (profile_id, category))
+
         self.all_facts = facts if facts else []
         self.current_fact_index = 0
     
@@ -1801,11 +2005,28 @@ class FactDariApp:
         # 2) Update the fact's view count and last viewed date
         self.execute_update("""
             UPDATE Facts 
-            SET TotalViews = TotalViews + 1,
-                ReviewCount = ReviewCount + 1,
-                LastViewedDate = GETDATE()
+            SET TotalViews = TotalViews + 1
             WHERE FactID = ?
         """, (fact_id,))
+        # Per-profile view count and last viewed
+        try:
+            pid = self.get_active_profile_id()
+            self.execute_update(
+                """
+                MERGE ProfileFacts AS target
+                USING (SELECT ? AS ProfileID, ? AS FactID) AS src
+                ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
+                WHEN MATCHED THEN
+                    UPDATE SET PersonalReviewCount = ISNULL(target.PersonalReviewCount,0) + 1,
+                               LastViewedByUser = GETDATE()
+                WHEN NOT MATCHED THEN
+                    INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
+                    VALUES (src.ProfileID, src.FactID, 1, 0, 0, GETDATE());
+                """,
+                (pid, fact_id)
+            )
+        except Exception:
+            pass
 
         # 3) Start a new view log and remember its ID + start time
         try:
@@ -1927,12 +2148,14 @@ class FactDariApp:
         except Exception:
             pass
         self.session_start_time = datetime.now()
+        profile_id = self.get_active_profile_id()
         session_id = self.execute_insert_return_id(
             """
-            INSERT INTO ReviewSessions (StartTime)
+            INSERT INTO ReviewSessions (ProfileID, StartTime)
             OUTPUT INSERTED.SessionID
-            VALUES (GETDATE())
-            """
+            VALUES (?, GETDATE())
+            """,
+            (profile_id,)
         )
         self.current_session_id = session_id
         # Daily streak check-in and possible achievements
@@ -2003,21 +2226,30 @@ class FactDariApp:
         """Toggle the favorite status of the current fact"""
         if not self.current_fact_id:
             return
-        
+        profile_id = self.get_active_profile_id()
+
         # Toggle the favorite status
         new_status = not self.current_fact_is_favorite
-        
-        # Update in database
-        success = self.execute_update("""
-            UPDATE Facts 
-            SET IsFavorite = ?
-            WHERE FactID = ?
-        """, (1 if new_status else 0, self.current_fact_id))
-        
+
+        # Update in database (per profile)
+        success = self.execute_update(
+            """
+            MERGE ProfileFacts AS target
+            USING (SELECT ? AS ProfileID, ? AS FactID) AS src
+            ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
+            WHEN MATCHED THEN
+                UPDATE SET IsFavorite = ?, LastViewedByUser = COALESCE(target.LastViewedByUser, GETDATE())
+            WHEN NOT MATCHED THEN
+                INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
+                VALUES (src.ProfileID, src.FactID, 0, ?, 0, GETDATE());
+            """,
+            (profile_id, self.current_fact_id, 1 if new_status else 0, 1 if new_status else 0)
+        )
+
         if success:
             # Update local state
             self.current_fact_is_favorite = new_status
-            
+
             # Update star icon
             if new_status:
                 self.star_button.config(image=self.gold_star_icon)
@@ -2043,7 +2275,7 @@ class FactDariApp:
                     _ = self.gamify.increment_counter('TotalFavorites', 1)
                     # Compute current number of favorites from Facts
                     try:
-                        rows = self.fetch_query("SELECT COUNT(*) FROM Facts WHERE IsFavorite = 1")
+                        rows = self.fetch_query("SELECT COUNT(*) FROM ProfileFacts WHERE ProfileID = ? AND IsFavorite = 1", (profile_id,))
                         current_fav_count = int(rows[0][0]) if rows else 0
                     except Exception:
                         current_fav_count = 0
@@ -2067,16 +2299,21 @@ class FactDariApp:
         """Toggle the 'known/easy' status of the current fact"""
         if not self.current_fact_id:
             return
-        if not self.column_exists('Facts', 'IsEasy'):
-            self.status_label.config(text="Please update DB to latest (IsEasy column)", fg=self.STATUS_COLOR)
-            self.clear_status_after_delay(3000)
-            return
+        profile_id = self.get_active_profile_id()
         new_status = not self.current_fact_is_easy
-        success = self.execute_update("""
-            UPDATE Facts
-            SET IsEasy = ?
-            WHERE FactID = ?
-        """, (1 if new_status else 0, self.current_fact_id))
+        success = self.execute_update(
+            """
+            MERGE ProfileFacts AS target
+            USING (SELECT ? AS ProfileID, ? AS FactID) AS src
+            ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
+            WHEN MATCHED THEN
+                UPDATE SET IsEasy = ?, LastViewedByUser = COALESCE(target.LastViewedByUser, GETDATE())
+            WHEN NOT MATCHED THEN
+                INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
+                VALUES (src.ProfileID, src.FactID, 0, 0, ?, GETDATE());
+            """,
+            (profile_id, self.current_fact_id, 1 if new_status else 0, 1 if new_status else 0)
+        )
         if success:
             self.current_fact_is_easy = new_status
             if new_status:
@@ -2101,7 +2338,7 @@ class FactDariApp:
                     _ = self.gamify.increment_counter('TotalKnown', 1)
                     # Compute current known facts from Facts
                     try:
-                        rows = self.fetch_query("SELECT COUNT(*) FROM Facts WHERE IsEasy = 1")
+                        rows = self.fetch_query("SELECT COUNT(*) FROM ProfileFacts WHERE ProfileID = ? AND IsEasy = 1", (profile_id,))
                         current_known_count = int(rows[0][0]) if rows else 0
                     except Exception:
                         current_known_count = 0
@@ -2218,14 +2455,30 @@ class FactDariApp:
             # Insert the new fact and get its ID
             new_fact_id = self.execute_insert_return_id(
                 """
-                INSERT INTO Facts (CategoryID, Content, DateAdded, ReviewCount, TotalViews, IsFavorite)
+                INSERT INTO Facts (CategoryID, Content, DateAdded, TotalViews)
                 OUTPUT INSERTED.FactID
-                VALUES (?, ?, GETDATE(), 0, 0, 0)
+                VALUES (?, ?, GETDATE(), 0)
                 """,
                 (category_id, content)
             )
             
             if new_fact_id:
+                # Initialize per-profile state for the active profile
+                try:
+                    pid = self.get_active_profile_id()
+                    self.execute_update(
+                        """
+                        MERGE ProfileFacts AS target
+                        USING (SELECT ? AS ProfileID, ? AS FactID) AS src
+                        ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
+                        WHEN NOT MATCHED THEN
+                            INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
+                            VALUES (src.ProfileID, src.FactID, 0, 0, 0, NULL);
+                        """,
+                        (pid, new_fact_id)
+                    )
+                except Exception:
+                    pass
                 self.status_label.config(text="New fact added successfully!", fg=self.GREEN_COLOR)
                 self.clear_status_after_delay(3000)
                 self.update_fact_count()

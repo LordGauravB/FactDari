@@ -5,6 +5,7 @@ erDiagram
         nvarchar Description
         bit IsActive
         datetime CreatedDate
+        int CreatedBy FK "default 1"
     }
 
     Facts {
@@ -12,15 +13,13 @@ erDiagram
         int CategoryID FK
         nvarchar Content
         date DateAdded
-        datetime LastViewedDate
-        int ReviewCount
-        int TotalViews
-        bit IsFavorite
-        bit IsEasy
+        int TotalViews "global"
+        int CreatedBy FK "default 1"
     }
 
     ReviewSessions {
         int SessionID PK
+        int ProfileID FK
         datetime StartTime
         datetime EndTime
         int DurationSeconds
@@ -44,6 +43,16 @@ erDiagram
         int CategoryIDSnapshot
     }
 
+    ProfileFacts {
+        int ProfileFactID PK
+        int ProfileID FK
+        int FactID FK
+        int PersonalReviewCount
+        bit IsFavorite
+        bit IsEasy
+        datetime LastViewedByUser
+    }
+
     GamificationProfile {
         int ProfileID PK
         int XP
@@ -54,6 +63,8 @@ erDiagram
         int TotalAdds
         int TotalEdits
         int TotalDeletes
+        int TotalAITokens
+        decimal TotalAICost
         int CurrentStreak
         int LongestStreak
         date LastCheckinDate
@@ -66,19 +77,46 @@ erDiagram
         nvarchar Category
         int Threshold
         int RewardXP
-        bit IsHidden
         datetime CreatedDate
     }
 
     AchievementUnlocks {
         int UnlockID PK
         int AchievementID FK
+        int ProfileID FK
         datetime UnlockDate
         bit Notified
     }
 
-    %% Relationships
+    AIUsageLogs {
+        int AIUsageID PK
+        int FactID FK
+        int SessionID FK
+        int ProfileID FK
+        nvarchar OperationType
+        nvarchar Status
+        nvarchar ModelName
+        nvarchar Provider
+        int InputTokens
+        int OutputTokens
+        int TotalTokens
+        decimal Cost
+        char CurrencyCode
+        int LatencyMs
+        datetime CreatedAt
+    }
+
+    %% Relationships (GamificationProfile as user identity)
+    GamificationProfile ||--o{ ReviewSessions : owns
+    GamificationProfile ||--o{ AchievementUnlocks : earns
+    GamificationProfile ||--o{ AIUsageLogs : incurs
+    GamificationProfile ||--o{ ProfileFacts : "tracks state"
+    Facts ||--o{ ProfileFacts : "has state"
+
     Categories ||--o{ Facts : contains
     Facts ||--o{ ReviewLogs : logs
     ReviewSessions ||--o{ ReviewLogs : tracks
     Achievements ||--o| AchievementUnlocks : unlocks
+    
+    Facts ||--o{ AIUsageLogs : "AI Explanations"
+    ReviewSessions ||--o{ AIUsageLogs : "AI Costs"
