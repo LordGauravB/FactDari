@@ -495,12 +495,17 @@ class FactDariApp:
         self.root.bind("a", lambda e: self.add_new_fact())
         self.root.bind("e", lambda e: self.edit_current_fact())
         self.root.bind("d", lambda e: self.delete_current_fact())
+        self.root.bind("r", lambda e: self.start_reviewing())  # Shortcut for start reviewing
         self.root.bind("h", lambda e: self.show_home_page())
         self.root.bind("g", lambda e: self.show_analytics())
         self.root.bind("c", lambda e: self.manage_categories())
+        self.root.bind("i", lambda e: self.show_shortcuts_window())  # Shortcut for shortcuts/info
+        self.root.bind("l", lambda e: self.show_achievements_window())  # Shortcut for achievements
         self.root.bind("f", lambda e: self.toggle_favorite())  # Shortcut for favorite
         self.root.bind("k", lambda e: self.toggle_easy())  # Shortcut for known/easy
-    
+        self.root.bind("x", lambda e: self.explain_fact_with_ai())  # Shortcut for AI explain
+        self.root.bind("v", lambda e: self.speak_text())  # Shortcut for speak/voice
+
     def apply_rounded_corners(self, radius=None):
         """Apply rounded corners to the window"""
         if radius is None:
@@ -562,8 +567,13 @@ class FactDariApp:
         row("Add Fact", "a")
         row("Edit Fact", "e")
         row("Delete Fact", "d")
+        row("Start Reviewing", "r")
         row("Analytics", "g")
         row("Categories", "c")
+        row("AI Explain", "x")
+        row("Speak Text", "v")
+        row("Achievements", "l")
+        row("Show Shortcuts", "i")
         row("Toggle Favorite", "f")
         row("Static Position", "s")
 

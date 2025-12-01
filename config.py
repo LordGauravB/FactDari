@@ -64,7 +64,7 @@ UI_CONFIG = {
     'popup_add_card_size': "496x400",
     'popup_edit_card_size': "496x520",
     'popup_categories_size': "400x520",
-    'popup_info_size': "420x480",
+    'popup_info_size': "420x550",
     # Dedicated width for the Achievements popup (slightly wider)
     'popup_achievements_size': os.environ.get('FACTDARI_POPUP_ACHIEVEMENTS_SIZE', "518x480"),
     'popup_confirm_size': "360x180",
