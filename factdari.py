@@ -12,6 +12,8 @@ import subprocess
 import tkinter as tk
 import random
 import threading
+import requests
+import time
 from ctypes import wintypes
 from PIL import Image, ImageTk
 from datetime import datetime, timedelta
@@ -107,6 +109,19 @@ class FactDariApp:
         self.SMALL_FONT = config.get_font('small')
         self.LARGE_FONT = config.get_font('large')
         self.STATS_FONT = config.get_font('stats')
+
+        # AI model/pricing (used for logging and cost estimation)
+        self.ai_model = config.AI_PRICING.get('model', "deepseek-ai/DeepSeek-V3.1")
+        self.ai_provider = config.AI_PRICING.get('provider', "together")
+        try:
+            self.ai_prompt_cost_per_1k = float(config.AI_PRICING.get('prompt_cost_per_1k', 0) or 0)
+        except Exception:
+            self.ai_prompt_cost_per_1k = 0.0
+        try:
+            self.ai_completion_cost_per_1k = float(config.AI_PRICING.get('completion_cost_per_1k', 0) or 0)
+        except Exception:
+            self.ai_completion_cost_per_1k = 0.0
+        self.ai_currency = config.AI_PRICING.get('currency', 'USD')
         
         # Instance variables
         self.x_window = 0
@@ -191,10 +206,10 @@ class FactDariApp:
         # Build header filters deterministically
         header = ["All Categories", "Favorites"]
         try:
-            has_is_easy = self.column_exists('Facts', 'IsEasy')
+            has_profile_state = self.column_exists('ProfileFacts', 'IsEasy')
         except Exception:
-            has_is_easy = False
-        if has_is_easy:
+            has_profile_state = False
+        if has_profile_state:
             header += ["Known", "Not Known"]
         header += ["Not Favorite"]
         return header + base_categories
@@ -370,6 +385,18 @@ class FactDariApp:
                                 cursor="hand2", borderwidth=0, highlightthickness=0)
         self.graph_button.place(relx=1.0, rely=0, anchor="ne", x=-30, y=5)
 
+        # AI explain button (placed before Mark as Known)
+        self.ai_button = tk.Button(
+            self.fact_frame,
+            image=self.ai_icon,
+            bg=self.BG_COLOR,
+            command=self.explain_fact_with_ai,
+            cursor="hand2",
+            borderwidth=0,
+            highlightthickness=0
+        )
+        self.ai_button.place(relx=1.0, rely=0, anchor="ne", x=-105, y=5)
+
         # Add easy/known button (left of the star)
         self.easy_button = tk.Button(self.fact_frame, image=self.easy_icon, bg=self.BG_COLOR, command=self.toggle_easy,
                                 cursor="hand2", borderwidth=0, highlightthickness=0)
@@ -431,6 +458,12 @@ class FactDariApp:
         self.edit_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("edit.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.delete_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("delete.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.graph_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("graph.png")).resize((20, 20), Image.Resampling.LANCZOS))
+        try:
+            self.ai_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("AI.png")).resize((20, 20), Image.Resampling.LANCZOS))
+            if hasattr(self, 'ai_button') and self.ai_button:
+                self.ai_button.config(image=self.ai_icon)
+        except Exception:
+            self.ai_icon = None
         self.white_star_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("White-Star.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.gold_star_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("Gold-Star.png")).resize((20, 20), Image.Resampling.LANCZOS))
         self.info_icon = ImageTk.PhotoImage(Image.open(config.get_icon_path("info.png")).resize((20, 20), Image.Resampling.LANCZOS))
@@ -462,12 +495,17 @@ class FactDariApp:
         self.root.bind("a", lambda e: self.add_new_fact())
         self.root.bind("e", lambda e: self.edit_current_fact())
         self.root.bind("d", lambda e: self.delete_current_fact())
+        self.root.bind("r", lambda e: self.start_reviewing())  # Shortcut for start reviewing
         self.root.bind("h", lambda e: self.show_home_page())
         self.root.bind("g", lambda e: self.show_analytics())
         self.root.bind("c", lambda e: self.manage_categories())
+        self.root.bind("i", lambda e: self.show_shortcuts_window())  # Shortcut for shortcuts/info
+        self.root.bind("l", lambda e: self.show_achievements_window())  # Shortcut for achievements
         self.root.bind("f", lambda e: self.toggle_favorite())  # Shortcut for favorite
         self.root.bind("k", lambda e: self.toggle_easy())  # Shortcut for known/easy
-    
+        self.root.bind("x", lambda e: self.explain_fact_with_ai())  # Shortcut for AI explain
+        self.root.bind("v", lambda e: self.speak_text())  # Shortcut for speak/voice
+
     def apply_rounded_corners(self, radius=None):
         """Apply rounded corners to the window"""
         if radius is None:
@@ -487,6 +525,7 @@ class FactDariApp:
             ToolTip(self.speaker_button, "Speak text")
             ToolTip(self.star_button, "Toggle favorite (f)")
             ToolTip(self.easy_button, "Mark as known (k)")
+            ToolTip(self.ai_button, "AI explain fact")
             ToolTip(self.graph_button, "Analytics (g)")
             ToolTip(self.info_button, "Show shortcuts")
             ToolTip(self.add_icon_button, "Add fact (a)")
@@ -528,8 +567,13 @@ class FactDariApp:
         row("Add Fact", "a")
         row("Edit Fact", "e")
         row("Delete Fact", "d")
+        row("Start Reviewing", "r")
         row("Analytics", "g")
         row("Categories", "c")
+        row("AI Explain", "x")
+        row("Speak Text", "v")
+        row("Achievements", "l")
+        row("Show Shortcuts", "i")
         row("Toggle Favorite", "f")
         row("Static Position", "s")
 
@@ -787,276 +831,27 @@ class FactDariApp:
             print(f"Database error in execute_insert_return_id: {e}")
             return None
 
+    def get_active_profile_id(self) -> int:
+        """Fetch the current GamificationProfile ID, defaulting to 1."""
+        try:
+            if getattr(self, 'gamify', None):
+                prof = self.gamify.get_profile()
+                pid = prof.get('ProfileID') if isinstance(prof, dict) else None
+                if pid:
+                    return int(pid)
+        except Exception:
+            pass
+        try:
+            rows = self.fetch_query("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
+            if rows and rows[0]:
+                return int(rows[0][0])
+        except Exception:
+            pass
+        return 1
+
     def ensure_schema(self):
-        """Create missing tables/columns for sessions and per-view durations."""
-        ddl = """
-        /* Create ReviewSessions if missing */
-        IF OBJECT_ID('dbo.ReviewSessions','U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.ReviewSessions (
-                SessionID INT IDENTITY(1,1) PRIMARY KEY,
-                StartTime DATETIME NOT NULL,
-                EndTime DATETIME NULL,
-                DurationSeconds INT NULL,
-                TimedOut BIT NOT NULL CONSTRAINT DF_ReviewSessions_TimedOut DEFAULT 0
-            );
-        END;
-
-        /* Ensure ReviewLogs table exists */
-        IF OBJECT_ID('dbo.ReviewLogs','U') IS NULL
-        BEGIN
-            -- Create minimal ReviewLogs table if missing (defensive)
-            CREATE TABLE dbo.ReviewLogs (
-                ReviewLogID INT IDENTITY(1,1) PRIMARY KEY,
-                FactID INT NULL,
-                ReviewDate DATETIME NOT NULL
-            );
-        END;
-        
-        /* Ensure SessionDuration column exists for per-view timing */
-        IF COL_LENGTH('dbo.ReviewLogs','SessionDuration') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD SessionDuration INT NULL;
-        END;
-        /* Ensure per-view TimedOut flag exists */
-        IF COL_LENGTH('dbo.ReviewLogs','TimedOut') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD TimedOut BIT NOT NULL CONSTRAINT DF_ReviewLogs_TimedOut DEFAULT 0;
-        END;
-        /* Ensure session-level TimedOut flag exists */
-        IF COL_LENGTH('dbo.ReviewSessions','TimedOut') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewSessions ADD TimedOut BIT NOT NULL CONSTRAINT DF_ReviewSessions_TimedOut DEFAULT 0;
-        END;
-        IF COL_LENGTH('dbo.ReviewLogs','SessionID') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD SessionID INT NULL;
-        END;
-        IF OBJECT_ID('dbo.FK_ReviewLogs_ReviewSessions','F') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs
-            ADD CONSTRAINT FK_ReviewLogs_ReviewSessions
-            FOREIGN KEY (SessionID) REFERENCES dbo.ReviewSessions(SessionID);
-        END;
-        IF NOT EXISTS (
-            SELECT 1 FROM sys.indexes 
-            WHERE name = 'IX_ReviewLogs_SessionID' AND object_id = OBJECT_ID('dbo.ReviewLogs')
-        )
-        BEGIN
-            CREATE INDEX IX_ReviewLogs_SessionID ON dbo.ReviewLogs(SessionID);
-        END;
-
-        /* Add action tracking columns to ReviewLogs */
-        IF COL_LENGTH('dbo.ReviewLogs','Action') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD Action NVARCHAR(16) NOT NULL CONSTRAINT DF_ReviewLogs_Action DEFAULT 'view';
-        END;
-        IF COL_LENGTH('dbo.ReviewLogs','FactEdited') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD FactEdited BIT NOT NULL CONSTRAINT DF_ReviewLogs_FactEdited DEFAULT 0;
-        END;
-        IF COL_LENGTH('dbo.ReviewLogs','FactDeleted') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD FactDeleted BIT NOT NULL CONSTRAINT DF_ReviewLogs_FactDeleted DEFAULT 0;
-        END;
-        IF COL_LENGTH('dbo.ReviewLogs','FactContentSnapshot') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD FactContentSnapshot NVARCHAR(MAX) NULL;
-        END;
-        IF COL_LENGTH('dbo.ReviewLogs','CategoryIDSnapshot') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD CategoryIDSnapshot INT NULL;
-        END;
-
-        /* Add per-session action counters */
-        IF COL_LENGTH('dbo.ReviewSessions','FactsAdded') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewSessions ADD FactsAdded INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsAdded DEFAULT 0;
-        END;
-        IF COL_LENGTH('dbo.ReviewSessions','FactsEdited') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewSessions ADD FactsEdited INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsEdited DEFAULT 0;
-        END;
-        IF COL_LENGTH('dbo.ReviewSessions','FactsDeleted') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewSessions ADD FactsDeleted INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsDeleted DEFAULT 0;
-        END;
-
-        /* Ensure FK from ReviewLogs(FactID) to Facts is ON DELETE SET NULL (to preserve logs for deleted cards) */
-        IF EXISTS (
-            SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ReviewLogs_Facts'
-        )
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs DROP CONSTRAINT FK_ReviewLogs_Facts;
-        END;
-        /* Make FactID nullable to support SET NULL */
-        IF EXISTS (
-            SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ReviewLogs') AND name = 'FactID' AND is_nullable = 0
-        )
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ALTER COLUMN FactID INT NULL;
-        END;
-        /* Recreate FK with SET NULL if not exists */
-        IF NOT EXISTS (
-            SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ReviewLogs_Facts'
-        )
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs WITH NOCHECK
-            ADD CONSTRAINT FK_ReviewLogs_Facts FOREIGN KEY (FactID)
-            REFERENCES dbo.Facts(FactID) ON DELETE SET NULL;
-        END;
-
-        /* Gamification core tables */
-        IF OBJECT_ID('dbo.GamificationProfile','U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.GamificationProfile (
-                ProfileID INT IDENTITY(1,1) PRIMARY KEY,
-                XP INT NOT NULL CONSTRAINT DF_GamificationProfile_XP DEFAULT 0,
-                Level INT NOT NULL CONSTRAINT DF_GamificationProfile_Level DEFAULT 1,
-                TotalReviews INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalReviews DEFAULT 0,
-                TotalKnown INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalKnown DEFAULT 0,
-                TotalFavorites INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalFavorites DEFAULT 0,
-                TotalAdds INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAdds DEFAULT 0,
-                TotalEdits INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalEdits DEFAULT 0,
-                TotalDeletes INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalDeletes DEFAULT 0,
-                CurrentStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_CurrentStreak DEFAULT 0,
-                LongestStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_LongestStreak DEFAULT 0,
-                LastCheckinDate DATE NULL
-            );
-        END;
-
-        IF OBJECT_ID('dbo.Achievements','U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.Achievements (
-                AchievementID INT IDENTITY(1,1) PRIMARY KEY,
-                Code NVARCHAR(64) NOT NULL UNIQUE,
-                Name NVARCHAR(200) NOT NULL,
-                Category NVARCHAR(32) NOT NULL,
-                Threshold INT NOT NULL,
-                RewardXP INT NOT NULL,
-                IsHidden BIT NOT NULL CONSTRAINT DF_Achievements_IsHidden DEFAULT 0,
-                CreatedDate DATETIME NOT NULL CONSTRAINT DF_Achievements_CreatedDate DEFAULT GETDATE()
-            );
-        END;
-
-        IF OBJECT_ID('dbo.AchievementUnlocks','U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.AchievementUnlocks (
-                UnlockID INT IDENTITY(1,1) PRIMARY KEY,
-                AchievementID INT NOT NULL
-                    CONSTRAINT FK_AchievementUnlocks_Achievements
-                    REFERENCES dbo.Achievements(AchievementID),
-                UnlockDate DATETIME NOT NULL CONSTRAINT DF_AchievementUnlocks_UnlockDate DEFAULT GETDATE(),
-                Notified BIT NOT NULL CONSTRAINT DF_AchievementUnlocks_Notified DEFAULT 0
-            );
-            CREATE UNIQUE INDEX UX_AchievementUnlocks_AchievementID ON dbo.AchievementUnlocks(AchievementID);
-        END;
-
-        /* Seed Achievements (insert any missing by Code) */
-            ;WITH Seeds (Code, Name, Category, Threshold, RewardXP) AS (
-                SELECT 'KNOWN_5','Know 5 facts','known',5,10 UNION ALL
-                SELECT 'KNOWN_10','Know 10 facts','known',10,15 UNION ALL
-                SELECT 'KNOWN_50','Know 50 facts','known',50,25 UNION ALL
-                SELECT 'KNOWN_100','Know 100 facts','known',100,50 UNION ALL
-                SELECT 'KNOWN_300','Know 300 facts','known',300,100 UNION ALL
-                SELECT 'KNOWN_500','Know 500 facts','known',500,150 UNION ALL
-                SELECT 'KNOWN_1000','Know 1000 facts','known',1000,250 UNION ALL
-                SELECT 'KNOWN_5000','Know 5000 facts','known',5000,600 UNION ALL
-                SELECT 'KNOWN_10000','Know 10000 facts','known',10000,1000 UNION ALL
-                SELECT 'KNOWN_30000','Know 30000 facts','known',30000,2500 UNION ALL
-                SELECT 'KNOWN_50000','Know 50000 facts','known',50000,4000 UNION ALL
-                SELECT 'KNOWN_100000','Know 100000 facts','known',100000,7000 UNION ALL
-
-                SELECT 'FAV_5','Favorite 5 facts','favorites',5,5 UNION ALL
-                SELECT 'FAV_10','Favorite 10 facts','favorites',10,10 UNION ALL
-                SELECT 'FAV_50','Favorite 50 facts','favorites',50,20 UNION ALL
-                SELECT 'FAV_100','Favorite 100 facts','favorites',100,40 UNION ALL
-                SELECT 'FAV_300','Favorite 300 facts','favorites',300,80 UNION ALL
-                SELECT 'FAV_500','Favorite 500 facts','favorites',500,120 UNION ALL
-                SELECT 'FAV_1000','Favorite 1000 facts','favorites',1000,200 UNION ALL
-                SELECT 'FAV_5000','Favorite 5000 facts','favorites',5000,500 UNION ALL
-                SELECT 'FAV_10000','Favorite 10000 facts','favorites',10000,900 UNION ALL
-                SELECT 'FAV_30000','Favorite 30000 facts','favorites',30000,2200 UNION ALL
-                SELECT 'FAV_50000','Favorite 50000 facts','favorites',50000,3500 UNION ALL
-                SELECT 'FAV_100000','Favorite 100000 facts','favorites',100000,6000 UNION ALL
-
-                SELECT 'REV_5','Review 5 times','reviews',5,10 UNION ALL
-                SELECT 'REV_10','Review 10 times','reviews',10,15 UNION ALL
-                SELECT 'REV_50','Review 50 times','reviews',50,25 UNION ALL
-                SELECT 'REV_100','Review 100 times','reviews',100,50 UNION ALL
-                SELECT 'REV_300','Review 300 times','reviews',300,100 UNION ALL
-                SELECT 'REV_500','Review 500 times','reviews',500,150 UNION ALL
-                SELECT 'REV_1000','Review 1000 times','reviews',1000,250 UNION ALL
-                SELECT 'REV_5000','Review 5000 times','reviews',5000,600 UNION ALL
-                SELECT 'REV_10000','Review 10000 times','reviews',10000,1000 UNION ALL
-                SELECT 'REV_30000','Review 30000 times','reviews',30000,2500 UNION ALL
-                SELECT 'REV_50000','Review 50000 times','reviews',50000,4000 UNION ALL
-                SELECT 'REV_100000','Review 100000 times','reviews',100000,7000 UNION ALL
-
-                SELECT 'ADD_5','Add 5 facts','adds',5,10 UNION ALL
-                SELECT 'ADD_10','Add 10 facts','adds',10,15 UNION ALL
-                SELECT 'ADD_50','Add 50 facts','adds',50,25 UNION ALL
-                SELECT 'ADD_100','Add 100 facts','adds',100,50 UNION ALL
-                SELECT 'ADD_300','Add 300 facts','adds',300,100 UNION ALL
-                SELECT 'ADD_500','Add 500 facts','adds',500,150 UNION ALL
-                SELECT 'ADD_1000','Add 1000 facts','adds',1000,250 UNION ALL
-                SELECT 'ADD_5000','Add 5000 facts','adds',5000,600 UNION ALL
-                SELECT 'ADD_10000','Add 10000 facts','adds',10000,1000 UNION ALL
-                SELECT 'ADD_30000','Add 30000 facts','adds',30000,2500 UNION ALL
-                SELECT 'ADD_50000','Add 50000 facts','adds',50000,4000 UNION ALL
-                SELECT 'ADD_100000','Add 100000 facts','adds',100000,7000 UNION ALL
-
-                SELECT 'EDIT_5','Edit 5 facts','edits',5,10 UNION ALL
-                SELECT 'EDIT_10','Edit 10 facts','edits',10,15 UNION ALL
-                SELECT 'EDIT_50','Edit 50 facts','edits',50,25 UNION ALL
-                SELECT 'EDIT_100','Edit 100 facts','edits',100,50 UNION ALL
-                SELECT 'EDIT_300','Edit 300 facts','edits',300,100 UNION ALL
-                SELECT 'EDIT_500','Edit 500 facts','edits',500,150 UNION ALL
-                SELECT 'EDIT_1000','Edit 1000 facts','edits',1000,250 UNION ALL
-                SELECT 'EDIT_5000','Edit 5000 facts','edits',5000,600 UNION ALL
-                SELECT 'EDIT_10000','Edit 10000 facts','edits',10000,1000 UNION ALL
-                SELECT 'EDIT_30000','Edit 30000 facts','edits',30000,2500 UNION ALL
-                SELECT 'EDIT_50000','Edit 50000 facts','edits',50000,4000 UNION ALL
-                SELECT 'EDIT_100000','Edit 100000 facts','edits',100000,7000 UNION ALL
-
-                SELECT 'DEL_5','Delete 5 facts','deletes',5,10 UNION ALL
-                SELECT 'DEL_10','Delete 10 facts','deletes',10,15 UNION ALL
-                SELECT 'DEL_50','Delete 50 facts','deletes',50,25 UNION ALL
-                SELECT 'DEL_100','Delete 100 facts','deletes',100,50 UNION ALL
-                SELECT 'DEL_300','Delete 300 facts','deletes',300,100 UNION ALL
-                SELECT 'DEL_500','Delete 500 facts','deletes',500,150 UNION ALL
-                SELECT 'DEL_1000','Delete 1000 facts','deletes',1000,250 UNION ALL
-                SELECT 'DEL_5000','Delete 5000 facts','deletes',5000,600 UNION ALL
-                SELECT 'DEL_10000','Delete 10000 facts','deletes',10000,1000 UNION ALL
-                SELECT 'DEL_30000','Delete 30000 facts','deletes',30000,2500 UNION ALL
-                SELECT 'DEL_50000','Delete 50000 facts','deletes',50000,4000 UNION ALL
-                SELECT 'DEL_100000','Delete 100000 facts','deletes',100000,7000 UNION ALL
-
-                /* Streaks */
-                SELECT 'STREAK_3','3-day review streak','streak',3,10 UNION ALL
-                SELECT 'STREAK_7','7-day review streak','streak',7,20 UNION ALL
-                SELECT 'STREAK_14','14-day review streak','streak',14,35 UNION ALL
-                SELECT 'STREAK_30','30-day review streak','streak',30,75 UNION ALL
-                SELECT 'STREAK_60','60-day review streak','streak',60,150 UNION ALL
-                SELECT 'STREAK_90','90-day review streak','streak',90,250 UNION ALL
-                SELECT 'STREAK_180','180-day review streak','streak',180,500 UNION ALL
-                SELECT 'STREAK_365','365-day review streak','streak',365,1000
-            )
-            INSERT INTO dbo.Achievements (Code, Name, Category, Threshold, RewardXP, IsHidden, CreatedDate)
-            SELECT s.Code, s.Name, s.Category, s.Threshold, s.RewardXP, 0, GETDATE()
-            FROM Seeds s
-            LEFT JOIN dbo.Achievements a ON a.Code = s.Code
-            WHERE a.AchievementID IS NULL;
-        
-
-        /* Ensure a single GamificationProfile row exists */
-        IF NOT EXISTS (SELECT 1 FROM dbo.GamificationProfile)
-        BEGIN
-            INSERT INTO dbo.GamificationProfile (XP, Level)
-            VALUES (0, 1);
-        END;
-        """
-        self.execute_update(ddl)
+        """No-op: schema is managed externally via factdari_setup.sql."""
+        return
     
     def count_facts(self):
         """Count total facts in the database"""
@@ -1066,14 +861,17 @@ class FactDariApp:
     def get_facts_viewed_today(self):
         """Get count of unique facts viewed today"""
         today = datetime.now().strftime('%Y-%m-%d')
+        profile_id = self.get_active_profile_id()
         # Count only actual view actions (exclude add/edit/delete logs)
         query = """
-        SELECT COUNT(DISTINCT FactID)
-        FROM ReviewLogs
-        WHERE CONVERT(date, ReviewDate) = CONVERT(date, ?)
-          AND (Action IS NULL OR Action = 'view')
+        SELECT COUNT(DISTINCT rl.FactID)
+        FROM ReviewLogs rl
+        LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+        WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, ?)
+          AND (rl.Action IS NULL OR rl.Action = 'view')
+          AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
         """
-        result = self.fetch_query(query, (today,))
+        result = self.fetch_query(query, (today, profile_id))
         return result[0][0] if result and len(result) > 0 else 0
 
     def update_level_progress(self):
@@ -1184,6 +982,336 @@ class FactDariApp:
         self.speaking_thread = threading.Thread(target=_worker, daemon=True)
         self.speaking_thread.start()
 
+    def explain_fact_with_ai(self):
+        """Open a popup and ask Together AI to explain the current fact in simple words."""
+        if self.is_home_page or not self.current_fact_id:
+            return
+
+        fact_text = (self.fact_label.cget("text") or "").strip()
+        if not fact_text:
+            self.status_label.config(text="No fact to explain", fg=self.RED_COLOR)
+            self.clear_status_after_delay(3000)
+            return
+
+        fact_id = self.current_fact_id
+        session_id = self.current_session_id
+        api_key = config.get_together_api_key()
+        if not api_key:
+            messagebox.showerror("API Key Missing", "Set FACTDARI_TOGETHER_API_KEY or TOGETHER_API_KEY environment variable.")
+            return
+
+        # Pause session timer while popup is open
+        self.pause_review_timer()
+
+        win = tk.Toplevel(self.root)
+        win.title("AI Fact Explanation")
+        try:
+            win.geometry(f"{self.POPUP_EDIT_CARD_SIZE}{self.POPUP_POSITION}")
+        except Exception:
+            win.geometry(self.POPUP_EDIT_CARD_SIZE)
+        win.configure(bg=self.BG_COLOR)
+
+        ai_usage_row_id = None
+        reading_started_at = None
+        track_reading_time = False
+        # Disable the AI button until this window closes to avoid duplicate clicks
+        try:
+            self.ai_button.config(state="disabled")
+        except Exception:
+            pass
+
+        def on_close():
+            nonlocal reading_started_at, ai_usage_row_id, track_reading_time
+            duration_sec = 0
+            if track_reading_time and reading_started_at is not None:
+                try:
+                    duration_sec = int(time.perf_counter() - reading_started_at)
+                    if duration_sec < 0:
+                        duration_sec = 0
+                except Exception:
+                    duration_sec = 0
+            if ai_usage_row_id:
+                try:
+                    self.execute_update(
+                        "UPDATE AIUsageLogs SET ReadingDurationSec = ? WHERE AIUsageID = ?",
+                        (duration_sec, ai_usage_row_id),
+                    )
+                except Exception as exc:
+                    print(f"Failed to update AI reading duration: {exc}")
+            try:
+                self.resume_review_timer()
+            except Exception:
+                pass
+            try:
+                self.ai_button.config(state="normal")
+            except Exception:
+                pass
+            win.destroy()
+
+        win.protocol("WM_DELETE_WINDOW", on_close)
+
+        tk.Label(win, text="AI Explanation", fg=self.TEXT_COLOR, bg=self.BG_COLOR, font=self.TITLE_FONT).pack(pady=10)
+
+        fact_frame = tk.Frame(win, bg=self.BG_COLOR)
+        fact_frame.pack(fill="both", expand=False, padx=20, pady=5)
+        tk.Label(fact_frame, text="Fact", fg=self.TEXT_COLOR, bg=self.BG_COLOR, font=self.NORMAL_FONT).pack(anchor="w")
+        fact_box = tk.Text(fact_frame, height=4, wrap="word", font=self.NORMAL_FONT, bg=self.LISTBOX_BG_COLOR, fg=self.TEXT_COLOR, bd=0)
+        fact_box.insert("1.0", fact_text)
+        fact_box.config(state="disabled")
+        fact_box.pack(fill="both", expand=True, pady=4)
+
+        explain_frame = tk.Frame(win, bg=self.BG_COLOR)
+        explain_frame.pack(fill="both", expand=True, padx=20, pady=5)
+        tk.Label(explain_frame, text="AI Explanation", fg=self.TEXT_COLOR, bg=self.BG_COLOR, font=self.NORMAL_FONT).pack(anchor="w")
+        explain_box = tk.Text(explain_frame, height=8, wrap="word", font=self.NORMAL_FONT, bg=self.LISTBOX_BG_COLOR, fg=self.TEXT_COLOR, bd=0)
+        explain_box.insert("1.0", "Fetching explanation...")
+        explain_box.config(state="disabled")
+        explain_box.pack(fill="both", expand=True, pady=4)
+
+        def update_text(text):
+            explain_box.config(state="normal")
+            explain_box.delete("1.0", "end")
+            explain_box.insert("1.0", text.strip())
+            explain_box.config(state="disabled")
+
+        def mark_explanation_ready(text):
+            nonlocal reading_started_at
+            update_text(text)
+            if track_reading_time and reading_started_at is None:
+                try:
+                    reading_started_at = time.perf_counter()
+                except Exception:
+                    reading_started_at = None
+
+        def worker():
+            nonlocal ai_usage_row_id, track_reading_time
+            result_text, usage_info = self._call_together_ai(fact_text, api_key)
+
+            try:
+                ai_usage_row_id = self._record_ai_usage(usage_info, fact_id=fact_id, session_id=session_id, reading_duration_sec=0)
+            except Exception as exc:
+                print(f"AI usage logging error: {exc}")
+                ai_usage_row_id = None
+
+            track_reading_time = (usage_info.get("status") == "SUCCESS")
+            
+            self.root.after(0, lambda: mark_explanation_ready(result_text))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _call_together_ai(self, fact_text: str, api_key: str):
+        """Call Together AI to explain a fact; returns (text, usage_info)."""
+        started = time.perf_counter()
+        usage_info = {
+            "operation_type": "EXPLANATION",
+            "model": getattr(self, 'ai_model', "deepseek-ai/DeepSeek-V3.1"),
+            "provider": getattr(self, 'ai_provider', "together"),
+            "status": "SUCCESS",
+        }
+        try:
+            payload = {
+                "model": usage_info["model"],
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You explain short facts clearly in simple language. Keep it concise: 2 short paragraphs max."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Explain this fact in simple words and briefly elaborate:\n\n{fact_text}"
+                    }
+                ],
+                "max_tokens": 320,
+                "temperature": 0.35,
+            }
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            resp = requests.post(
+                "https://api.together.xyz/v1/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=30
+            )
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            usage_info["latency_ms"] = latency_ms
+            if resp.status_code != 200:
+                usage_info["status"] = "FAILED"
+                return f"Error from AI ({resp.status_code}): {resp.text}", usage_info
+            data = resp.json()
+            choices = data.get("choices") or []
+            if not choices:
+                usage_info["status"] = "FAILED"
+                return "No explanation returned.", usage_info
+            message = choices[0].get("message", {}).get("content", "")
+            raw_usage = data.get("usage") or {}
+            input_tokens = raw_usage.get("prompt_tokens")
+            output_tokens = raw_usage.get("completion_tokens")
+            total_tokens = raw_usage.get("total_tokens")
+            # Fallback computation if total not provided but parts are
+            if total_tokens is None and (input_tokens is not None or output_tokens is not None):
+                total_tokens = int(input_tokens or 0) + int(output_tokens or 0)
+            if total_tokens == 0 and input_tokens is None and output_tokens is None:
+                total_tokens = None
+            usage_info.update({
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": total_tokens,
+            })
+            return message.strip() or "No explanation returned.", usage_info
+        except Exception as exc:
+            try:
+                usage_info["latency_ms"] = int((time.perf_counter() - started) * 1000)
+            except Exception:
+                pass
+            usage_info["status"] = "FAILED"
+            return f"Failed to fetch explanation: {exc}", usage_info
+
+    def _estimate_ai_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
+        """Estimate call cost using configured per-1K token prices."""
+        try:
+            prompt_val = int(prompt_tokens or 0)
+        except Exception:
+            prompt_val = 0
+        try:
+            completion_val = int(completion_tokens or 0)
+        except Exception:
+            completion_val = 0
+        prompt_cost = (prompt_val / 1000.0) * float(getattr(self, 'ai_prompt_cost_per_1k', 0) or 0)
+        completion_cost = (completion_val / 1000.0) * float(getattr(self, 'ai_completion_cost_per_1k', 0) or 0)
+        return round(prompt_cost + completion_cost, 9)
+
+    def _record_ai_usage(self, usage_info: dict, fact_id: int, session_id=None, reading_duration_sec: int = 0):
+        """Persist AI usage row and roll totals into gamification profile.
+        Returns AIUsageID if insert succeeds (else None).
+        """
+        if not usage_info:
+            return None
+        if fact_id is None:
+            return None
+        model_name = usage_info.get("model") or getattr(self, 'ai_model', None)
+        provider = usage_info.get("provider") or getattr(self, 'ai_provider', None)
+        operation_type = usage_info.get("operation_type") or "EXPLANATION"
+        input_tokens = usage_info.get("input_tokens")
+        output_tokens = usage_info.get("output_tokens")
+        total_tokens = usage_info.get("total_tokens")
+
+        try:
+            input_tokens = int(input_tokens) if input_tokens is not None else None
+        except Exception:
+            input_tokens = None
+        try:
+            output_tokens = int(output_tokens) if output_tokens is not None else None
+        except Exception:
+            output_tokens = None
+
+        if total_tokens is not None:
+            try:
+                total_tokens = int(total_tokens)
+            except Exception:
+                total_tokens = None
+
+        if total_tokens is None and (input_tokens is not None or output_tokens is not None):
+            total_tokens = (input_tokens or 0) + (output_tokens or 0)
+
+        cost = usage_info.get("cost")
+        if cost is None and (input_tokens is not None or output_tokens is not None):
+            cost = self._estimate_ai_cost(input_tokens or 0, output_tokens or 0)
+
+        latency_ms = usage_info.get("latency_ms")
+        try:
+            latency_ms = int(latency_ms) if latency_ms is not None else None
+        except Exception:
+            latency_ms = None
+
+        try:
+            reading_duration_sec = int(reading_duration_sec) if reading_duration_sec is not None else 0
+        except Exception:
+            reading_duration_sec = 0
+
+        status = usage_info.get("status") or "SUCCESS"
+        try:
+            status = str(status).upper()
+        except Exception:
+            status = "SUCCESS"
+        if status not in ("SUCCESS", "FAILED"):
+            status = "SUCCESS"
+
+        resolved_session_id = session_id if session_id is not None else getattr(self, 'current_session_id', None)
+
+        return self._log_ai_usage(
+            fact_id=fact_id,
+            session_id=resolved_session_id,
+            operation_type=operation_type,
+            status=status,
+            model_name=model_name,
+            provider=provider,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            cost=cost,
+            latency_ms=latency_ms,
+            reading_duration_sec=reading_duration_sec,
+        )
+
+    def _log_ai_usage(self, fact_id, session_id, operation_type, status, model_name, provider, input_tokens, output_tokens, total_tokens, cost, latency_ms, reading_duration_sec=0):
+        """Insert into AIUsageLogs and roll totals into GamificationProfile. Returns AIUsageID or None."""
+        try:
+            cost_val = None if cost is None else round(float(cost), 9)
+        except Exception:
+            cost_val = None
+
+        # Normalize tokens for insert
+        it = input_tokens if input_tokens is None else int(input_tokens)
+        ot = output_tokens if output_tokens is None else int(output_tokens)
+        total_for_profile = total_tokens
+        if total_for_profile is None:
+            total_for_profile = (0 if it is None else it) + (0 if ot is None else ot)
+            if total_for_profile == 0:
+                total_for_profile = None
+
+        try:
+            reading_duration_sec = int(reading_duration_sec) if reading_duration_sec is not None else 0
+        except Exception:
+            reading_duration_sec = 0
+
+        profile_id = self.get_active_profile_id()
+        ai_usage_id = None
+        try:
+            ai_usage_id = self.execute_insert_return_id(
+                """
+                INSERT INTO AIUsageLogs (FactID, SessionID, ProfileID, OperationType, Status, ModelName, Provider, InputTokens, OutputTokens, Cost, CurrencyCode, LatencyMs, ReadingDurationSec)
+                OUTPUT INSERTED.AIUsageID
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    fact_id,
+                    session_id,
+                    profile_id,
+                    operation_type,
+                    status,
+                    model_name,
+                    provider,
+                    it,
+                    ot,
+                    cost_val,
+                    getattr(self, 'ai_currency', 'USD'),
+                    latency_ms,
+                    reading_duration_sec,
+                ),
+            )
+        except Exception as exc:
+            print(f"Database error in _log_ai_usage: {exc}")
+
+        try:
+            if self.gamify and (total_for_profile is not None or (cost_val is not None and cost_val != 0)):
+                self.gamify.add_ai_usage(total_for_profile or 0, cost_val or 0.0)
+        except Exception as exc:
+            print(f"Gamification error in _log_ai_usage: {exc}")
+
+        return ai_usage_id
+
     def stop_speaking(self):
         """Stop any ongoing speech immediately."""
         try:
@@ -1254,95 +1382,40 @@ class FactDariApp:
     def load_all_facts(self):
         """Load all facts for the current category"""
         category = self.category_var.get()
-        
-        has_is_easy = self.column_exists('Facts', 'IsEasy')
+        profile_id = self.get_active_profile_id()
+        base_select = """
+            SELECT f.FactID,
+                   f.Content,
+                   COALESCE(pf.IsFavorite, 0) AS IsFavorite,
+                   COALESCE(pf.IsEasy, 0) AS IsEasy
+            FROM Facts f
+            LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
+        """
+
+        facts = []
         if category == "All Categories":
-            if has_is_easy:
-                query = """
-                    SELECT FactID, Content, IsFavorite, IsEasy
-                    FROM Facts
-                    ORDER BY NEWID()
-                """
-            else:
-                query = """
-                    SELECT FactID, Content, IsFavorite
-                    FROM Facts
-                    ORDER BY NEWID()
-                """
-            facts = self.fetch_query(query)
+            query = base_select + " ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id,))
         elif category == "Favorites":
-            if has_is_easy:
-                query = """
-                    SELECT FactID, Content, IsFavorite, IsEasy
-                    FROM Facts
-                    WHERE IsFavorite = 1
-                    ORDER BY NEWID()
-                """
-            else:
-                query = """
-                    SELECT FactID, Content, IsFavorite
-                    FROM Facts
-                    WHERE IsFavorite = 1
-                    ORDER BY NEWID()
-                """
-            facts = self.fetch_query(query)
+            query = base_select + " WHERE COALESCE(pf.IsFavorite,0) = 1 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id,))
         elif category == "Known":
-            if has_is_easy:
-                query = """
-                    SELECT FactID, Content, IsFavorite, IsEasy
-                    FROM Facts
-                    WHERE IsEasy = 1
-                    ORDER BY NEWID()
-                """
-                facts = self.fetch_query(query)
-            else:
-                facts = []
+            query = base_select + " WHERE COALESCE(pf.IsEasy,0) = 1 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id,))
         elif category == "Not Known":
-            if has_is_easy:
-                query = """
-                    SELECT FactID, Content, IsFavorite, IsEasy
-                    FROM Facts
-                    WHERE IsEasy = 0
-                    ORDER BY NEWID()
-                """
-                facts = self.fetch_query(query)
-            else:
-                facts = []
+            query = base_select + " WHERE COALESCE(pf.IsEasy,0) = 0 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id,))
         elif category == "Not Favorite":
-            if has_is_easy:
-                query = """
-                    SELECT FactID, Content, IsFavorite, IsEasy
-                    FROM Facts
-                    WHERE IsFavorite = 0
-                    ORDER BY NEWID()
-                """
-            else:
-                query = """
-                    SELECT FactID, Content, IsFavorite
-                    FROM Facts
-                    WHERE IsFavorite = 0
-                    ORDER BY NEWID()
-                """
-            facts = self.fetch_query(query)
+            query = base_select + " WHERE COALESCE(pf.IsFavorite,0) = 0 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id,))
         else:
-            if has_is_easy:
-                query = """
-                    SELECT f.FactID, f.Content, f.IsFavorite, f.IsEasy
-                    FROM Facts f
-                    JOIN Categories c ON f.CategoryID = c.CategoryID
-                    WHERE c.CategoryName = ?
-                    ORDER BY NEWID()
-                """
-            else:
-                query = """
-                    SELECT f.FactID, f.Content, f.IsFavorite
-                    FROM Facts f
-                    JOIN Categories c ON f.CategoryID = c.CategoryID
-                    WHERE c.CategoryName = ?
-                    ORDER BY NEWID()
-                """
-            facts = self.fetch_query(query, (category,))
-        
+            query = base_select + """
+                JOIN Categories c ON f.CategoryID = c.CategoryID
+                WHERE c.CategoryName = ?
+                ORDER BY NEWID()
+            """
+            facts = self.fetch_query(query, (profile_id, category))
+
         self.all_facts = facts if facts else []
         self.current_fact_index = 0
     
@@ -1472,11 +1545,28 @@ class FactDariApp:
         # 2) Update the fact's view count and last viewed date
         self.execute_update("""
             UPDATE Facts 
-            SET TotalViews = TotalViews + 1,
-                ReviewCount = ReviewCount + 1,
-                LastViewedDate = GETDATE()
+            SET TotalViews = TotalViews + 1
             WHERE FactID = ?
         """, (fact_id,))
+        # Per-profile view count and last viewed
+        try:
+            pid = self.get_active_profile_id()
+            self.execute_update(
+                """
+                MERGE ProfileFacts AS target
+                USING (SELECT ? AS ProfileID, ? AS FactID) AS src
+                ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
+                WHEN MATCHED THEN
+                    UPDATE SET PersonalReviewCount = ISNULL(target.PersonalReviewCount,0) + 1,
+                               LastViewedByUser = GETDATE()
+                WHEN NOT MATCHED THEN
+                    INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
+                    VALUES (src.ProfileID, src.FactID, 1, 0, 0, GETDATE());
+                """,
+                (pid, fact_id)
+            )
+        except Exception:
+            pass
 
         # 3) Start a new view log and remember its ID + start time
         try:
@@ -1505,6 +1595,27 @@ class FactDariApp:
             )
             self.current_review_log_id = None
             self.current_fact_start_time = now
+
+        # Force a streak check-in now that a log exists for today
+        try:
+            if getattr(self, 'gamify', None):
+                # Calculate new streak based on the log we just inserted
+                result = self.gamify.daily_checkin()
+
+                # Optional: Update UI feedback immediately
+                prof = result.get('profile', {}) if isinstance(result, dict) else {}
+                streak = prof.get('CurrentStreak', 0)
+                if streak and int(streak) > 0:
+                    # Update the status label briefly to show streak is active
+                    if not hasattr(self, '_streak_shown_today'):
+                        self.status_label.config(
+                            text=f"Streak active: {streak} day(s)!",
+                            fg=self.GREEN_COLOR
+                        )
+                        self.clear_status_after_delay(3000)
+                        self._streak_shown_today = True
+        except Exception as e:
+            print(f"Error updating streak: {e}")
 
     def pause_review_timer(self):
         """Pause the current review timer (exclude time until resumed)."""
@@ -1577,12 +1688,14 @@ class FactDariApp:
         except Exception:
             pass
         self.session_start_time = datetime.now()
+        profile_id = self.get_active_profile_id()
         session_id = self.execute_insert_return_id(
             """
-            INSERT INTO ReviewSessions (StartTime)
+            INSERT INTO ReviewSessions (ProfileID, StartTime)
             OUTPUT INSERTED.SessionID
-            VALUES (GETDATE())
-            """
+            VALUES (?, GETDATE())
+            """,
+            (profile_id,)
         )
         self.current_session_id = session_id
         # Daily streak check-in and possible achievements
@@ -1653,21 +1766,30 @@ class FactDariApp:
         """Toggle the favorite status of the current fact"""
         if not self.current_fact_id:
             return
-        
+        profile_id = self.get_active_profile_id()
+
         # Toggle the favorite status
         new_status = not self.current_fact_is_favorite
-        
-        # Update in database
-        success = self.execute_update("""
-            UPDATE Facts 
-            SET IsFavorite = ?
-            WHERE FactID = ?
-        """, (1 if new_status else 0, self.current_fact_id))
-        
+
+        # Update in database (per profile)
+        success = self.execute_update(
+            """
+            MERGE ProfileFacts AS target
+            USING (SELECT ? AS ProfileID, ? AS FactID) AS src
+            ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
+            WHEN MATCHED THEN
+                UPDATE SET IsFavorite = ?, LastViewedByUser = COALESCE(target.LastViewedByUser, GETDATE())
+            WHEN NOT MATCHED THEN
+                INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
+                VALUES (src.ProfileID, src.FactID, 0, ?, 0, GETDATE());
+            """,
+            (profile_id, self.current_fact_id, 1 if new_status else 0, 1 if new_status else 0)
+        )
+
         if success:
             # Update local state
             self.current_fact_is_favorite = new_status
-            
+
             # Update star icon
             if new_status:
                 self.star_button.config(image=self.gold_star_icon)
@@ -1693,7 +1815,7 @@ class FactDariApp:
                     _ = self.gamify.increment_counter('TotalFavorites', 1)
                     # Compute current number of favorites from Facts
                     try:
-                        rows = self.fetch_query("SELECT COUNT(*) FROM Facts WHERE IsFavorite = 1")
+                        rows = self.fetch_query("SELECT COUNT(*) FROM ProfileFacts WHERE ProfileID = ? AND IsFavorite = 1", (profile_id,))
                         current_fav_count = int(rows[0][0]) if rows else 0
                     except Exception:
                         current_fav_count = 0
@@ -1717,16 +1839,21 @@ class FactDariApp:
         """Toggle the 'known/easy' status of the current fact"""
         if not self.current_fact_id:
             return
-        if not self.column_exists('Facts', 'IsEasy'):
-            self.status_label.config(text="Please update DB to latest (IsEasy column)", fg=self.STATUS_COLOR)
-            self.clear_status_after_delay(3000)
-            return
+        profile_id = self.get_active_profile_id()
         new_status = not self.current_fact_is_easy
-        success = self.execute_update("""
-            UPDATE Facts
-            SET IsEasy = ?
-            WHERE FactID = ?
-        """, (1 if new_status else 0, self.current_fact_id))
+        success = self.execute_update(
+            """
+            MERGE ProfileFacts AS target
+            USING (SELECT ? AS ProfileID, ? AS FactID) AS src
+            ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
+            WHEN MATCHED THEN
+                UPDATE SET IsEasy = ?, LastViewedByUser = COALESCE(target.LastViewedByUser, GETDATE())
+            WHEN NOT MATCHED THEN
+                INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
+                VALUES (src.ProfileID, src.FactID, 0, 0, ?, GETDATE());
+            """,
+            (profile_id, self.current_fact_id, 1 if new_status else 0, 1 if new_status else 0)
+        )
         if success:
             self.current_fact_is_easy = new_status
             if new_status:
@@ -1751,7 +1878,7 @@ class FactDariApp:
                     _ = self.gamify.increment_counter('TotalKnown', 1)
                     # Compute current known facts from Facts
                     try:
-                        rows = self.fetch_query("SELECT COUNT(*) FROM Facts WHERE IsEasy = 1")
+                        rows = self.fetch_query("SELECT COUNT(*) FROM ProfileFacts WHERE ProfileID = ? AND IsEasy = 1", (profile_id,))
                         current_known_count = int(rows[0][0]) if rows else 0
                     except Exception:
                         current_known_count = 0
@@ -1868,14 +1995,30 @@ class FactDariApp:
             # Insert the new fact and get its ID
             new_fact_id = self.execute_insert_return_id(
                 """
-                INSERT INTO Facts (CategoryID, Content, DateAdded, ReviewCount, TotalViews, IsFavorite)
+                INSERT INTO Facts (CategoryID, Content, DateAdded, TotalViews)
                 OUTPUT INSERTED.FactID
-                VALUES (?, ?, GETDATE(), 0, 0, 0)
+                VALUES (?, ?, GETDATE(), 0)
                 """,
                 (category_id, content)
             )
             
             if new_fact_id:
+                # Initialize per-profile state for the active profile
+                try:
+                    pid = self.get_active_profile_id()
+                    self.execute_update(
+                        """
+                        MERGE ProfileFacts AS target
+                        USING (SELECT ? AS ProfileID, ? AS FactID) AS src
+                        ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
+                        WHEN NOT MATCHED THEN
+                            INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
+                            VALUES (src.ProfileID, src.FactID, 0, 0, 0, NULL);
+                        """,
+                        (pid, new_fact_id)
+                    )
+                except Exception:
+                    pass
                 self.status_label.config(text="New fact added successfully!", fg=self.GREEN_COLOR)
                 self.clear_status_after_delay(3000)
                 self.update_fact_count()
@@ -2533,6 +2676,10 @@ class FactDariApp:
                 self.easy_button.place_forget()
             except Exception:
                 pass
+            try:
+                self.ai_button.place_forget()
+            except Exception:
+                pass
             # Hide level label on home page
             try:
                 self.level_label.place_forget()
@@ -2622,6 +2769,7 @@ class FactDariApp:
         try:
             self.info_button.place_forget()
             # Show easy button before star
+            self.ai_button.place(relx=1.0, rely=0, anchor="ne", x=-105, y=5)
             self.easy_button.place(relx=1.0, rely=0, anchor="ne", x=-80, y=5)
             self.star_button.place(relx=1.0, rely=0, anchor="ne", x=-55, y=5)
             # Show speaker on reviewing page

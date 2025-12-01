@@ -12,32 +12,35 @@ class Gamification:
     def __init__(self, conn_str: str):
         self.conn_str = conn_str
 
+    def _get_or_create_profile_id(self, cur, conn=None) -> int:
+        """Return the active profile id, inserting the default row if missing."""
+        cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
+        row = cur.fetchone()
+        if row:
+            return int(row[0])
+        cur.execute("INSERT INTO GamificationProfile (XP, Level) VALUES (0,1)")
+        if conn:
+            conn.commit()
+        cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
+        row = cur.fetchone()
+        return int(row[0]) if row else 1
+
     # --- Profile helpers ---
     def get_profile(self) -> dict:
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
+                pid = self._get_or_create_profile_id(cur, conn)
                 cur.execute(
                     """
-                    SELECT TOP 1 ProfileID, XP, Level, TotalReviews, TotalKnown, TotalFavorites,
-                           TotalAdds, TotalEdits, TotalDeletes, CurrentStreak, LongestStreak, LastCheckinDate
+                    SELECT ProfileID, XP, Level, TotalReviews, TotalKnown, TotalFavorites,
+                           TotalAdds, TotalEdits, TotalDeletes, TotalAITokens, TotalAICost,
+                           CurrentStreak, LongestStreak, LastCheckinDate
                     FROM GamificationProfile
-                    ORDER BY ProfileID
-                    """
+                    WHERE ProfileID = ?
+                    """,
+                    (pid,)
                 )
                 row = cur.fetchone()
-                if not row:
-                    # Bootstrap a row if missing, then re-select it for accurate values
-                    cur.execute("INSERT INTO GamificationProfile (XP, Level) VALUES (0,1)")
-                    conn.commit()
-                    cur.execute(
-                        """
-                        SELECT TOP 1 ProfileID, XP, Level, TotalReviews, TotalKnown, TotalFavorites,
-                               TotalAdds, TotalEdits, TotalDeletes, CurrentStreak, LongestStreak, LastCheckinDate
-                        FROM GamificationProfile
-                        ORDER BY ProfileID
-                        """
-                    )
-                    row = cur.fetchone()
                 cols = [d[0] for d in cur.description]
                 return dict(zip(cols, row))
 
@@ -53,34 +56,47 @@ class Gamification:
             return 0
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
-                # Target the first (and only) profile row explicitly
-                cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
-                r = cur.fetchone()
-                if not r:
-                    # Ensure a row exists
-                    cur.execute("INSERT INTO GamificationProfile (XP, Level) VALUES (0,1)")
-                    conn.commit()
-                    cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
-                    r = cur.fetchone()
-                pid = int(r[0])
+                pid = self._get_or_create_profile_id(cur, conn)
                 cur.execute(f"UPDATE GamificationProfile SET {field} = {field} + ? WHERE ProfileID = ?", (amount, pid))
                 conn.commit()
                 cur.execute(f"SELECT {field} FROM GamificationProfile WHERE ProfileID = ?", (pid,))
                 return int(cur.fetchone()[0])
+
+    def add_ai_usage(self, total_tokens: int = 0, cost: float = 0.0) -> dict:
+        """Accumulate AI token/cost totals on the profile."""
+        try:
+            tokens_val = int(total_tokens or 0)
+        except Exception:
+            tokens_val = 0
+        try:
+            cost_val = float(cost or 0.0)
+        except Exception:
+            cost_val = 0.0
+
+        if tokens_val <= 0 and cost_val <= 0.0:
+            return self.get_profile()
+
+        with pyodbc.connect(self.conn_str) as conn:
+            with conn.cursor() as cur:
+                pid = self._get_or_create_profile_id(cur, conn)
+                cur.execute(
+                    """
+                    UPDATE GamificationProfile
+                    SET TotalAITokens = ISNULL(TotalAITokens,0) + ?,
+                        TotalAICost = ISNULL(TotalAICost,0) + ?
+                    WHERE ProfileID = ?
+                    """,
+                    (tokens_val, cost_val, pid)
+                )
+                conn.commit()
+        return self.get_profile()
 
     def award_xp(self, amount: int) -> dict:
         if amount <= 0:
             return self.get_profile()
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
-                r = cur.fetchone()
-                if not r:
-                    cur.execute("INSERT INTO GamificationProfile (XP, Level) VALUES (0,1)")
-                    conn.commit()
-                    cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
-                    r = cur.fetchone()
-                pid = int(r[0])
+                pid = self._get_or_create_profile_id(cur, conn)
                 # Update XP for that profile
                 cur.execute("UPDATE GamificationProfile SET XP = XP + ? WHERE ProfileID = ?", (amount, pid))
                 conn.commit()
@@ -98,12 +114,9 @@ class Gamification:
 
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
-                r = cur.fetchone()
-                if r:
-                    pid = int(r[0])
-                    cur.execute("UPDATE GamificationProfile SET Level = ? WHERE ProfileID = ?", (int(level), pid))
-                    conn.commit()
+                pid = self._get_or_create_profile_id(cur, conn)
+                cur.execute("UPDATE GamificationProfile SET Level = ? WHERE ProfileID = ?", (int(level), pid))
+                conn.commit()
         profile['Level'] = int(level)
         return profile
 
@@ -115,23 +128,24 @@ class Gamification:
         unlocked = []
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
+                pid = self._get_or_create_profile_id(cur, conn)
                 cur.execute(
                     """
                     SELECT a.AchievementID, a.Code, a.Name, a.RewardXP
                     FROM Achievements a
-                    LEFT JOIN AchievementUnlocks u ON u.AchievementID = a.AchievementID
+                    LEFT JOIN AchievementUnlocks u ON u.AchievementID = a.AchievementID AND u.ProfileID = ?
                     WHERE a.Category = ? AND a.Threshold <= ? AND u.UnlockID IS NULL
                     ORDER BY a.Threshold
                     """,
-                    (category, int(current_value))
+                    (pid, category, int(current_value))
                 )
                 rows = cur.fetchall()
                 for r in rows:
                     ach_id, code, name, reward = r
                     try:
                         cur.execute(
-                            "INSERT INTO AchievementUnlocks (AchievementID) VALUES (?)",
-                            (ach_id,)
+                            "INSERT INTO AchievementUnlocks (AchievementID, ProfileID) VALUES (?, ?)",
+                            (ach_id, pid)
                         )
                         unlocked.append({'Code': code, 'Name': name, 'RewardXP': int(reward)})
                     except Exception:
@@ -153,23 +167,21 @@ class Gamification:
         unlocked = []
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
+                pid = self._get_or_create_profile_id(cur, conn)
                 cur.execute(
                     """
-                    SELECT TOP 1 ProfileID, XP, Level, TotalReviews, TotalKnown, TotalFavorites,
-                           TotalAdds, TotalEdits, TotalDeletes, CurrentStreak, LongestStreak, LastCheckinDate
+                    SELECT ProfileID, XP, Level, TotalReviews, TotalKnown, TotalFavorites,
+                           TotalAdds, TotalEdits, TotalDeletes, TotalAITokens, TotalAICost,
+                           CurrentStreak, LongestStreak, LastCheckinDate
                     FROM GamificationProfile
-                    ORDER BY ProfileID
-                    """
+                    WHERE ProfileID = ?
+                    """,
+                    (pid,)
                 )
                 row = cur.fetchone()
-                if not row:
-                    cur.execute("INSERT INTO GamificationProfile (XP, Level, CurrentStreak, LongestStreak) VALUES (0,1,0,0)")
-                    conn.commit()
-                    cur.execute("SELECT TOP 1 ProfileID, XP, Level, TotalReviews, TotalKnown, TotalFavorites, TotalAdds, TotalEdits, TotalDeletes, CurrentStreak, LongestStreak, LastCheckinDate FROM GamificationProfile ORDER BY ProfileID")
-                    row = cur.fetchone()
 
                 cols = [d[0] for d in cur.description]
-                prof = dict(zip(cols, row))
+                prof = dict(zip(cols, row)) if row else {'ProfileID': pid}
 
                 today = date.today()
                 last = prof.get('LastCheckinDate')
@@ -182,26 +194,26 @@ class Gamification:
                     except Exception:
                         last = None
 
-                # Determine new streak
-                new_streak = int(prof.get('CurrentStreak', 0) or 0)
-                longest = int(prof.get('LongestStreak', 0) or 0)
+                # Derive streak from actual review activity (authoritative)
+                log_current, log_longest, log_last = self._calculate_streak_from_logs(cur, pid)
+                new_streak = log_current
+                longest = log_longest
                 changed = False
 
-                if last == today:
-                    # Already checked in today
-                    pass
-                else:
-                    if last == today - timedelta(days=1):
-                        new_streak = new_streak + 1 if new_streak > 0 else 1
-                    else:
-                        new_streak = 1
-                    longest = max(longest, new_streak)
+                if log_last:
+                    # Persist derived values
+                    last_param = log_last
+                    if isinstance(log_last, (datetime, date)):
+                        # SQL Server accepts ISO date strings; avoid driver date binding issues
+                        last_param = log_last.strftime("%Y-%m-%d")
                     cur.execute(
-                        "UPDATE GamificationProfile SET CurrentStreak = ?, LongestStreak = ?, LastCheckinDate = ?",
-                        (int(new_streak), int(longest), today)
+                        "UPDATE GamificationProfile SET CurrentStreak = ?, LongestStreak = ?, LastCheckinDate = ? WHERE ProfileID = ?",
+                        (int(new_streak), int(longest), last_param, pid)
                     )
                     conn.commit()
-                    changed = True
+                    # Award daily XP only once per new day
+                    if last != today and log_last == today:
+                        changed = True
 
                 # Award daily check-in XP (only when day advanced or first time)
                 if changed:
@@ -216,8 +228,64 @@ class Gamification:
                 # Return updated profile snapshot
                 prof['CurrentStreak'] = new_streak
                 prof['LongestStreak'] = longest
-                prof['LastCheckinDate'] = today if changed else last
+                prof['LastCheckinDate'] = log_last
                 return {'profile': prof, 'unlocked': unlocked}
+
+    def _calculate_streak_from_logs(self, cur, profile_id: int):
+        """Compute current and longest streak from ReviewLogs (view/null actions only) for a profile."""
+        try:
+            cur.execute(
+                """
+                SELECT DISTINCT CONVERT(date, rl.ReviewDate) as ReviewDay
+                FROM ReviewLogs rl
+                LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+                WHERE (rl.Action IS NULL OR rl.Action = 'view')
+                  AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+                ORDER BY ReviewDay DESC
+                """,
+                (profile_id,)
+            )
+            rows = cur.fetchall()
+        except Exception:
+            return 0, 0, None
+
+        dates = []
+        for r in rows:
+            d = r[0]
+            if isinstance(d, datetime):
+                d = d.date()
+            elif not isinstance(d, date):
+                try:
+                    d = datetime.strptime(str(d), '%Y-%m-%d').date()
+                except Exception:
+                    continue
+            dates.append(d)
+
+        if not dates:
+            return 0, 0, None
+
+        today = date.today()
+        longest = 1
+        run = 1
+        for i in range(1, len(dates)):
+            if dates[i] == dates[i-1] - timedelta(days=1):
+                run += 1
+            else:
+                run = 1
+            if run > longest:
+                longest = run
+
+        current = 0
+        if dates[0] in (today, today - timedelta(days=1)):
+            current = 1
+            for i in range(1, len(dates)):
+                if dates[i] == dates[i-1] - timedelta(days=1):
+                    current += 1
+                else:
+                    break
+
+        last_review = dates[0]
+        return current, longest, last_review
 
     def get_level_progress(self) -> dict:
         """Return progress metrics using stored Level (with gating) and current XP.
@@ -296,6 +364,7 @@ class Gamification:
         and from profile lifetime counters for other categories.
         """
         prof = self.get_profile()
+        pid = int(prof.get('ProfileID', 1) or 1)
         counters = {
             'known': 0,  # placeholder, will be computed from Facts
             'favorites': 0,  # placeholder, will be computed from Facts
@@ -310,12 +379,12 @@ class Gamification:
             with conn.cursor() as cur:
                 # Compute current states from Facts
                 try:
-                    cur.execute("SELECT COUNT(*) FROM Facts WHERE IsEasy = 1")
+                    cur.execute("SELECT COUNT(*) FROM ProfileFacts WHERE ProfileID = ? AND IsEasy = 1", (pid,))
                     counters['known'] = int(cur.fetchone()[0] or 0)
                 except Exception:
                     counters['known'] = 0
                 try:
-                    cur.execute("SELECT COUNT(*) FROM Facts WHERE IsFavorite = 1")
+                    cur.execute("SELECT COUNT(*) FROM ProfileFacts WHERE ProfileID = ? AND IsFavorite = 1", (pid,))
                     counters['favorites'] = int(cur.fetchone()[0] or 0)
                 except Exception:
                     counters['favorites'] = 0
@@ -325,9 +394,10 @@ class Gamification:
                     SELECT a.AchievementID, a.Code, a.Name, a.Category, a.Threshold, a.RewardXP,
                            u.UnlockID, u.UnlockDate, u.Notified
                     FROM Achievements a
-                    LEFT JOIN AchievementUnlocks u ON u.AchievementID = a.AchievementID
+                    LEFT JOIN AchievementUnlocks u ON u.AchievementID = a.AchievementID AND u.ProfileID = ?
                     ORDER BY a.Category, a.Threshold
-                    """
+                    """,
+                    (pid,)
                 )
                 rows = cur.fetchall()
                 for r in rows:
@@ -353,19 +423,22 @@ class Gamification:
             return
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
+                pid = self._get_or_create_profile_id(cur, conn)
                 # Update Notified for unlock rows that match codes and are not yet notified
+                placeholders = ','.join('?' for _ in codes)
                 q = (
                     "UPDATE u SET Notified = 1 FROM AchievementUnlocks u "
                     "JOIN Achievements a ON a.AchievementID = u.AchievementID "
-                    f"WHERE a.Code IN ({','.join('?' for _ in codes)}) AND u.Notified = 0"
+                    f"WHERE a.Code IN ({placeholders}) AND u.ProfileID = ? AND u.Notified = 0"
                 )
-                cur.execute(q, tuple(codes))
+                cur.execute(q, tuple(codes) + (pid,))
                 conn.commit()
 
     def mark_all_unnotified_as_notified(self):
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
-                cur.execute("UPDATE AchievementUnlocks SET Notified = 1 WHERE Notified = 0")
+                pid = self._get_or_create_profile_id(cur, conn)
+                cur.execute("UPDATE AchievementUnlocks SET Notified = 1 WHERE Notified = 0 AND ProfileID = ?", (pid,))
                 conn.commit()
 
     # --- Internal helpers ---
@@ -433,10 +506,11 @@ class Gamification:
     def _all_achievements_unlocked(self) -> bool:
         with pyodbc.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
+                pid = self._get_or_create_profile_id(cur, conn)
                 cur.execute("SELECT COUNT(*) FROM Achievements")
                 total = int(cur.fetchone()[0])
                 if total == 0:
                     return False
-                cur.execute("SELECT COUNT(*) FROM AchievementUnlocks")
+                cur.execute("SELECT COUNT(*) FROM AchievementUnlocks WHERE ProfileID = ?", (pid,))
                 unlocked = int(cur.fetchone()[0])
                 return unlocked >= total

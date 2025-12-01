@@ -64,7 +64,7 @@ UI_CONFIG = {
     'popup_add_card_size': "496x400",
     'popup_edit_card_size': "496x520",
     'popup_categories_size': "400x520",
-    'popup_info_size': "420x480",
+    'popup_info_size': "420x550",
     # Dedicated width for the Achievements popup (slightly wider)
     'popup_achievements_size': os.environ.get('FACTDARI_POPUP_ACHIEVEMENTS_SIZE', "518x480"),
     'popup_confirm_size': "360x180",
@@ -93,6 +93,28 @@ UI_CONFIG = {
     'small_font_size': 8,
     'large_font_size': 16,
     'stats_font_size': 9
+}
+
+
+def _get_float_env(var_name: str, default: str = "0") -> float:
+    """Safely parse a float from environment variables."""
+    try:
+        return float(os.environ.get(var_name, default))
+    except Exception:
+        try:
+            return float(default)
+        except Exception:
+            return 0.0
+
+
+# AI pricing/configuration (used for cost estimation and logging)
+AI_PRICING = {
+    'provider': os.environ.get('FACTDARI_AI_PROVIDER', 'together'),
+    'model': os.environ.get('FACTDARI_AI_MODEL', 'deepseek-ai/DeepSeek-V3.1'),
+    # Defaults derived from provided pricing per 1M tokens: $0.60 input, $1.70 output
+    'prompt_cost_per_1k': _get_float_env('FACTDARI_AI_PROMPT_COST_PER_1K', '0.0006'),
+    'completion_cost_per_1k': _get_float_env('FACTDARI_AI_COMPLETION_COST_PER_1K', '0.0017'),
+    'currency': os.environ.get('FACTDARI_AI_CURRENCY', 'USD'),
 }
 
 
@@ -132,6 +154,14 @@ def get_font(font_type):
         return (UI_CONFIG['font_family'], UI_CONFIG['stats_font_size'])
     else:
         return (UI_CONFIG['font_family'], UI_CONFIG['normal_font_size'])
+
+def get_together_api_key():
+    """Fetch Together AI API key from environment."""
+    return (
+        os.environ.get('FACTDARI_TOGETHER_API_KEY')
+        or os.environ.get('TOGETHER_API_KEY')
+        or os.environ.get('TOGETHER_API_TOKEN')
+    )
 
 # (no chart config helpers are needed; Chart.js is configured in the template)
 

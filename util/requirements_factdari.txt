@@ -5,6 +5,7 @@
 pyodbc==5.1.0          # Database connectivity
 Pillow==10.3.0         # Image processing for icons
 pyttsx3==2.90          # Text-to-speech functionality
+requests==2.32.3       # HTTP calls for Together AI explanations
 
 # Web framework for analytics
 Flask==3.0.3

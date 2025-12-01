@@ -236,12 +236,33 @@
   function doughnutChart(key, canvasId, payload) {
     const ctx = qs(`#${canvasId}`).getContext('2d');
     destroyChart(key);
+    const showCenterTotal = ['favorite_categories', 'known_categories', 'categories_viewed_today'].includes(key);
     
     const colors = isDarkMode ? [
       '#f87171','#fbbf24','#34d399','#60a5fa','#a78bfa'
     ] : [
       '#ef4444','#f59e0b','#10b981','#3b82f6','#8b5cf6'
     ];
+
+    const centerTotalPlugin = {
+      id: `centerTotal-${key}`,
+      beforeDraw(chart) {
+        if (!showCenterTotal) return;
+        const meta = chart.getDatasetMeta(0);
+        if (!meta || !meta.data || !meta.data.length) return;
+        const total = chart.data.datasets?.[0]?.data?.reduce((a, b) => a + (Number(b) || 0), 0) || 0;
+        const { ctx } = chart;
+        const { x, y } = meta.data[0];
+        ctx.save();
+        const fontSize = Math.max(14, Math.min(chart.width, chart.height) / 10);
+        ctx.font = `600 ${fontSize}px "Inter", sans-serif`;
+        ctx.fillStyle = isDarkMode ? '#e2e8f0' : '#0f172a';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(total, x, y);
+        ctx.restore();
+      }
+    };
     
     charts[key] = new Chart(ctx, {
       type: 'doughnut',
@@ -282,13 +303,19 @@
           animateScale: true,
           duration: 800
         }
-      }
+      },
+      plugins: [centerTotalPlugin]
     });
   }
 
   function lineChart(key, canvasId, payload) {
     const ctx = qs(`#${canvasId}`).getContext('2d');
     destroyChart(key);
+
+    const axisTitles = {
+      reviews_per_day: { x: 'Date', y: 'Reviews' }
+    };
+    const titles = axisTitles[key] || {};
     
     // Enhanced dataset styling
     if (payload.datasets) {
@@ -325,7 +352,13 @@
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
-            }
+            },
+            title: titles.x ? {
+              display: true,
+              text: titles.x,
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
+            } : undefined
           },
           y: { 
             beginAtZero: true,
@@ -335,7 +368,13 @@
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
-            }
+            },
+            title: titles.y ? {
+              display: true,
+              text: titles.y,
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { bottom: 8 }
+            } : undefined
           }
         },
         plugins: {
@@ -363,6 +402,13 @@
   function barChart(key, canvasId, payload, horizontal=false) {
     const ctx = qs(`#${canvasId}`).getContext('2d');
     destroyChart(key);
+
+    const axisTitles = {
+      facts_timeline: { x: 'Date Added', y: 'Facts Added' },
+      category_reviews: { x: 'Total Reviews', y: 'Category' },
+      category_review_time: { x: 'Avg Review Time (seconds)', y: 'Category' }
+    };
+    const titles = axisTitles[key] || {};
     
     // Enhanced dataset styling
     if (payload.datasets) {
@@ -397,7 +443,13 @@
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
-            }
+            },
+            title: titles.x ? {
+              display: true,
+              text: titles.x,
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
+            } : undefined
           },
           y: {
             beginAtZero: !horizontal,
@@ -407,7 +459,13 @@
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
-            }
+            },
+            title: titles.y ? {
+              display: true,
+              text: titles.y,
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { bottom: 8 }
+            } : undefined
           }
         },
         plugins: {
@@ -1558,6 +1616,12 @@
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            title: {
+              display: true,
+              text: 'Date',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
             }
           },
           y: {
@@ -1667,6 +1731,12 @@
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            title: {
+              display: true,
+              text: 'Date',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
             }
           },
           y: {
@@ -1777,6 +1847,11 @@
     const canvas = qs(`#${elementId}`);
     if (!canvas || !payload) return;
     const ctx = canvas.getContext('2d');
+
+    const axisTitles = {
+      top_hours: { x: 'Review Count', y: 'Hour of Day' }
+    };
+    const titles = axisTitles[key] || {};
     
     if (charts[key]) {
       charts[key].destroy();
@@ -1809,7 +1884,13 @@
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
-            }
+            },
+            title: titles.x ? {
+              display: true,
+              text: titles.x,
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
+            } : undefined
           },
           y: {
             grid: {
@@ -1820,7 +1901,13 @@
               font: {
                 size: 11
               }
-            }
+            },
+            title: titles.y ? {
+              display: true,
+              text: titles.y,
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { bottom: 8 }
+            } : undefined
           }
         }
       }
@@ -1832,6 +1919,12 @@
     const canvas = qs(`#${elementId}`);
     if (!canvas || !payload) return;
     const ctx = canvas.getContext('2d');
+
+    const axisTitles = {
+      session_actions: { x: 'Session (oldest → newest)', y: 'Count' },
+      growth_trend: { x: 'Category', y: 'Total Facts (Lifetime)' }
+    };
+    const titles = axisTitles[key] || {};
     
     if (charts[key]) {
       charts[key].destroy();
@@ -1869,7 +1962,13 @@
               color: isDarkMode ? '#94a3b8' : '#64748b',
               maxRotation: 45,
               minRotation: 45
-            }
+            },
+            title: titles.x ? {
+              display: true,
+              text: titles.x,
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
+            } : undefined
           },
           y: {
             beginAtZero: true,
@@ -1878,7 +1977,13 @@
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
-            }
+            },
+            title: titles.y ? {
+              display: true,
+              text: titles.y,
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { bottom: 8 }
+            } : undefined
           }
         }
       }
@@ -1912,6 +2017,12 @@
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            title: {
+              display: true,
+              text: 'Month (last 6 months)',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
             }
           },
           y: {

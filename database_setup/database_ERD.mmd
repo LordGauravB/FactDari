@@ -1,26 +1,53 @@
 erDiagram
+    GamificationProfile {
+        int ProfileID PK
+        int XP
+        int Level
+        int TotalReviews
+        int TotalKnown
+        int TotalFavorites
+        int TotalAdds
+        int TotalEdits
+        int TotalDeletes
+        int TotalAITokens
+        decimal TotalAICost
+        int CurrentStreak
+        int LongestStreak
+        date LastCheckinDate
+    }
+
     Categories {
         int CategoryID PK
         nvarchar CategoryName "UNIQUE"
         nvarchar Description
         bit IsActive
         datetime CreatedDate
+        int CreatedBy FK "default 1"
     }
 
     Facts {
         int FactID PK
         int CategoryID FK
         nvarchar Content
+        nvarchar ContentKey "Computed/Persisted"
         date DateAdded
-        datetime LastViewedDate
-        int ReviewCount
         int TotalViews
+        int CreatedBy FK "default 1"
+    }
+
+    ProfileFacts {
+        int ProfileFactID PK
+        int ProfileID FK
+        int FactID FK
+        int PersonalReviewCount
         bit IsFavorite
         bit IsEasy
+        datetime LastViewedByUser
     }
 
     ReviewSessions {
         int SessionID PK
+        int ProfileID FK
         datetime StartTime
         datetime EndTime
         int DurationSeconds
@@ -44,19 +71,23 @@ erDiagram
         int CategoryIDSnapshot
     }
 
-    GamificationProfile {
-        int ProfileID PK
-        int XP
-        int Level
-        int TotalReviews
-        int TotalKnown
-        int TotalFavorites
-        int TotalAdds
-        int TotalEdits
-        int TotalDeletes
-        int CurrentStreak
-        int LongestStreak
-        date LastCheckinDate
+    AIUsageLogs {
+        int AIUsageID PK
+        int FactID FK
+        int SessionID FK
+        int ProfileID FK
+        nvarchar OperationType
+        nvarchar Status
+        nvarchar ModelName
+        nvarchar Provider
+        int InputTokens
+        int OutputTokens
+        int TotalTokens "Computed"
+        decimal Cost
+        char CurrencyCode
+        int LatencyMs
+        int ReadingDurationSec
+        datetime CreatedAt
     }
 
     Achievements {
@@ -66,19 +97,38 @@ erDiagram
         nvarchar Category
         int Threshold
         int RewardXP
-        bit IsHidden
         datetime CreatedDate
     }
 
     AchievementUnlocks {
         int UnlockID PK
         int AchievementID FK
+        int ProfileID FK
         datetime UnlockDate
         bit Notified
     }
 
-    %% Relationships
+    %% --- Core Relationships ---
+    GamificationProfile ||--o{ ReviewSessions : owns
+    GamificationProfile ||--o{ AchievementUnlocks : earns
+    GamificationProfile ||--o{ AIUsageLogs : incurs
+    GamificationProfile ||--o{ ProfileFacts : "tracks state"
+    
+    %% --- Creator Tracking (Added these based on SQL FKs) ---
+    GamificationProfile ||--o{ Categories : "creates"
+    GamificationProfile ||--o{ Facts : "creates"
+
+    %% --- Content Structure ---
     Categories ||--o{ Facts : contains
+    Facts ||--o{ ProfileFacts : "has state"
+    
+    %% --- Logging & History ---
     Facts ||--o{ ReviewLogs : logs
     ReviewSessions ||--o{ ReviewLogs : tracks
-    Achievements ||--o| AchievementUnlocks : unlocks
+    
+    %% --- AI ---
+    Facts ||--o{ AIUsageLogs : "AI Context"
+    ReviewSessions ||--o{ AIUsageLogs : "AI Session"
+
+    %% --- Gamification ---
+    Achievements ||--o{ AchievementUnlocks : unlocks
