@@ -141,6 +141,7 @@ CREATE TABLE AIUsageLogs (
     Cost DECIMAL(19,9) NULL, -- store USD equivalent cost for the call
     CurrencyCode CHAR(3) NOT NULL CONSTRAINT DF_AIUsageLogs_CurrencyCode DEFAULT 'USD',
     LatencyMs INT NULL,
+    ReadingDurationSec INT NOT NULL CONSTRAINT DF_AIUsageLogs_ReadingDurationSec DEFAULT 0, -- time user spent reading AI output (seconds)
     CreatedAt DATETIME NOT NULL CONSTRAINT DF_AIUsageLogs_CreatedAt DEFAULT GETDATE(),
     CONSTRAINT FK_AIUsageLogs_Facts FOREIGN KEY (FactID)
         REFERENCES Facts(FactID) ON DELETE SET NULL,

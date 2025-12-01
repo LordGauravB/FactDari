@@ -840,534 +840,8 @@ class FactDariApp:
         return 1
 
     def ensure_schema(self):
-        """Create missing tables/columns for sessions and per-view durations."""
-        ddl = """
-        /* Create GamificationProfile if missing (user identity) */
-        IF OBJECT_ID('dbo.GamificationProfile','U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.GamificationProfile (
-                ProfileID INT IDENTITY(1,1) PRIMARY KEY,
-                XP INT NOT NULL CONSTRAINT DF_GamificationProfile_XP DEFAULT 0,
-                Level INT NOT NULL CONSTRAINT DF_GamificationProfile_Level DEFAULT 1,
-                TotalReviews INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalReviews DEFAULT 0,
-                TotalKnown INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalKnown DEFAULT 0,
-                TotalFavorites INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalFavorites DEFAULT 0,
-                TotalAdds INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAdds DEFAULT 0,
-                TotalEdits INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalEdits DEFAULT 0,
-                TotalDeletes INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalDeletes DEFAULT 0,
-                TotalAITokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAITokens DEFAULT 0,
-                TotalAICost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalAICost DEFAULT 0,
-                CurrentStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_CurrentStreak DEFAULT 0,
-                LongestStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_LongestStreak DEFAULT 0,
-                LastCheckinDate DATE NULL
-            );
-        END;
-
-        /* Backfill AI totals on existing GamificationProfile tables */
-        IF COL_LENGTH('dbo.GamificationProfile','TotalAITokens') IS NULL
-        BEGIN
-            ALTER TABLE dbo.GamificationProfile ADD TotalAITokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAITokens DEFAULT 0;
-        END;
-        IF COL_LENGTH('dbo.GamificationProfile','TotalAICost') IS NULL
-        BEGIN
-            ALTER TABLE dbo.GamificationProfile ADD TotalAICost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalAICost DEFAULT 0;
-        END;
-
-        /* ProfileFacts: per-profile state for facts (favorites, difficulty, personal counts) */
-        IF OBJECT_ID('dbo.ProfileFacts','U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.ProfileFacts (
-                ProfileFactID INT IDENTITY(1,1) PRIMARY KEY,
-                ProfileID INT NOT NULL
-                    CONSTRAINT FK_ProfileFacts_Profile
-                    REFERENCES dbo.GamificationProfile(ProfileID),
-                FactID INT NOT NULL
-                    CONSTRAINT FK_ProfileFacts_Fact
-                    REFERENCES dbo.Facts(FactID) ON DELETE CASCADE,
-                PersonalReviewCount INT NOT NULL CONSTRAINT DF_ProfileFacts_PersonalReviewCount DEFAULT 0,
-                IsFavorite BIT NOT NULL CONSTRAINT DF_ProfileFacts_IsFavorite DEFAULT 0,
-                IsEasy BIT NOT NULL CONSTRAINT DF_ProfileFacts_IsEasy DEFAULT 0,
-                LastViewedByUser DATETIME NULL,
-                CONSTRAINT UX_ProfileFacts_Profile_Fact UNIQUE (ProfileID, FactID)
-            );
-            CREATE INDEX IX_ProfileFacts_ProfileID ON dbo.ProfileFacts(ProfileID);
-            CREATE INDEX IX_ProfileFacts_FactID ON dbo.ProfileFacts(FactID);
-        END;
-        ELSE
-        BEGIN
-            IF COL_LENGTH('dbo.ProfileFacts','PersonalReviewCount') IS NULL
-            BEGIN
-                ALTER TABLE dbo.ProfileFacts ADD PersonalReviewCount INT NOT NULL CONSTRAINT DF_ProfileFacts_PersonalReviewCount DEFAULT 0;
-            END;
-            IF COL_LENGTH('dbo.ProfileFacts','IsFavorite') IS NULL
-            BEGIN
-                ALTER TABLE dbo.ProfileFacts ADD IsFavorite BIT NOT NULL CONSTRAINT DF_ProfileFacts_IsFavorite DEFAULT 0;
-            END;
-            IF COL_LENGTH('dbo.ProfileFacts','IsEasy') IS NULL
-            BEGIN
-                ALTER TABLE dbo.ProfileFacts ADD IsEasy BIT NOT NULL CONSTRAINT DF_ProfileFacts_IsEasy DEFAULT 0;
-            END;
-            IF COL_LENGTH('dbo.ProfileFacts','LastViewedByUser') IS NULL
-            BEGIN
-                ALTER TABLE dbo.ProfileFacts ADD LastViewedByUser DATETIME NULL;
-            END;
-            IF OBJECT_ID('dbo.UX_ProfileFacts_Profile_Fact','UQ') IS NULL
-               AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_ProfileFacts_Profile_Fact' AND object_id = OBJECT_ID('dbo.ProfileFacts'))
-            BEGIN
-                ALTER TABLE dbo.ProfileFacts
-                ADD CONSTRAINT UX_ProfileFacts_Profile_Fact UNIQUE (ProfileID, FactID);
-            END;
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ProfileFacts_ProfileID' AND object_id = OBJECT_ID('dbo.ProfileFacts'))
-            BEGIN
-                CREATE INDEX IX_ProfileFacts_ProfileID ON dbo.ProfileFacts(ProfileID);
-            END;
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ProfileFacts_FactID' AND object_id = OBJECT_ID('dbo.ProfileFacts'))
-            BEGIN
-                CREATE INDEX IX_ProfileFacts_FactID ON dbo.ProfileFacts(FactID);
-            END;
-        END;
-
-        /* Backfill ProfileFacts for default profile using any existing global columns */
-        IF NOT EXISTS (SELECT 1 FROM dbo.ProfileFacts WHERE ProfileID = 1)
-        BEGIN
-            DECLARE @hasFav BIT = CASE WHEN COL_LENGTH('dbo.Facts','IsFavorite') IS NOT NULL THEN 1 ELSE 0 END;
-            DECLARE @hasEasy BIT = CASE WHEN COL_LENGTH('dbo.Facts','IsEasy') IS NOT NULL THEN 1 ELSE 0 END;
-            DECLARE @merge_sql NVARCHAR(MAX) = '
-                MERGE dbo.ProfileFacts AS target
-                USING (
-                    SELECT
-                        1 AS ProfileID,
-                        f.FactID,
-                        0 AS PersonalReviewCount,
-                        ' + CASE WHEN @hasFav = 1 THEN 'ISNULL(f.IsFavorite,0)' ELSE 'CAST(0 AS BIT)' END + ' AS IsFavorite,
-                        ' + CASE WHEN @hasEasy = 1 THEN 'ISNULL(f.IsEasy,0)' ELSE 'CAST(0 AS BIT)' END + ' AS IsEasy,
-                        NULL AS LastViewedByUser
-                    FROM dbo.Facts f
-                ) AS src
-                ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
-                WHEN NOT MATCHED THEN
-                    INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
-                    VALUES (src.ProfileID, src.FactID, src.PersonalReviewCount, src.IsFavorite, src.IsEasy, src.LastViewedByUser);';
-            EXEC(@merge_sql);
-        END;
-
-        /* Drop obsolete ReviewCount column from Facts (now tracked per-profile + TotalViews) */
-        IF COL_LENGTH('dbo.Facts','ReviewCount') IS NOT NULL
-        BEGIN
-            DECLARE @df NVARCHAR(128);
-            SELECT @df = dc.name
-            FROM sys.default_constraints dc
-            JOIN sys.columns c ON c.column_id = dc.parent_column_id AND c.object_id = dc.parent_object_id
-            WHERE dc.parent_object_id = OBJECT_ID('dbo.Facts') AND c.name = 'ReviewCount';
-            IF @df IS NOT NULL 
-            BEGIN
-                DECLARE @cmd_drop_df NVARCHAR(400);
-                SET @cmd_drop_df = 'ALTER TABLE dbo.Facts DROP CONSTRAINT ' + QUOTENAME(@df);
-                EXEC(@cmd_drop_df);
-            END;
-            ALTER TABLE dbo.Facts DROP COLUMN ReviewCount;
-        END;
-        /* Drop obsolete LastViewedDate column from Facts (now per-profile in ProfileFacts) */
-        IF COL_LENGTH('dbo.Facts','LastViewedDate') IS NOT NULL
-        BEGIN
-            DECLARE @df2 NVARCHAR(128);
-            SELECT @df2 = dc.name
-            FROM sys.default_constraints dc
-            JOIN sys.columns c ON c.column_id = dc.parent_column_id AND c.object_id = dc.parent_object_id
-            WHERE dc.parent_object_id = OBJECT_ID('dbo.Facts') AND c.name = 'LastViewedDate';
-            IF @df2 IS NOT NULL 
-            BEGIN
-                DECLARE @cmd_drop_df2 NVARCHAR(400);
-                SET @cmd_drop_df2 = 'ALTER TABLE dbo.Facts DROP CONSTRAINT ' + QUOTENAME(@df2);
-                EXEC(@cmd_drop_df2);
-            END;
-            ALTER TABLE dbo.Facts DROP COLUMN LastViewedDate;
-        END;
-
-        /* Ensure CreatedBy columns on Categories and Facts (default profile 1) */
-        IF COL_LENGTH('dbo.Categories','CreatedBy') IS NULL
-        BEGIN
-            ALTER TABLE dbo.Categories ADD CreatedBy INT NOT NULL CONSTRAINT DF_Categories_CreatedBy DEFAULT 1;
-            UPDATE dbo.Categories SET CreatedBy = 1 WHERE CreatedBy IS NULL;
-            ALTER TABLE dbo.Categories
-            ADD CONSTRAINT FK_Categories_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES dbo.GamificationProfile(ProfileID);
-        END;
-        IF COL_LENGTH('dbo.Facts','CreatedBy') IS NULL
-        BEGIN
-            ALTER TABLE dbo.Facts ADD CreatedBy INT NOT NULL CONSTRAINT DF_Facts_CreatedBy DEFAULT 1;
-            UPDATE dbo.Facts SET CreatedBy = 1 WHERE CreatedBy IS NULL;
-            ALTER TABLE dbo.Facts
-            ADD CONSTRAINT FK_Facts_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES dbo.GamificationProfile(ProfileID);
-        END;
-
-        /* Create ReviewSessions if missing */
-        IF OBJECT_ID('dbo.ReviewSessions','U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.ReviewSessions (
-                SessionID INT IDENTITY(1,1) PRIMARY KEY,
-                ProfileID INT NOT NULL CONSTRAINT DF_ReviewSessions_ProfileID DEFAULT 1,
-                StartTime DATETIME NOT NULL,
-                EndTime DATETIME NULL,
-                DurationSeconds INT NULL,
-                TimedOut BIT NOT NULL CONSTRAINT DF_ReviewSessions_TimedOut DEFAULT 0,
-                FactsAdded INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsAdded DEFAULT 0,
-                FactsEdited INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsEdited DEFAULT 0,
-                FactsDeleted INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsDeleted DEFAULT 0
-            );
-        END;
-
-        /* Ensure ReviewLogs table exists */
-        IF OBJECT_ID('dbo.ReviewLogs','U') IS NULL
-        BEGIN
-            -- Create minimal ReviewLogs table if missing (defensive)
-            CREATE TABLE dbo.ReviewLogs (
-                ReviewLogID INT IDENTITY(1,1) PRIMARY KEY,
-                FactID INT NULL,
-                ReviewDate DATETIME NOT NULL
-            );
-        END;
-        
-        /* Ensure SessionDuration column exists for per-view timing */
-        IF COL_LENGTH('dbo.ReviewLogs','SessionDuration') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD SessionDuration INT NULL;
-        END;
-        /* Ensure per-view TimedOut flag exists */
-        IF COL_LENGTH('dbo.ReviewLogs','TimedOut') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD TimedOut BIT NOT NULL CONSTRAINT DF_ReviewLogs_TimedOut DEFAULT 0;
-        END;
-        /* Ensure session-level TimedOut flag exists */
-        IF COL_LENGTH('dbo.ReviewSessions','TimedOut') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewSessions ADD TimedOut BIT NOT NULL CONSTRAINT DF_ReviewSessions_TimedOut DEFAULT 0;
-        END;
-        IF COL_LENGTH('dbo.ReviewLogs','SessionID') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD SessionID INT NULL;
-        END;
-        IF OBJECT_ID('dbo.FK_ReviewLogs_ReviewSessions','F') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs
-            ADD CONSTRAINT FK_ReviewLogs_ReviewSessions
-            FOREIGN KEY (SessionID) REFERENCES dbo.ReviewSessions(SessionID);
-        END;
-        IF NOT EXISTS (
-            SELECT 1 FROM sys.indexes 
-            WHERE name = 'IX_ReviewLogs_SessionID' AND object_id = OBJECT_ID('dbo.ReviewLogs')
-        )
-        BEGIN
-            CREATE INDEX IX_ReviewLogs_SessionID ON dbo.ReviewLogs(SessionID);
-        END;
-
-        /* Add action tracking columns to ReviewLogs */
-        IF COL_LENGTH('dbo.ReviewLogs','Action') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD Action NVARCHAR(16) NOT NULL CONSTRAINT DF_ReviewLogs_Action DEFAULT 'view';
-        END;
-        IF COL_LENGTH('dbo.ReviewLogs','FactEdited') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD FactEdited BIT NOT NULL CONSTRAINT DF_ReviewLogs_FactEdited DEFAULT 0;
-        END;
-        IF COL_LENGTH('dbo.ReviewLogs','FactDeleted') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD FactDeleted BIT NOT NULL CONSTRAINT DF_ReviewLogs_FactDeleted DEFAULT 0;
-        END;
-        IF COL_LENGTH('dbo.ReviewLogs','FactContentSnapshot') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD FactContentSnapshot NVARCHAR(MAX) NULL;
-        END;
-        IF COL_LENGTH('dbo.ReviewLogs','CategoryIDSnapshot') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ADD CategoryIDSnapshot INT NULL;
-        END;
-
-        /* Add per-session action counters */
-        IF COL_LENGTH('dbo.ReviewSessions','FactsAdded') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewSessions ADD FactsAdded INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsAdded DEFAULT 0;
-        END;
-        IF COL_LENGTH('dbo.ReviewSessions','FactsEdited') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewSessions ADD FactsEdited INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsEdited DEFAULT 0;
-        END;
-        IF COL_LENGTH('dbo.ReviewSessions','FactsDeleted') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewSessions ADD FactsDeleted INT NOT NULL CONSTRAINT DF_ReviewSessions_FactsDeleted DEFAULT 0;
-        END;
-
-        /* Attach ProfileID to ReviewSessions */
-        IF COL_LENGTH('dbo.ReviewSessions','ProfileID') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewSessions ADD ProfileID INT NULL CONSTRAINT DF_ReviewSessions_ProfileID DEFAULT 1;
-            UPDATE dbo.ReviewSessions SET ProfileID = 1 WHERE ProfileID IS NULL;
-            ALTER TABLE dbo.ReviewSessions ALTER COLUMN ProfileID INT NOT NULL;
-        END;
-        IF OBJECT_ID('dbo.FK_ReviewSessions_Profile','F') IS NULL
-        BEGIN
-            ALTER TABLE dbo.ReviewSessions
-            ADD CONSTRAINT FK_ReviewSessions_Profile
-            FOREIGN KEY (ProfileID) REFERENCES dbo.GamificationProfile(ProfileID);
-        END;
-        IF NOT EXISTS (
-            SELECT 1 FROM sys.indexes 
-            WHERE name = 'IX_ReviewSessions_ProfileID' AND object_id = OBJECT_ID('dbo.ReviewSessions')
-        )
-        BEGIN
-            CREATE INDEX IX_ReviewSessions_ProfileID ON dbo.ReviewSessions(ProfileID);
-        END;
-
-        /* Ensure FK from ReviewLogs(FactID) to Facts is ON DELETE SET NULL (to preserve logs for deleted cards) */
-        IF EXISTS (
-            SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ReviewLogs_Facts'
-        )
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs DROP CONSTRAINT FK_ReviewLogs_Facts;
-        END;
-        /* Make FactID nullable to support SET NULL */
-        IF EXISTS (
-            SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ReviewLogs') AND name = 'FactID' AND is_nullable = 0
-        )
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs ALTER COLUMN FactID INT NULL;
-        END;
-        /* Recreate FK with SET NULL if not exists */
-        IF NOT EXISTS (
-            SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ReviewLogs_Facts'
-        )
-        BEGIN
-            ALTER TABLE dbo.ReviewLogs WITH NOCHECK
-            ADD CONSTRAINT FK_ReviewLogs_Facts FOREIGN KEY (FactID)
-            REFERENCES dbo.Facts(FactID) ON DELETE SET NULL;
-        END;
-
-        /* AI usage logging */
-        IF OBJECT_ID('dbo.AIUsageLogs','U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.AIUsageLogs (
-                AIUsageID INT IDENTITY(1,1) PRIMARY KEY,
-                FactID INT NULL,
-                SessionID INT NULL,
-                ProfileID INT NOT NULL CONSTRAINT DF_AIUsageLogs_ProfileID DEFAULT 1,
-                OperationType NVARCHAR(32) NOT NULL CONSTRAINT DF_AIUsageLogs_OperationType DEFAULT 'EXPLANATION',
-                Status NVARCHAR(16) NOT NULL CONSTRAINT DF_AIUsageLogs_Status DEFAULT 'SUCCESS',
-                ModelName NVARCHAR(200) NULL,
-                Provider NVARCHAR(100) NULL,
-                InputTokens INT NULL,
-                OutputTokens INT NULL,
-                TotalTokens AS (ISNULL(InputTokens, 0) + ISNULL(OutputTokens, 0)) PERSISTED,
-                Cost DECIMAL(19,9) NULL,
-                CurrencyCode CHAR(3) NOT NULL CONSTRAINT DF_AIUsageLogs_CurrencyCode DEFAULT 'USD',
-                LatencyMs INT NULL,
-                CreatedAt DATETIME NOT NULL CONSTRAINT DF_AIUsageLogs_CreatedAt DEFAULT GETDATE(),
-                CONSTRAINT FK_AIUsageLogs_Facts FOREIGN KEY (FactID) REFERENCES dbo.Facts(FactID) ON DELETE SET NULL,
-                CONSTRAINT FK_AIUsageLogs_Profile FOREIGN KEY (ProfileID) REFERENCES dbo.GamificationProfile(ProfileID),
-                CONSTRAINT FK_AIUsageLogs_ReviewSessions FOREIGN KEY (SessionID) REFERENCES dbo.ReviewSessions(SessionID) ON DELETE SET NULL
-            );
-            CREATE INDEX IX_AIUsageLogs_FactID ON dbo.AIUsageLogs(FactID);
-            CREATE INDEX IX_AIUsageLogs_SessionID ON dbo.AIUsageLogs(SessionID);
-            CREATE INDEX IX_AIUsageLogs_ProfileID ON dbo.AIUsageLogs(ProfileID);
-            CREATE INDEX IX_AIUsageLogs_CreatedAt ON dbo.AIUsageLogs(CreatedAt);
-        END;
-        IF COL_LENGTH('dbo.AIUsageLogs','ProfileID') IS NULL
-        BEGIN
-            ALTER TABLE dbo.AIUsageLogs ADD ProfileID INT NULL CONSTRAINT DF_AIUsageLogs_ProfileID DEFAULT 1;
-            UPDATE dbo.AIUsageLogs SET ProfileID = 1 WHERE ProfileID IS NULL;
-            ALTER TABLE dbo.AIUsageLogs ALTER COLUMN ProfileID INT NOT NULL;
-        END;
-        IF COL_LENGTH('dbo.AIUsageLogs','Status') IS NULL
-        BEGIN
-            ALTER TABLE dbo.AIUsageLogs ADD Status NVARCHAR(16) NULL CONSTRAINT DF_AIUsageLogs_Status DEFAULT 'SUCCESS';
-            UPDATE dbo.AIUsageLogs SET Status = 'SUCCESS' WHERE Status IS NULL;
-            ALTER TABLE dbo.AIUsageLogs ALTER COLUMN Status NVARCHAR(16) NOT NULL;
-        END;
-        IF OBJECT_ID('dbo.FK_AIUsageLogs_Profile','F') IS NULL
-        BEGIN
-            ALTER TABLE dbo.AIUsageLogs
-            ADD CONSTRAINT FK_AIUsageLogs_Profile FOREIGN KEY (ProfileID) REFERENCES dbo.GamificationProfile(ProfileID);
-        END;
-        IF NOT EXISTS (
-            SELECT 1 FROM sys.indexes 
-            WHERE name = 'IX_AIUsageLogs_ProfileID' AND object_id = OBJECT_ID('dbo.AIUsageLogs')
-        )
-        BEGIN
-            CREATE INDEX IX_AIUsageLogs_ProfileID ON dbo.AIUsageLogs(ProfileID);
-        END;
-
-        IF OBJECT_ID('dbo.Achievements','U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.Achievements (
-                AchievementID INT IDENTITY(1,1) PRIMARY KEY,
-                Code NVARCHAR(64) NOT NULL UNIQUE,
-                Name NVARCHAR(200) NOT NULL,
-                Category NVARCHAR(32) NOT NULL,
-                Threshold INT NOT NULL,
-                RewardXP INT NOT NULL,
-                CreatedDate DATETIME NOT NULL CONSTRAINT DF_Achievements_CreatedDate DEFAULT GETDATE()
-            );
-        END;
-        ELSE
-        BEGIN
-            /* Drop IsHidden if it exists (unused) */
-            IF COL_LENGTH('dbo.Achievements','IsHidden') IS NOT NULL
-            BEGIN
-                DECLARE @df_ach NVARCHAR(128);
-                SELECT @df_ach = dc.name
-                FROM sys.default_constraints dc
-                JOIN sys.columns c ON c.column_id = dc.parent_column_id AND c.object_id = dc.parent_object_id
-                WHERE dc.parent_object_id = OBJECT_ID('dbo.Achievements') AND c.name = 'IsHidden';
-                IF @df_ach IS NOT NULL 
-                BEGIN
-                    DECLARE @cmd_drop_df_ach NVARCHAR(400);
-                    SET @cmd_drop_df_ach = 'ALTER TABLE dbo.Achievements DROP CONSTRAINT ' + QUOTENAME(@df_ach);
-                    EXEC(@cmd_drop_df_ach);
-                END;
-                ALTER TABLE dbo.Achievements DROP COLUMN IsHidden;
-            END;
-        END;
-
-        IF OBJECT_ID('dbo.AchievementUnlocks','U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.AchievementUnlocks (
-                UnlockID INT IDENTITY(1,1) PRIMARY KEY,
-                AchievementID INT NOT NULL
-                    CONSTRAINT FK_AchievementUnlocks_Achievements
-                    REFERENCES dbo.Achievements(AchievementID),
-                ProfileID INT NOT NULL CONSTRAINT DF_AchievementUnlocks_ProfileID DEFAULT 1,
-                UnlockDate DATETIME NOT NULL CONSTRAINT DF_AchievementUnlocks_UnlockDate DEFAULT GETDATE(),
-                Notified BIT NOT NULL CONSTRAINT DF_AchievementUnlocks_Notified DEFAULT 0,
-                CONSTRAINT FK_AchievementUnlocks_Profile FOREIGN KEY (ProfileID) REFERENCES dbo.GamificationProfile(ProfileID)
-            );
-            CREATE UNIQUE INDEX UX_AchievementUnlocks_Profile_Achievement ON dbo.AchievementUnlocks(ProfileID, AchievementID);
-        END;
-        ELSE
-        BEGIN
-            IF COL_LENGTH('dbo.AchievementUnlocks','ProfileID') IS NULL
-            BEGIN
-                ALTER TABLE dbo.AchievementUnlocks ADD ProfileID INT NULL CONSTRAINT DF_AchievementUnlocks_ProfileID DEFAULT 1;
-                UPDATE dbo.AchievementUnlocks SET ProfileID = 1 WHERE ProfileID IS NULL;
-                ALTER TABLE dbo.AchievementUnlocks ALTER COLUMN ProfileID INT NOT NULL;
-            END;
-            IF OBJECT_ID('dbo.FK_AchievementUnlocks_Profile','F') IS NULL
-            BEGIN
-                ALTER TABLE dbo.AchievementUnlocks
-                ADD CONSTRAINT FK_AchievementUnlocks_Profile FOREIGN KEY (ProfileID) REFERENCES dbo.GamificationProfile(ProfileID);
-            END;
-            IF EXISTS (SELECT * FROM sys.indexes WHERE name = 'UX_AchievementUnlocks_AchievementID' AND object_id = OBJECT_ID('dbo.AchievementUnlocks'))
-            BEGIN
-                DROP INDEX UX_AchievementUnlocks_AchievementID ON dbo.AchievementUnlocks;
-            END;
-            IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'UX_AchievementUnlocks_Profile_Achievement' AND object_id = OBJECT_ID('dbo.AchievementUnlocks'))
-            BEGIN
-                CREATE UNIQUE INDEX UX_AchievementUnlocks_Profile_Achievement ON dbo.AchievementUnlocks(ProfileID, AchievementID);
-            END;
-        END;
-
-        /* Seed Achievements (insert any missing by Code) */
-            ;WITH Seeds (Code, Name, Category, Threshold, RewardXP) AS (
-                SELECT 'KNOWN_5','Know 5 facts','known',5,10 UNION ALL
-                SELECT 'KNOWN_10','Know 10 facts','known',10,15 UNION ALL
-                SELECT 'KNOWN_50','Know 50 facts','known',50,25 UNION ALL
-                SELECT 'KNOWN_100','Know 100 facts','known',100,50 UNION ALL
-                SELECT 'KNOWN_300','Know 300 facts','known',300,100 UNION ALL
-                SELECT 'KNOWN_500','Know 500 facts','known',500,150 UNION ALL
-                SELECT 'KNOWN_1000','Know 1000 facts','known',1000,250 UNION ALL
-                SELECT 'KNOWN_5000','Know 5000 facts','known',5000,600 UNION ALL
-                SELECT 'KNOWN_10000','Know 10000 facts','known',10000,1000 UNION ALL
-                SELECT 'KNOWN_30000','Know 30000 facts','known',30000,2500 UNION ALL
-                SELECT 'KNOWN_50000','Know 50000 facts','known',50000,4000 UNION ALL
-                SELECT 'KNOWN_100000','Know 100000 facts','known',100000,7000 UNION ALL
-
-                SELECT 'FAV_5','Favorite 5 facts','favorites',5,5 UNION ALL
-                SELECT 'FAV_10','Favorite 10 facts','favorites',10,10 UNION ALL
-                SELECT 'FAV_50','Favorite 50 facts','favorites',50,20 UNION ALL
-                SELECT 'FAV_100','Favorite 100 facts','favorites',100,40 UNION ALL
-                SELECT 'FAV_300','Favorite 300 facts','favorites',300,80 UNION ALL
-                SELECT 'FAV_500','Favorite 500 facts','favorites',500,120 UNION ALL
-                SELECT 'FAV_1000','Favorite 1000 facts','favorites',1000,200 UNION ALL
-                SELECT 'FAV_5000','Favorite 5000 facts','favorites',5000,500 UNION ALL
-                SELECT 'FAV_10000','Favorite 10000 facts','favorites',10000,900 UNION ALL
-                SELECT 'FAV_30000','Favorite 30000 facts','favorites',30000,2200 UNION ALL
-                SELECT 'FAV_50000','Favorite 50000 facts','favorites',50000,3500 UNION ALL
-                SELECT 'FAV_100000','Favorite 100000 facts','favorites',100000,6000 UNION ALL
-
-                SELECT 'REV_5','Review 5 times','reviews',5,10 UNION ALL
-                SELECT 'REV_10','Review 10 times','reviews',10,15 UNION ALL
-                SELECT 'REV_50','Review 50 times','reviews',50,25 UNION ALL
-                SELECT 'REV_100','Review 100 times','reviews',100,50 UNION ALL
-                SELECT 'REV_300','Review 300 times','reviews',300,100 UNION ALL
-                SELECT 'REV_500','Review 500 times','reviews',500,150 UNION ALL
-                SELECT 'REV_1000','Review 1000 times','reviews',1000,250 UNION ALL
-                SELECT 'REV_5000','Review 5000 times','reviews',5000,600 UNION ALL
-                SELECT 'REV_10000','Review 10000 times','reviews',10000,1000 UNION ALL
-                SELECT 'REV_30000','Review 30000 times','reviews',30000,2500 UNION ALL
-                SELECT 'REV_50000','Review 50000 times','reviews',50000,4000 UNION ALL
-                SELECT 'REV_100000','Review 100000 times','reviews',100000,7000 UNION ALL
-
-                SELECT 'ADD_5','Add 5 facts','adds',5,10 UNION ALL
-                SELECT 'ADD_10','Add 10 facts','adds',10,15 UNION ALL
-                SELECT 'ADD_50','Add 50 facts','adds',50,25 UNION ALL
-                SELECT 'ADD_100','Add 100 facts','adds',100,50 UNION ALL
-                SELECT 'ADD_300','Add 300 facts','adds',300,100 UNION ALL
-                SELECT 'ADD_500','Add 500 facts','adds',500,150 UNION ALL
-                SELECT 'ADD_1000','Add 1000 facts','adds',1000,250 UNION ALL
-                SELECT 'ADD_5000','Add 5000 facts','adds',5000,600 UNION ALL
-                SELECT 'ADD_10000','Add 10000 facts','adds',10000,1000 UNION ALL
-                SELECT 'ADD_30000','Add 30000 facts','adds',30000,2500 UNION ALL
-                SELECT 'ADD_50000','Add 50000 facts','adds',50000,4000 UNION ALL
-                SELECT 'ADD_100000','Add 100000 facts','adds',100000,7000 UNION ALL
-
-                SELECT 'EDIT_5','Edit 5 facts','edits',5,10 UNION ALL
-                SELECT 'EDIT_10','Edit 10 facts','edits',10,15 UNION ALL
-                SELECT 'EDIT_50','Edit 50 facts','edits',50,25 UNION ALL
-                SELECT 'EDIT_100','Edit 100 facts','edits',100,50 UNION ALL
-                SELECT 'EDIT_300','Edit 300 facts','edits',300,100 UNION ALL
-                SELECT 'EDIT_500','Edit 500 facts','edits',500,150 UNION ALL
-                SELECT 'EDIT_1000','Edit 1000 facts','edits',1000,250 UNION ALL
-                SELECT 'EDIT_5000','Edit 5000 facts','edits',5000,600 UNION ALL
-                SELECT 'EDIT_10000','Edit 10000 facts','edits',10000,1000 UNION ALL
-                SELECT 'EDIT_30000','Edit 30000 facts','edits',30000,2500 UNION ALL
-                SELECT 'EDIT_50000','Edit 50000 facts','edits',50000,4000 UNION ALL
-                SELECT 'EDIT_100000','Edit 100000 facts','edits',100000,7000 UNION ALL
-
-                SELECT 'DEL_5','Delete 5 facts','deletes',5,10 UNION ALL
-                SELECT 'DEL_10','Delete 10 facts','deletes',10,15 UNION ALL
-                SELECT 'DEL_50','Delete 50 facts','deletes',50,25 UNION ALL
-                SELECT 'DEL_100','Delete 100 facts','deletes',100,50 UNION ALL
-                SELECT 'DEL_300','Delete 300 facts','deletes',300,100 UNION ALL
-                SELECT 'DEL_500','Delete 500 facts','deletes',500,150 UNION ALL
-                SELECT 'DEL_1000','Delete 1000 facts','deletes',1000,250 UNION ALL
-                SELECT 'DEL_5000','Delete 5000 facts','deletes',5000,600 UNION ALL
-                SELECT 'DEL_10000','Delete 10000 facts','deletes',10000,1000 UNION ALL
-                SELECT 'DEL_30000','Delete 30000 facts','deletes',30000,2500 UNION ALL
-                SELECT 'DEL_50000','Delete 50000 facts','deletes',50000,4000 UNION ALL
-                SELECT 'DEL_100000','Delete 100000 facts','deletes',100000,7000 UNION ALL
-
-                /* Streaks */
-                SELECT 'STREAK_3','3-day review streak','streak',3,10 UNION ALL
-                SELECT 'STREAK_7','7-day review streak','streak',7,20 UNION ALL
-                SELECT 'STREAK_14','14-day review streak','streak',14,35 UNION ALL
-                SELECT 'STREAK_30','30-day review streak','streak',30,75 UNION ALL
-                SELECT 'STREAK_60','60-day review streak','streak',60,150 UNION ALL
-                SELECT 'STREAK_90','90-day review streak','streak',90,250 UNION ALL
-                SELECT 'STREAK_180','180-day review streak','streak',180,500 UNION ALL
-                SELECT 'STREAK_365','365-day review streak','streak',365,1000
-            )
-            INSERT INTO dbo.Achievements (Code, Name, Category, Threshold, RewardXP, CreatedDate)
-            SELECT s.Code, s.Name, s.Category, s.Threshold, s.RewardXP, GETDATE()
-            FROM Seeds s
-            LEFT JOIN dbo.Achievements a ON a.Code = s.Code
-            WHERE a.AchievementID IS NULL;
-        
-
-        /* Ensure a single GamificationProfile row exists */
-        IF NOT EXISTS (SELECT 1 FROM dbo.GamificationProfile)
-        BEGIN
-            INSERT INTO dbo.GamificationProfile (XP, Level)
-            VALUES (0, 1);
-        END;
-        """
-        self.execute_update(ddl)
+        """No-op: schema is managed externally via factdari_setup.sql."""
+        return
     
     def count_facts(self):
         """Count total facts in the database"""
@@ -1527,9 +1001,39 @@ class FactDariApp:
             win.geometry(self.POPUP_EDIT_CARD_SIZE)
         win.configure(bg=self.BG_COLOR)
 
+        ai_usage_row_id = None
+        reading_started_at = None
+        track_reading_time = False
+        # Disable the AI button until this window closes to avoid duplicate clicks
+        try:
+            self.ai_button.config(state="disabled")
+        except Exception:
+            pass
+
         def on_close():
+            nonlocal reading_started_at, ai_usage_row_id, track_reading_time
+            duration_sec = 0
+            if track_reading_time and reading_started_at is not None:
+                try:
+                    duration_sec = int(time.perf_counter() - reading_started_at)
+                    if duration_sec < 0:
+                        duration_sec = 0
+                except Exception:
+                    duration_sec = 0
+            if ai_usage_row_id:
+                try:
+                    self.execute_update(
+                        "UPDATE AIUsageLogs SET ReadingDurationSec = ? WHERE AIUsageID = ?",
+                        (duration_sec, ai_usage_row_id),
+                    )
+                except Exception as exc:
+                    print(f"Failed to update AI reading duration: {exc}")
             try:
                 self.resume_review_timer()
+            except Exception:
+                pass
+            try:
+                self.ai_button.config(state="normal")
             except Exception:
                 pass
             win.destroy()
@@ -1560,20 +1064,28 @@ class FactDariApp:
             explain_box.insert("1.0", text.strip())
             explain_box.config(state="disabled")
 
+        def mark_explanation_ready(text):
+            nonlocal reading_started_at
+            update_text(text)
+            if track_reading_time and reading_started_at is None:
+                try:
+                    reading_started_at = time.perf_counter()
+                except Exception:
+                    reading_started_at = None
+
         def worker():
-            # Disable button so you can't click it twice while waiting
-            self.root.after(0, lambda: self.ai_button.config(state="disabled")) 
-            
+            nonlocal ai_usage_row_id, track_reading_time
             result_text, usage_info = self._call_together_ai(fact_text, api_key)
 
             try:
-                self._record_ai_usage(usage_info, fact_id=fact_id, session_id=session_id)
+                ai_usage_row_id = self._record_ai_usage(usage_info, fact_id=fact_id, session_id=session_id, reading_duration_sec=0)
             except Exception as exc:
                 print(f"AI usage logging error: {exc}")
+                ai_usage_row_id = None
+
+            track_reading_time = (usage_info.get("status") == "SUCCESS")
             
-            self.root.after(0, lambda: update_text(result_text))
-            # Re-enable button
-            self.root.after(0, lambda: self.ai_button.config(state="normal"))
+            self.root.after(0, lambda: mark_explanation_ready(result_text))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -1660,12 +1172,14 @@ class FactDariApp:
         completion_cost = (completion_val / 1000.0) * float(getattr(self, 'ai_completion_cost_per_1k', 0) or 0)
         return round(prompt_cost + completion_cost, 9)
 
-    def _record_ai_usage(self, usage_info: dict, fact_id: int, session_id=None):
-        """Persist AI usage row and roll totals into gamification profile."""
+    def _record_ai_usage(self, usage_info: dict, fact_id: int, session_id=None, reading_duration_sec: int = 0):
+        """Persist AI usage row and roll totals into gamification profile.
+        Returns AIUsageID if insert succeeds (else None).
+        """
         if not usage_info:
-            return
+            return None
         if fact_id is None:
-            return
+            return None
         model_name = usage_info.get("model") or getattr(self, 'ai_model', None)
         provider = usage_info.get("provider") or getattr(self, 'ai_provider', None)
         operation_type = usage_info.get("operation_type") or "EXPLANATION"
@@ -1701,6 +1215,11 @@ class FactDariApp:
         except Exception:
             latency_ms = None
 
+        try:
+            reading_duration_sec = int(reading_duration_sec) if reading_duration_sec is not None else 0
+        except Exception:
+            reading_duration_sec = 0
+
         status = usage_info.get("status") or "SUCCESS"
         try:
             status = str(status).upper()
@@ -1711,7 +1230,7 @@ class FactDariApp:
 
         resolved_session_id = session_id if session_id is not None else getattr(self, 'current_session_id', None)
 
-        self._log_ai_usage(
+        return self._log_ai_usage(
             fact_id=fact_id,
             session_id=resolved_session_id,
             operation_type=operation_type,
@@ -1723,10 +1242,11 @@ class FactDariApp:
             total_tokens=total_tokens,
             cost=cost,
             latency_ms=latency_ms,
+            reading_duration_sec=reading_duration_sec,
         )
 
-    def _log_ai_usage(self, fact_id, session_id, operation_type, status, model_name, provider, input_tokens, output_tokens, total_tokens, cost, latency_ms):
-        """Insert into AIUsageLogs and roll totals into GamificationProfile."""
+    def _log_ai_usage(self, fact_id, session_id, operation_type, status, model_name, provider, input_tokens, output_tokens, total_tokens, cost, latency_ms, reading_duration_sec=0):
+        """Insert into AIUsageLogs and roll totals into GamificationProfile. Returns AIUsageID or None."""
         try:
             cost_val = None if cost is None else round(float(cost), 9)
         except Exception:
@@ -1741,12 +1261,19 @@ class FactDariApp:
             if total_for_profile == 0:
                 total_for_profile = None
 
-        profile_id = self.get_active_profile_id()
         try:
-            self.execute_update(
+            reading_duration_sec = int(reading_duration_sec) if reading_duration_sec is not None else 0
+        except Exception:
+            reading_duration_sec = 0
+
+        profile_id = self.get_active_profile_id()
+        ai_usage_id = None
+        try:
+            ai_usage_id = self.execute_insert_return_id(
                 """
-                INSERT INTO AIUsageLogs (FactID, SessionID, ProfileID, OperationType, Status, ModelName, Provider, InputTokens, OutputTokens, Cost, CurrencyCode, LatencyMs)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO AIUsageLogs (FactID, SessionID, ProfileID, OperationType, Status, ModelName, Provider, InputTokens, OutputTokens, Cost, CurrencyCode, LatencyMs, ReadingDurationSec)
+                OUTPUT INSERTED.AIUsageID
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     fact_id,
@@ -1761,6 +1288,7 @@ class FactDariApp:
                     cost_val,
                     getattr(self, 'ai_currency', 'USD'),
                     latency_ms,
+                    reading_duration_sec,
                 ),
             )
         except Exception as exc:
@@ -1771,6 +1299,8 @@ class FactDariApp:
                 self.gamify.add_ai_usage(total_for_profile or 0, cost_val or 0.0)
         except Exception as exc:
             print(f"Gamification error in _log_ai_usage: {exc}")
+
+        return ai_usage_id
 
     def stop_speaking(self):
         """Stop any ongoing speech immediately."""
