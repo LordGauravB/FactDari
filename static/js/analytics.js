@@ -15,6 +15,9 @@
   // Recent reviews datasets
   let recentReviewsData50 = [];
   let recentReviewsData500 = [];
+  // AI usage datasets
+  let aiMostExplainedData = [];
+  let aiRecentUsageData = [];
   // Current datasets and sort state for main tables
   let currentMostData = [];
   let currentLeastData = [];
@@ -683,71 +686,151 @@
     });
   }
 
-  function renderAllAchievementsTable(rows) {
-    const table = qs('#all-achievements-table');
-    const tbody = qs('#all-achievements-table tbody');
-    if (!table || !tbody) return;
-    const data = Array.isArray(rows) ? rows.slice() : [];
+  // Store achievements data globally for filtering
+  let allAchievementsData = [];
+  let currentAchievementFilter = 'all';
 
-    // Sorting helper
-    const sortBy = (idx, dir) => {
-      const asc = dir === 'asc';
-      const getVal = (r) => {
-        switch(idx) {
-          case 0: return r.Unlocked ? 1 : 0; // status
-          case 1: return (r.Name || '').toLowerCase();
-          case 2: return (r.Category || '').toLowerCase();
-          case 3: return (r.ProgressCurrent || 0) / Math.max(1, r.Threshold || 1); // ratio
-          case 4: return r.RewardXP || 0;
-          case 5: return r.UnlockDate ? new Date(r.UnlockDate).getTime() : 0;
-          default: return 0;
-        }
-      };
-      data.sort((a, b) => {
-        // Always show unlocked achievements first
-        if (a.Unlocked !== b.Unlocked) {
-          return a.Unlocked ? -1 : 1;
-        }
-        // Then apply the selected sorting
-        const va = getVal(a), vb = getVal(b);
-        if (typeof va === 'string' && typeof vb === 'string') return asc ? va.localeCompare(vb) : vb.localeCompare(va);
-        return asc ? (va - vb) : (vb - va);
-      });
-    };
-    sortBy(achievementsSortState.index, achievementsSortState.dir);
+  // Category to icon mapping for achievements
+  const achievementIcons = {
+    'streak': '🔥',
+    'review': '📖',
+    'favorite': '⭐',
+    'known': '✅',
+    'category': '📊',
+    'session': '⏱️',
+    'time': '🕐',
+    'milestone': '🏆',
+    'explorer': '🧭',
+    'master': '🎓',
+    'dedication': '💪',
+    'speed': '⚡',
+    'consistency': '📅',
+    'collector': '📚',
+    'default': '🏅'
+  };
 
-    tbody.innerHTML = '';
-    data.forEach(r => {
-      const tr = document.createElement('tr');
-      const status = r.Unlocked ? 'Unlocked' : 'Locked';
-      const progress = `${Math.min(r.ProgressCurrent || 0, r.Threshold || 0)}/${r.Threshold || 0}`;
-      const when = r.UnlockDate ? new Date(r.UnlockDate).toLocaleString() : '';
-      tr.innerHTML = `
-        <td>${status}</td>
-        <td>${r.Name || ''}</td>
-        <td>${r.Category || ''}</td>
-        <td style="text-align:center;">${progress}</td>
-        <td style="text-align:center;">${r.RewardXP || 0} XP</td>
-        <td>${when}</td>
-      `;
-      if (r.Unlocked) tr.classList.add('row-unlocked');
-      tbody.appendChild(tr);
+  function getAchievementIcon(category, name) {
+    const catLower = (category || '').toLowerCase();
+    const nameLower = (name || '').toLowerCase();
+
+    // Check category first
+    for (const [key, icon] of Object.entries(achievementIcons)) {
+      if (catLower.includes(key)) return icon;
+    }
+
+    // Check name as fallback
+    for (const [key, icon] of Object.entries(achievementIcons)) {
+      if (nameLower.includes(key)) return icon;
+    }
+
+    return achievementIcons.default;
+  }
+
+  function renderAllAchievementsBadges(rows, filter = 'all') {
+    const container = qs('#achievements-badges-container');
+    if (!container) return;
+
+    allAchievementsData = Array.isArray(rows) ? rows.slice() : [];
+    currentAchievementFilter = filter;
+
+    // Sort: unlocked first, then by name
+    allAchievementsData.sort((a, b) => {
+      if (a.Unlocked !== b.Unlocked) {
+        return a.Unlocked ? -1 : 1;
+      }
+      return (a.Name || '').localeCompare(b.Name || '');
     });
 
-    if (!table.dataset.sortAttached) {
-      const ths = Array.from(table.querySelectorAll('thead th'));
-      ths.forEach((th, idx) => {
-        th.classList.add('sortable');
-        th.addEventListener('click', () => {
-          const newDir = (achievementsSortState.index === idx && achievementsSortState.dir === 'asc') ? 'desc' : 'asc';
-          achievementsSortState = { index: idx, dir: newDir };
-          renderAllAchievementsTable(rows || []);
-          applySortIndicator(table, idx, newDir);
-        });
-      });
-      table.dataset.sortAttached = '1';
-      applySortIndicator(table, achievementsSortState.index, achievementsSortState.dir);
+    // Filter based on current selection
+    let filteredData = allAchievementsData;
+    if (filter === 'unlocked') {
+      filteredData = allAchievementsData.filter(r => r.Unlocked);
+    } else if (filter === 'locked') {
+      filteredData = allAchievementsData.filter(r => !r.Unlocked);
     }
+
+    container.innerHTML = '';
+
+    if (filteredData.length === 0) {
+      container.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 40px;">
+        No ${filter === 'all' ? '' : filter} achievements found
+      </div>`;
+      return;
+    }
+
+    filteredData.forEach(r => {
+      const badge = document.createElement('div');
+      badge.className = `achievement-badge ${r.Unlocked ? 'unlocked' : 'locked'}`;
+
+      const icon = getAchievementIcon(r.Category, r.Name);
+      const progressCurrent = Math.min(r.ProgressCurrent || 0, r.Threshold || 0);
+      const threshold = r.Threshold || 0;
+      const progressPercent = threshold > 0 ? Math.round((progressCurrent / threshold) * 100) : 0;
+      const unlockDate = r.UnlockDate ? new Date(r.UnlockDate).toLocaleDateString() : '';
+
+      let progressBar = '';
+      if (!r.Unlocked && threshold > 0) {
+        progressBar = `
+          <div class="badge-progress">
+            <div class="badge-progress-fill" style="width: ${progressPercent}%"></div>
+          </div>
+        `;
+      }
+
+      let dateDisplay = '';
+      if (r.Unlocked && unlockDate) {
+        dateDisplay = `<div class="badge-date">${unlockDate}</div>`;
+      }
+
+      badge.innerHTML = `
+        <span class="badge-xp">${r.RewardXP || 0} XP</span>
+        <div class="badge-icon">${icon}</div>
+        <div class="badge-name">${r.Name || 'Achievement'}</div>
+        <div class="badge-category">${r.Category || ''}</div>
+        ${progressBar}
+        ${dateDisplay}
+        <div class="badge-tooltip">
+          <div class="badge-tooltip-title">${r.Name || 'Achievement'}</div>
+          <div class="badge-tooltip-desc">${r.Description || 'Complete this achievement to earn XP!'}</div>
+          <div class="badge-tooltip-meta">
+            <span>${r.Category || 'General'}</span>
+            <span>${r.RewardXP || 0} XP</span>
+          </div>
+          ${!r.Unlocked ? `<div class="badge-tooltip-progress">Progress: ${progressCurrent}/${threshold} (${progressPercent}%)</div>` : ''}
+          ${r.Unlocked ? `<div class="badge-tooltip-progress" style="color: var(--success);">Unlocked: ${unlockDate}</div>` : ''}
+        </div>
+      `;
+
+      container.appendChild(badge);
+    });
+
+    // Setup filter buttons if not already done
+    setupAchievementFilters();
+  }
+
+  function setupAchievementFilters() {
+    const filterBtns = qsa('.achievement-filter-tabs .filter-btn');
+    if (!filterBtns.length) return;
+
+    filterBtns.forEach(btn => {
+      if (btn.dataset.filterAttached) return;
+      btn.dataset.filterAttached = '1';
+
+      btn.addEventListener('click', () => {
+        // Update active state
+        filterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Re-render with new filter
+        const filter = btn.dataset.filter || 'all';
+        renderAllAchievementsBadges(allAchievementsData, filter);
+      });
+    });
+  }
+
+  // Keep old function name for backward compatibility
+  function renderAllAchievementsTable(rows) {
+    renderAllAchievementsBadges(rows, currentAchievementFilter);
   }
 
   function renderKnownTable(data) {
@@ -961,6 +1044,16 @@
         renderSessionsTable(sessionsData);
         renderRecentReviewsTable(recentReviewsData50);
         renderSessionActionsTable(data.session_actions_table || []);
+
+        // AI Usage Analytics
+        renderAIUsageMetrics(data.ai_usage_summary);
+        renderAICostTimeline('ai_cost_timeline', 'ai-cost-timeline', data.ai_cost_timeline);
+        doughnutChart('ai_token_distribution', 'ai-token-distribution', data.ai_token_distribution);
+        pieChart('ai_usage_by_category', 'ai-usage-by-category', data.ai_usage_by_category);
+        pieChart('ai_latency_distribution', 'ai-latency-distribution', data.ai_latency_distribution);
+        renderAIUsageTrend('ai_usage_trend', 'ai-usage-trend', data.ai_cost_timeline);
+        renderAIMostExplainedTable(data.ai_most_explained_facts);
+        renderAIRecentUsageTable(data.ai_recent_usage);
       }, 100);
       
       hideLoadingState();
@@ -1044,8 +1137,9 @@
         const key = btn.getAttribute('data-chart');
         
         // Handle tables and heatmap differently
-        if (key === 'most-reviewed-table' || key === 'least-reviewed-table' || 
-            key === 'favorite-facts-table' || key === 'known-facts-table') {
+        if (key === 'most-reviewed-table' || key === 'least-reviewed-table' ||
+            key === 'favorite-facts-table' || key === 'known-facts-table' ||
+            key === 'ai-most-explained-table' || key === 'ai-usage-log-table') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
           
@@ -1153,19 +1247,19 @@
             headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th><th>Days Since</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
-            
+
             // Create body with ALL known facts
             const tbody = document.createElement('tbody');
             fullKnownData.forEach((row, index) => {
               const tr = document.createElement('tr');
               const factContent = row.Content || '';
-              
+
               // Add medal class for top 3
               let medalClass = '';
               if (index === 0) medalClass = 'medal-gold';
               else if (index === 1) medalClass = 'medal-silver';
               else if (index === 2) medalClass = 'medal-bronze';
-              
+
               tr.innerHTML = `
                 <td><span class="fact-text">${factContent}</span></td>
                 <td>${row.CategoryName || ''}</td>
@@ -1177,8 +1271,61 @@
             table.appendChild(tbody);
             // Enable sorting in modal for Known Facts
             makeModalTableSortable(table, fullKnownData, 'known');
+
+          } else if (key === 'ai-most-explained-table') {
+            headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>AI Calls</th><th>Total Cost</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            aiMostExplainedData.forEach((row, index) => {
+              const tr = document.createElement('tr');
+              const factContent = row.Content || '';
+              const cost = parseFloat(row.TotalCost || 0);
+
+              let medalClass = '';
+              if (index === 0) medalClass = 'medal-gold';
+              else if (index === 1) medalClass = 'medal-silver';
+              else if (index === 2) medalClass = 'medal-bronze';
+
+              tr.innerHTML = `
+                <td><span class="fact-text">${factContent}</span></td>
+                <td>${row.CategoryName || ''}</td>
+                <td style="text-align: center;" class="${medalClass}">${row.CallCount || 0}</td>
+                <td style="text-align: center;">$${cost.toFixed(4)}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+          } else if (key === 'ai-usage-log-table') {
+            headerRow.innerHTML = '<th>Time</th><th>Fact</th><th>Tokens</th><th>Cost</th><th>Latency</th><th>Status</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            aiRecentUsageData.forEach(row => {
+              const tr = document.createElement('tr');
+              const time = row.CreatedAt ? new Date(row.CreatedAt).toLocaleString() : '';
+              const factContent = row.FactContent || '';
+              const cost = parseFloat(row.Cost || 0);
+              const latency = row.LatencyMs || 0;
+              const status = row.Status || 'UNKNOWN';
+              const statusClass = status === 'SUCCESS' ? 'status-success' : 'status-failed';
+
+              tr.innerHTML = `
+                <td>${time}</td>
+                <td><span class="fact-text">${factContent}</span></td>
+                <td style="text-align: center;">${row.TotalTokens || 0}</td>
+                <td style="text-align: center;">$${cost.toFixed(4)}</td>
+                <td style="text-align: center;">${latency}ms</td>
+                <td style="text-align: center;"><span class="${statusClass}">${status}</span></td>
+              `;
+              tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
           }
-          
+
           tableContainer.appendChild(table);
           
           modalChartContainer.innerHTML = '';
@@ -1197,6 +1344,10 @@
             title.textContent = `All Favorite Facts (${fullFavoriteData.length} total)`;
           } else if (key === 'known-facts-table') {
             title.textContent = `All Known Facts (${fullKnownData.length} total)`;
+          } else if (key === 'ai-most-explained-table') {
+            title.textContent = `Most Explained Facts by AI (${aiMostExplainedData.length} total)`;
+          } else if (key === 'ai-usage-log-table') {
+            title.textContent = `Recent AI Usage Log (${aiRecentUsageData.length} entries)`;
           }
           modalChartContainer.insertBefore(title, tableContainer);
           
@@ -1270,7 +1421,12 @@
             'top-hours': 'top_hours',
             'growth-trend': 'growth_trend',
             'monthly-progress': 'monthly_progress',
-            'session-actions-chart': 'session_actions'
+            'session-actions-chart': 'session_actions',
+            'ai-cost-timeline': 'ai_cost_timeline',
+            'ai-token-distribution': 'ai_token_distribution',
+            'ai-usage-by-category': 'ai_usage_by_category',
+            'ai-latency-distribution': 'ai_latency_distribution',
+            'ai-usage-trend': 'ai_usage_trend'
           };
           const chartKey = idMap[key];
           if (chartKey) {
@@ -1529,6 +1685,8 @@
           case '2':
           case '3':
           case '4':
+          case '5':
+          case '6':
             e.preventDefault();
             const tabIndex = parseInt(e.key) - 1;
             const tabs = qsa('.tab-btn');
@@ -2079,6 +2237,274 @@
     });
   }
   
+  // AI Usage Analytics Functions
+  function renderAIUsageMetrics(summary) {
+    if (!summary) return;
+
+    const totalCalls = summary.TotalCalls || 0;
+    const totalTokens = summary.TotalTokens || 0;
+    const totalCost = parseFloat(summary.TotalCost || 0);
+    const avgCost = parseFloat(summary.AvgCost || 0);
+    const avgLatency = summary.AvgLatency || 0;
+    const successCount = summary.SuccessCount || 0;
+    const failedCount = summary.FailedCount || 0;
+    const successRate = totalCalls > 0 ? ((successCount / totalCalls) * 100).toFixed(1) : 0;
+    const avgReadingTime = summary.AvgReadingTime || 0;
+    const minReadingTime = summary.MinReadingTime || 0;
+    const maxReadingTime = summary.MaxReadingTime || 0;
+
+    setText('#total-ai-calls', totalCalls.toLocaleString());
+    setText('#total-ai-tokens', totalTokens.toLocaleString());
+    setText('#total-ai-cost', `$${totalCost.toFixed(4)}`);
+    setText('#avg-ai-cost', `$${avgCost.toFixed(4)}`);
+    setText('#avg-ai-latency', avgLatency > 0 ? `${Math.round(avgLatency)}ms` : '--');
+    setText('#ai-success-rate', `${successRate}%`);
+
+    // Reading time stats
+    setText('#avg-ai-reading-time', avgReadingTime > 0 ? `${Math.round(avgReadingTime)}s` : '--');
+    setText('#min-ai-reading-time', minReadingTime > 0 ? `${Math.round(minReadingTime)}s` : '--');
+    setText('#max-ai-reading-time', maxReadingTime > 0 ? `${Math.round(maxReadingTime)}s` : '--');
+  }
+
+  function renderAICostTimeline(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: payload,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            display: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            title: {
+              display: true,
+              text: 'Date',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
+            }
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Cost ($)',
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              callback: function(value) {
+                return '$' + value.toFixed(4);
+              }
+            },
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              usePointStyle: true
+            }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                return context.dataset.label + ': $' + context.parsed.y.toFixed(4);
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderAIUsageTrend(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+
+    // Add calls data as a line
+    const trendPayload = {
+      labels: payload.labels,
+      datasets: [
+        {
+          label: 'Daily Cost ($)',
+          data: payload.datasets[0]?.data || [],
+          type: 'bar',
+          backgroundColor: '#10b981',
+          yAxisID: 'y'
+        },
+        {
+          label: 'Cumulative Cost ($)',
+          data: payload.datasets[1]?.data || [],
+          type: 'line',
+          borderColor: '#3b82f6',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          tension: 0.4,
+          yAxisID: 'y'
+        }
+      ]
+    };
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: trendPayload,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            display: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            title: {
+              display: true,
+              text: 'Date',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
+            }
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Cost ($)',
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              usePointStyle: true
+            }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1
+          }
+        }
+      }
+    });
+  }
+
+  function renderAIMostExplainedTable(data) {
+    const tbody = qs('#ai-most-explained-table tbody');
+    if (!tbody) return;
+
+    aiMostExplainedData = data || [];
+    tbody.innerHTML = '';
+
+    (data || []).forEach((row, index) => {
+      const tr = document.createElement('tr');
+      const factContent = row.Content || '';
+      const displayText = factContent.length > 100
+        ? `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 100)}...</span>`
+        : `<span class="fact-text">${factContent}</span>`;
+      const cost = parseFloat(row.TotalCost || 0);
+
+      let medalClass = '';
+      if (index === 0) medalClass = 'medal-gold';
+      else if (index === 1) medalClass = 'medal-silver';
+      else if (index === 2) medalClass = 'medal-bronze';
+
+      tr.innerHTML = `
+        <td>${displayText}</td>
+        <td>${row.CategoryName || ''}</td>
+        <td style="text-align: center;" class="${medalClass}">${row.CallCount || 0}</td>
+        <td style="text-align: center;">$${cost.toFixed(4)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderAIRecentUsageTable(data) {
+    const tbody = qs('#ai-usage-log-table tbody');
+    if (!tbody) return;
+
+    aiRecentUsageData = data || [];
+    tbody.innerHTML = '';
+
+    (data || []).forEach(row => {
+      const tr = document.createElement('tr');
+      const time = row.CreatedAt ? new Date(row.CreatedAt).toLocaleString() : '';
+      const factContent = row.FactContent || '';
+      const displayText = factContent.length > 60
+        ? `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 60)}...</span>`
+        : `<span class="fact-text">${factContent}</span>`;
+      const cost = parseFloat(row.Cost || 0);
+      const latency = row.LatencyMs || 0;
+      const status = row.Status || 'UNKNOWN';
+      const statusClass = status === 'SUCCESS' ? 'status-success' : 'status-failed';
+
+      tr.innerHTML = `
+        <td>${time}</td>
+        <td>${displayText}</td>
+        <td style="text-align: center;">${row.TotalTokens || 0}</td>
+        <td style="text-align: center;">$${cost.toFixed(4)}</td>
+        <td style="text-align: center;">${latency}ms</td>
+        <td style="text-align: center;"><span class="${statusClass}">${status}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
   // Add CSS for animations
   function injectAnimationStyles() {
     const style = document.createElement('style');

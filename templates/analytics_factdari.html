@@ -176,6 +176,14 @@
                     </svg>
                     Achievements
                 </button>
+                <button class="tab-btn" data-tab="ai-usage" role="tab" aria-selected="false" aria-controls="ai-usage-tab" title="Press Ctrl+6">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                        <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                        <circle cx="8" cy="14" r="2"/>
+                        <circle cx="16" cy="14" r="2"/>
+                    </svg>
+                    AI Usage
+                </button>
             </nav>
 
             <!-- Tab Contents -->
@@ -912,18 +920,227 @@
                         <article class="chart-card span-2">
                             <header class="chart-header">
                                 <h3>All Achievements</h3>
+                                <div class="achievement-filter-tabs">
+                                    <button class="filter-btn active" data-filter="all">All</button>
+                                    <button class="filter-btn" data-filter="unlocked">Unlocked</button>
+                                    <button class="filter-btn" data-filter="locked">Locked</button>
+                                </div>
+                            </header>
+                            <div class="chart-container badges-chart">
+                                <div id="achievements-badges-container" class="achievements-badges-grid">
+                                    <!-- Badges will be rendered here by JavaScript -->
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Hover over badges to see details. Greyed out badges are locked.
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- AI Usage Tab -->
+                <section id="ai-usage-tab" class="tab-content" role="tabpanel">
+                    <!-- AI Usage Metrics Section -->
+                    <section class="metrics-section" aria-label="AI usage metrics">
+                        <div class="metrics-grid">
+                            <article class="metric-card" title="Total AI API calls made">
+                                <div class="metric-icon">🤖</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="total-ai-calls">0</div>
+                                    <div class="metric-label">Total AI Calls</div>
+                                </div>
+                            </article>
+
+                            <article class="metric-card" title="Total tokens consumed">
+                                <div class="metric-icon">🔢</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="total-ai-tokens">0</div>
+                                    <div class="metric-label">Total Tokens</div>
+                                </div>
+                            </article>
+
+                            <article class="metric-card" title="Total cost of AI usage">
+                                <div class="metric-icon">💰</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="total-ai-cost">$0.00</div>
+                                    <div class="metric-label">Total Cost</div>
+                                </div>
+                            </article>
+
+                            <article class="metric-card" title="Average cost per AI call">
+                                <div class="metric-icon">📊</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="avg-ai-cost">$0.00</div>
+                                    <div class="metric-label">Avg Cost/Call</div>
+                                </div>
+                            </article>
+
+                            <article class="metric-card" title="Average API response time">
+                                <div class="metric-icon">⚡</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="avg-ai-latency">--</div>
+                                    <div class="metric-label">Avg Latency</div>
+                                </div>
+                            </article>
+
+                            <article class="metric-card" title="AI success rate">
+                                <div class="metric-icon">✅</div>
+                                <div class="metric-content">
+                                    <div class="metric-value" id="ai-success-rate">--%</div>
+                                    <div class="metric-label">Success Rate</div>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+
+                    <div class="charts-grid">
+                        <!-- AI Cost Over Time -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>AI Cost Over Time</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="ai-cost-timeline" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="ai-cost-timeline"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Daily AI costs over the last 30 days
+                            </div>
+                        </article>
+
+                        <!-- Token Usage Distribution -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Token Usage Distribution</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="ai-token-distribution" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="ai-token-distribution"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Input vs Output tokens
+                            </div>
+                        </article>
+
+                        <!-- AI Usage by Category -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>AI Usage by Category</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="ai-usage-by-category" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="ai-usage-by-category"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                AI explanations by fact category
+                            </div>
+                        </article>
+
+                        <!-- AI Usage Trend -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>AI Usage Trend (Last 30 Days)</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="ai-usage-trend" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="ai-usage-trend"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Daily AI calls and tokens usage
+                            </div>
+                        </article>
+
+                        <!-- AI Reading Time Stats -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>AI Explanation Reading Time</h3>
+                            </header>
+                            <div class="chart-container">
+                                <div class="review-time-stats">
+                                    <div class="time-stat">
+                                        <span class="time-label">Average:</span>
+                                        <span class="time-value" id="avg-ai-reading-time">--</span>
+                                    </div>
+                                    <div class="time-stat">
+                                        <span class="time-label">Shortest:</span>
+                                        <span class="time-value" id="min-ai-reading-time">--</span>
+                                    </div>
+                                    <div class="time-stat">
+                                        <span class="time-label">Longest:</span>
+                                        <span class="time-value" id="max-ai-reading-time">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Time spent reading AI explanations
+                            </div>
+                        </article>
+
+                        <!-- AI Latency Distribution -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>API Latency Distribution</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="ai-latency-distribution" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="ai-latency-distribution"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Distribution of API response times
+                            </div>
+                        </article>
+
+                        <!-- Most Explained Facts -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Most Explained Facts</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="ai-most-explained-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </header>
                             <div class="chart-container table-chart">
                                 <div class="table-container">
-                                    <table id="all-achievements-table" class="data-table">
+                                    <table id="ai-most-explained-table" class="data-table">
                                         <thead>
                                             <tr>
-                                                <th>Status</th>
-                                                <th>Name</th>
+                                                <th>Fact</th>
                                                 <th>Category</th>
-                                                <th>Progress</th>
-                                                <th>Reward</th>
-                                                <th>Unlocked At</th>
+                                                <th>AI Calls</th>
+                                                <th>Total Cost</th>
                                             </tr>
                                         </thead>
                                         <tbody></tbody>
@@ -931,7 +1148,41 @@
                                 </div>
                             </div>
                             <div class="chart-description">
-                                All achievements with current progress
+                                Facts that have been explained by AI most frequently
+                            </div>
+                        </article>
+
+                        <!-- Recent AI Usage Log -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Recent AI Usage Log</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="ai-usage-log-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="ai-usage-log-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Time</th>
+                                                <th>Fact</th>
+                                                <th>Tokens</th>
+                                                <th>Cost</th>
+                                                <th>Latency</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Last 50 AI API calls
                             </div>
                         </article>
                     </div>
