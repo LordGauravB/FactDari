@@ -1,4 +1,4 @@
-// Enhanced FactDari Analytics JavaScript
+﻿// Enhanced FactDari Analytics JavaScript
 (() => {
   'use strict';
   
@@ -15,6 +15,13 @@
   // Recent reviews datasets
   let recentReviewsData50 = [];
   let recentReviewsData500 = [];
+  // AI usage datasets
+  let aiMostExplainedData = [];
+  let aiRecentUsageData = [];
+  // Currency settings
+  let currentCurrency = 'USD';
+  const USD_TO_GBP_RATE = 0.79; // Approximate conversion rate
+  let cachedAIData = null; // Store AI data for currency conversion
   // Current datasets and sort state for main tables
   let currentMostData = [];
   let currentLeastData = [];
@@ -29,6 +36,14 @@
 
   function qs(sel) { return document.querySelector(sel); }
   function qsa(sel) { return Array.from(document.querySelectorAll(sel)); }
+
+  // HTML escape function to prevent XSS attacks
+  function escapeHtml(text) {
+    if (text == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+  }
 
   async function fetchData() {
     const res = await fetch('/api/chart-data');
@@ -110,8 +125,8 @@
               else if (index === 2) medalClass = 'medal-bronze';
             }
             html = `
-              <td><span class="fact-text">${factContent}</span></td>
-              <td>${row.CategoryName || ''}</td>
+              <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+              <td>${escapeHtml(row.CategoryName || '')}</td>
               <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
             `;
           } else {
@@ -122,8 +137,8 @@
               else if (index === 2) medalClass = 'medal-bronze';
             }
             html = `
-              <td><span class="fact-text">${factContent}</span></td>
-              <td>${row.CategoryName || ''}</td>
+              <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+              <td>${escapeHtml(row.CategoryName || '')}</td>
               <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
               <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
             `;
@@ -161,12 +176,15 @@
     setText('#active-categories', totalCategories);
     setText('#favorites-count', favoritesCount);
     setText('#known-facts-count', knownFactsCount);
-    // Update navbar gamification stats
-    setText('#nav-level-value', `Lv ${level}`);
-    const gated = (level < 100) && (xpToNext <= 0);
-    const xpText = gated ? `${xp} (achievements required)` : (xpToNext > 0 ? `${xp} (${xpToNext}->)` : `${xp} (MAX)`);
-    setText('#nav-xp-value', xpText);
-    setText('#nav-achievements-count', `${ach.unlocked || 0}/${ach.total || 0}`);
+
+    // Update Lifetime Stats Grid
+    const lifetimeStats = data.lifetime_stats || {};
+    setText('#lifetime-adds', lifetimeStats.total_adds || 0);
+    setText('#lifetime-edits', lifetimeStats.total_edits || 0);
+    setText('#lifetime-deletes', lifetimeStats.total_deletes || 0);
+    setText('#lifetime-reviews', lifetimeStats.total_reviews || 0);
+    setText('#current-streak-value', lifetimeStats.current_streak || 0);
+    setText('#longest-streak-value', lifetimeStats.longest_streak || 0);
   }
 
   function destroyChart(key) { if (charts[key]) { charts[key].destroy(); charts[key] = null; } }
@@ -538,9 +556,10 @@
     mostToShow.forEach((row, index) => {
       const tr = document.createElement('tr');
       const factContent = row.Content || '';
+      const escapedContent = escapeHtml(factContent);
       const displayText = factContent.length > 150 ?
-        `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 150)}...</span>` :
-        `<span class="fact-text">${factContent}</span>`;
+        `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 150))}...</span>` :
+        `<span class="fact-text">${escapedContent}</span>`;
       let medalClass = '';
       if (showMedals) {
         if (index === 0) medalClass = 'medal-gold';
@@ -549,7 +568,7 @@
       }
       tr.innerHTML = `
         <td>${displayText}</td>
-        <td>${row.CategoryName || ''}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
         <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
       `;
       mostTbody.appendChild(tr);
@@ -565,9 +584,10 @@
     leastToShow.forEach((row, index) => {
       const tr = document.createElement('tr');
       const factContent = row.Content || '';
+      const escapedContent = escapeHtml(factContent);
       const displayText = factContent.length > 150 ?
-        `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 150)}...</span>` :
-        `<span class="fact-text">${factContent}</span>`;
+        `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 150))}...</span>` :
+        `<span class="fact-text">${escapedContent}</span>`;
       let medalClass = '';
       if (showMedals) {
         if (index === 0) medalClass = 'medal-gold';
@@ -576,7 +596,7 @@
       }
       tr.innerHTML = `
         <td>${displayText}</td>
-        <td>${row.CategoryName || ''}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
         <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
         <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
       `;
@@ -599,8 +619,8 @@
         else if (index === 2) medalClass = 'medal-bronze';
       }
       tr.innerHTML = `
-        <td><span class="fact-text">${factContent}</span></td>
-        <td>${row.CategoryName || ''}</td>
+        <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
         <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
         <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
       `;
@@ -636,8 +656,8 @@
       const tr = document.createElement('tr');
       const when = row.UnlockDate ? new Date(row.UnlockDate).toLocaleString() : '';
       tr.innerHTML = `
-        <td>${when}</td>
-        <td>${row.Name || ''}</td>
+        <td>${escapeHtml(when)}</td>
+        <td>${escapeHtml(row.Name || '')}</td>
         <td style="text-align:center;">${row.RewardXP || 0} XP</td>
       `;
       tbody.appendChild(tr);
@@ -671,83 +691,174 @@
       const reviewTime = row.ReviewDate ? new Date(row.ReviewDate).toLocaleString() : '';
       const factContent = row.Content || '';
       const displayText = factContent.length > 150 ?
-        `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 150)}...</span>` :
-        `<span class="fact-text">${factContent}</span>`;
+        `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 150))}...</span>` :
+        `<span class="fact-text">${escapeHtml(factContent)}</span>`;
       tr.innerHTML = `
-        <td>${sessionStart}</td>
-        <td>${reviewTime}</td>
-        <td>${row.CategoryName || ''}</td>
+        <td>${escapeHtml(sessionStart)}</td>
+        <td>${escapeHtml(reviewTime)}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
         <td>${displayText}</td>
       `;
       tbody.appendChild(tr);
     });
   }
 
-  function renderAllAchievementsTable(rows) {
-    const table = qs('#all-achievements-table');
-    const tbody = qs('#all-achievements-table tbody');
-    if (!table || !tbody) return;
-    const data = Array.isArray(rows) ? rows.slice() : [];
+  // Store achievements data globally for filtering
+  let allAchievementsData = [];
+  let currentAchievementFilter = 'all';
 
-    // Sorting helper
-    const sortBy = (idx, dir) => {
-      const asc = dir === 'asc';
-      const getVal = (r) => {
-        switch(idx) {
-          case 0: return r.Unlocked ? 1 : 0; // status
-          case 1: return (r.Name || '').toLowerCase();
-          case 2: return (r.Category || '').toLowerCase();
-          case 3: return (r.ProgressCurrent || 0) / Math.max(1, r.Threshold || 1); // ratio
-          case 4: return r.RewardXP || 0;
-          case 5: return r.UnlockDate ? new Date(r.UnlockDate).getTime() : 0;
-          default: return 0;
-        }
-      };
-      data.sort((a, b) => {
-        // Always show unlocked achievements first
-        if (a.Unlocked !== b.Unlocked) {
-          return a.Unlocked ? -1 : 1;
-        }
-        // Then apply the selected sorting
-        const va = getVal(a), vb = getVal(b);
-        if (typeof va === 'string' && typeof vb === 'string') return asc ? va.localeCompare(vb) : vb.localeCompare(va);
-        return asc ? (va - vb) : (vb - va);
-      });
-    };
-    sortBy(achievementsSortState.index, achievementsSortState.dir);
+  // Category to icon mapping for achievements
+  const achievementIcons = {
+    'streak': '🔥',
+    'review': '📖',
+    'favorite': '⭐',
+    'known': '✅',
+    'category': '📊',
+    'session': '⏱️',
+    'time': '🕐',
+    'milestone': '🏆',
+    'explorer': '🧭',
+    'master': '🎓',
+    'dedication': '💪',
+    'speed': '⚡',
+    'consistency': '📅',
+    'collector': '📚',
+    'default': '🏅'
+  };
 
-    tbody.innerHTML = '';
-    data.forEach(r => {
-      const tr = document.createElement('tr');
-      const status = r.Unlocked ? 'Unlocked' : 'Locked';
-      const progress = `${Math.min(r.ProgressCurrent || 0, r.Threshold || 0)}/${r.Threshold || 0}`;
-      const when = r.UnlockDate ? new Date(r.UnlockDate).toLocaleString() : '';
-      tr.innerHTML = `
-        <td>${status}</td>
-        <td>${r.Name || ''}</td>
-        <td>${r.Category || ''}</td>
-        <td style="text-align:center;">${progress}</td>
-        <td style="text-align:center;">${r.RewardXP || 0} XP</td>
-        <td>${when}</td>
-      `;
-      if (r.Unlocked) tr.classList.add('row-unlocked');
-      tbody.appendChild(tr);
+  function getAchievementIcon(category, name) {
+    const catLower = (category || '').toLowerCase();
+    const nameLower = (name || '').toLowerCase();
+
+    // Check category first
+    for (const [key, icon] of Object.entries(achievementIcons)) {
+      if (catLower.includes(key)) return icon;
+    }
+
+    // Check name as fallback
+    for (const [key, icon] of Object.entries(achievementIcons)) {
+      if (nameLower.includes(key)) return icon;
+    }
+
+    return achievementIcons.default;
+  }
+
+  function renderAllAchievementsBadges(rows, filter = 'all') {
+    const container = qs('#achievements-badges-container');
+    if (!container) return;
+
+    allAchievementsData = Array.isArray(rows) ? rows.slice() : [];
+    currentAchievementFilter = filter;
+
+    // Calculate unlocked/locked counts
+    const unlockedCount = allAchievementsData.filter(r => r.Unlocked).length;
+    const lockedCount = allAchievementsData.filter(r => !r.Unlocked).length;
+    const totalCount = allAchievementsData.length;
+
+    // Update the count display
+    const countEl = qs('#achievements-count');
+    if (countEl) {
+      countEl.textContent = `(${unlockedCount}/${totalCount} Unlocked)`;
+    }
+
+    // Sort: unlocked first, then by name
+    allAchievementsData.sort((a, b) => {
+      if (a.Unlocked !== b.Unlocked) {
+        return a.Unlocked ? -1 : 1;
+      }
+      return (a.Name || '').localeCompare(b.Name || '');
     });
 
-    if (!table.dataset.sortAttached) {
-      const ths = Array.from(table.querySelectorAll('thead th'));
-      ths.forEach((th, idx) => {
-        th.classList.add('sortable');
-        th.addEventListener('click', () => {
-          const newDir = (achievementsSortState.index === idx && achievementsSortState.dir === 'asc') ? 'desc' : 'asc';
-          achievementsSortState = { index: idx, dir: newDir };
-          renderAllAchievementsTable(rows || []);
-          applySortIndicator(table, idx, newDir);
-        });
-      });
-      table.dataset.sortAttached = '1';
-      applySortIndicator(table, achievementsSortState.index, achievementsSortState.dir);
+    // Filter based on current selection
+    let filteredData = allAchievementsData;
+    if (filter === 'unlocked') {
+      filteredData = allAchievementsData.filter(r => r.Unlocked);
+    } else if (filter === 'locked') {
+      filteredData = allAchievementsData.filter(r => !r.Unlocked);
     }
+
+    container.innerHTML = '';
+
+    if (filteredData.length === 0) {
+      container.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 40px;">
+        No ${filter === 'all' ? '' : filter} achievements found
+      </div>`;
+      return;
+    }
+
+    filteredData.forEach(r => {
+      const badge = document.createElement('div');
+      badge.className = `achievement-badge ${r.Unlocked ? 'unlocked' : 'locked'}`;
+
+      const icon = getAchievementIcon(r.Category, r.Name);
+      const progressCurrent = Math.min(r.ProgressCurrent || 0, r.Threshold || 0);
+      const threshold = r.Threshold || 0;
+      const progressPercent = threshold > 0 ? Math.round((progressCurrent / threshold) * 100) : 0;
+      const unlockDate = r.UnlockDate ? new Date(r.UnlockDate).toLocaleDateString() : '';
+
+      let progressBar = '';
+      if (!r.Unlocked && threshold > 0) {
+        progressBar = `
+          <div class="badge-progress">
+            <div class="badge-progress-fill" style="width: ${progressPercent}%"></div>
+          </div>
+        `;
+      }
+
+      let dateDisplay = '';
+      if (r.Unlocked && unlockDate) {
+        dateDisplay = `<div class="badge-date">${unlockDate}</div>`;
+      }
+
+      badge.innerHTML = `
+        <span class="badge-xp">${r.RewardXP || 0} XP</span>
+        <div class="badge-icon">${icon}</div>
+        <div class="badge-name">${r.Name || 'Achievement'}</div>
+        <div class="badge-category">${r.Category || ''}</div>
+        ${progressBar}
+        ${dateDisplay}
+        <div class="badge-tooltip">
+          <div class="badge-tooltip-title">${r.Name || 'Achievement'}</div>
+          <div class="badge-tooltip-desc">${r.Description || 'Complete this achievement to earn XP!'}</div>
+          <div class="badge-tooltip-meta">
+            <span>${r.Category || 'General'}</span>
+            <span>${r.RewardXP || 0} XP</span>
+          </div>
+          ${!r.Unlocked ? `<div class="badge-tooltip-progress">Progress: ${progressCurrent}/${threshold} (${progressPercent}%)</div>` : ''}
+          ${r.Unlocked ? `<div class="badge-tooltip-progress" style="color: var(--success);">Unlocked: ${unlockDate}</div>` : ''}
+        </div>
+      `;
+
+      container.appendChild(badge);
+    });
+
+    // Setup filter buttons if not already done
+    setupAchievementFilters();
+  }
+
+  function setupAchievementFilters() {
+    const filterBtns = qsa('.achievement-filter-tabs .filter-btn');
+    if (!filterBtns.length) return;
+
+    filterBtns.forEach(btn => {
+      if (btn.dataset.filterAttached) return;
+      btn.dataset.filterAttached = '1';
+
+      btn.addEventListener('click', () => {
+        // Update active state
+        filterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Re-render with new filter
+        const filter = btn.dataset.filter || 'all';
+        renderAllAchievementsBadges(allAchievementsData, filter);
+      });
+    });
+  }
+
+  // Keep old function name for backward compatibility
+  function renderAllAchievementsTable(rows) {
+    renderAllAchievementsBadges(rows, currentAchievementFilter);
   }
 
   function renderKnownTable(data) {
@@ -765,8 +876,8 @@
         else if (index === 2) medalClass = 'medal-bronze';
       }
       tr.innerHTML = `
-        <td><span class="fact-text">${factContent}</span></td>
-        <td>${row.CategoryName || ''}</td>
+        <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
         <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
         <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
       `;
@@ -961,6 +1072,26 @@
         renderSessionsTable(sessionsData);
         renderRecentReviewsTable(recentReviewsData50);
         renderSessionActionsTable(data.session_actions_table || []);
+
+        // AI Usage Analytics
+        renderAIUsageMetrics(data.ai_usage_summary);
+        renderAICostTimeline('ai_cost_timeline', 'ai-cost-timeline', data.ai_cost_timeline);
+        doughnutChart('ai_token_distribution', 'ai-token-distribution', data.ai_token_distribution);
+        pieChart('ai_usage_by_category', 'ai-usage-by-category', data.ai_usage_by_category);
+        pieChart('ai_latency_distribution', 'ai-latency-distribution', data.ai_latency_distribution);
+        renderAIUsageTrend('ai_usage_trend', 'ai-usage-trend', data.ai_cost_timeline);
+        renderAIMostExplainedTable(data.ai_most_explained_facts);
+        renderAIRecentUsageTable(data.ai_recent_usage);
+        renderAIProviderComparisonTable(data.ai_provider_comparison);
+
+        // New analytics charts
+        renderCategoryCompletionRate('category_completion_rate', 'category-completion-rate', data.category_completion_rate);
+        renderLearningVelocity('learning_velocity', 'learning-velocity', data.learning_velocity);
+        renderPeakProductivity('peak_productivity', 'peak-productivity', data.peak_productivity_times);
+        pieChart('action_breakdown', 'action-breakdown', data.action_breakdown);
+
+        // Update XP progress bar
+        updateXPProgressBar(data.gamification);
       }, 100);
       
       hideLoadingState();
@@ -1044,8 +1175,11 @@
         const key = btn.getAttribute('data-chart');
         
         // Handle tables and heatmap differently
-        if (key === 'most-reviewed-table' || key === 'least-reviewed-table' || 
-            key === 'favorite-facts-table' || key === 'known-facts-table') {
+        if (key === 'most-reviewed-table' || key === 'least-reviewed-table' ||
+            key === 'favorite-facts-table' || key === 'known-facts-table' ||
+            key === 'ai-most-explained-table' || key === 'ai-usage-log-table' ||
+            key === 'ai-provider-comparison' || key === 'session-actions-table' ||
+            key === 'achievements-table') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
           
@@ -1067,22 +1201,22 @@
             headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
-            
+
             // Create body with ALL facts
             const tbody = document.createElement('tbody');
             fullMostReviewedData.forEach((row, index) => {
               const tr = document.createElement('tr');
               const factContent = row.Content || '';
-              
+
               // Add medal class for top 3
               let medalClass = '';
               if (index === 0) medalClass = 'medal-gold';
               else if (index === 1) medalClass = 'medal-silver';
               else if (index === 2) medalClass = 'medal-bronze';
-              
+
               tr.innerHTML = `
-                <td><span class="fact-text">${factContent}</span></td>
-                <td>${row.CategoryName || ''}</td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
                 <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
               `;
               tbody.appendChild(tr);
@@ -1090,27 +1224,27 @@
             table.appendChild(tbody);
             // Enable sorting in modal for Most Reviewed
             makeModalTableSortable(table, fullMostReviewedData, 'most');
-            
+
           } else if (key === 'least-reviewed-table') {
             headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th><th>Days Since</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
-            
+
             // Create body with ALL facts
             const tbody = document.createElement('tbody');
             fullLeastReviewedData.forEach((row, index) => {
               const tr = document.createElement('tr');
               const factContent = row.Content || '';
-              
+
               // Add medal class for top 3
               let medalClass = '';
               if (index === 0) medalClass = 'medal-gold';
               else if (index === 1) medalClass = 'medal-silver';
               else if (index === 2) medalClass = 'medal-bronze';
-              
+
               tr.innerHTML = `
-                <td><span class="fact-text">${factContent}</span></td>
-                <td>${row.CategoryName || ''}</td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
                 <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
                 <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
               `;
@@ -1119,27 +1253,27 @@
             table.appendChild(tbody);
             // Enable sorting in modal for Least Reviewed
             makeModalTableSortable(table, fullLeastReviewedData, 'least');
-            
+
           } else if (key === 'favorite-facts-table') {
             headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th><th>Days Since</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
-            
+
             // Create body with ALL favorite facts
             const tbody = document.createElement('tbody');
             fullFavoriteData.forEach((row, index) => {
               const tr = document.createElement('tr');
               const factContent = row.Content || '';
-              
+
               // Add medal class for top 3
               let medalClass = '';
               if (index === 0) medalClass = 'medal-gold';
               else if (index === 1) medalClass = 'medal-silver';
               else if (index === 2) medalClass = 'medal-bronze';
-              
+
               tr.innerHTML = `
-                <td><span class="fact-text">${factContent}</span></td>
-                <td>${row.CategoryName || ''}</td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
                 <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
                 <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
               `;
@@ -1148,27 +1282,27 @@
             table.appendChild(tbody);
             // Enable sorting in modal for Favorite Facts
             makeModalTableSortable(table, fullFavoriteData, 'favorite');
-            
+
           } else if (key === 'known-facts-table') {
             headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th><th>Days Since</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
-            
+
             // Create body with ALL known facts
             const tbody = document.createElement('tbody');
             fullKnownData.forEach((row, index) => {
               const tr = document.createElement('tr');
               const factContent = row.Content || '';
-              
+
               // Add medal class for top 3
               let medalClass = '';
               if (index === 0) medalClass = 'medal-gold';
               else if (index === 1) medalClass = 'medal-silver';
               else if (index === 2) medalClass = 'medal-bronze';
-              
+
               tr.innerHTML = `
-                <td><span class="fact-text">${factContent}</span></td>
-                <td>${row.CategoryName || ''}</td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
                 <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
                 <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
               `;
@@ -1177,8 +1311,99 @@
             table.appendChild(tbody);
             // Enable sorting in modal for Known Facts
             makeModalTableSortable(table, fullKnownData, 'known');
+
+          } else if (key === 'ai-most-explained-table') {
+            headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>AI Calls</th><th>Total Cost</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            aiMostExplainedData.forEach((row, index) => {
+              const tr = document.createElement('tr');
+              const factContent = row.Content || '';
+              const cost = parseFloat(row.TotalCost || 0);
+
+              let medalClass = '';
+              if (index === 0) medalClass = 'medal-gold';
+              else if (index === 1) medalClass = 'medal-silver';
+              else if (index === 2) medalClass = 'medal-bronze';
+
+              tr.innerHTML = `
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
+                <td style="text-align: center;" class="${medalClass}">${row.CallCount || 0}</td>
+                <td style="text-align: center;">$${cost.toFixed(4)}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+          } else if (key === 'ai-usage-log-table') {
+            headerRow.innerHTML = '<th>Time</th><th>Fact</th><th>Tokens</th><th>Cost</th><th>Latency</th><th>Status</th><th>Model</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            aiRecentUsageData.forEach(row => {
+              const tr = document.createElement('tr');
+              const time = row.CreatedAt ? new Date(row.CreatedAt).toLocaleString() : '';
+              const factContent = row.FactContent || '';
+              const cost = parseFloat(row.Cost || 0);
+              const latency = row.LatencyMs || 0;
+              const status = row.Status || 'UNKNOWN';
+              const statusClass = status === 'SUCCESS' ? 'status-success' : 'status-failed';
+              const model = row.Model || '--';
+
+              tr.innerHTML = `
+                <td>${escapeHtml(time)}</td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td style="text-align: center;">${row.TotalTokens || 0}</td>
+                <td style="text-align: center;">$${cost.toFixed(7)}</td>
+                <td style="text-align: center;">${latency}ms</td>
+                <td style="text-align: center;"><span class="${statusClass}">${escapeHtml(status)}</span></td>
+                <td style="text-align: center;">${escapeHtml(model)}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+          } else if (key === 'ai-provider-comparison') {
+            headerRow.innerHTML = '<th>Provider</th><th>Calls</th><th>Total Cost</th><th>Avg Cost</th><th>Avg Latency</th><th>Success Rate</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            const providerData = qs('#ai-provider-comparison-table tbody');
+            if (providerData) {
+              tbody.innerHTML = providerData.innerHTML;
+            }
+            table.appendChild(tbody);
+
+          } else if (key === 'session-actions-table') {
+            headerRow.innerHTML = '<th>Time</th><th>Fact</th><th>Action</th><th>Category</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            const actionsData = qs('#session-actions-table tbody');
+            if (actionsData) {
+              tbody.innerHTML = actionsData.innerHTML;
+            }
+            table.appendChild(tbody);
+
+          } else if (key === 'achievements-table') {
+            headerRow.innerHTML = '<th>When</th><th>Achievement</th><th>Reward</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            const achievementsData = qs('#achievements-table tbody');
+            if (achievementsData) {
+              tbody.innerHTML = achievementsData.innerHTML;
+            }
+            table.appendChild(tbody);
           }
-          
+
           tableContainer.appendChild(table);
           
           modalChartContainer.innerHTML = '';
@@ -1197,6 +1422,16 @@
             title.textContent = `All Favorite Facts (${fullFavoriteData.length} total)`;
           } else if (key === 'known-facts-table') {
             title.textContent = `All Known Facts (${fullKnownData.length} total)`;
+          } else if (key === 'ai-most-explained-table') {
+            title.textContent = `Most Explained Facts by AI (${aiMostExplainedData.length} total)`;
+          } else if (key === 'ai-usage-log-table') {
+            title.textContent = `Recent AI Usage Log (${aiRecentUsageData.length} entries)`;
+          } else if (key === 'ai-provider-comparison') {
+            title.textContent = 'AI Provider Comparison';
+          } else if (key === 'session-actions-table') {
+            title.textContent = 'Recent Session Actions';
+          } else if (key === 'achievements-table') {
+            title.textContent = 'Recent Achievements';
           }
           modalChartContainer.insertBefore(title, tableContainer);
           
@@ -1270,7 +1505,16 @@
             'top-hours': 'top_hours',
             'growth-trend': 'growth_trend',
             'monthly-progress': 'monthly_progress',
-            'session-actions-chart': 'session_actions'
+            'session-actions-chart': 'session_actions',
+            'ai-cost-timeline': 'ai_cost_timeline',
+            'ai-token-distribution': 'ai_token_distribution',
+            'ai-usage-by-category': 'ai_usage_by_category',
+            'ai-latency-distribution': 'ai_latency_distribution',
+            'ai-usage-trend': 'ai_usage_trend',
+            'category-completion-rate': 'category_completion_rate',
+            'learning-velocity': 'learning_velocity',
+            'peak-productivity': 'peak_productivity',
+            'action-breakdown': 'action_breakdown'
           };
           const chartKey = idMap[key];
           if (chartKey) {
@@ -1436,12 +1680,12 @@
             const reviewTime = row.ReviewDate ? new Date(row.ReviewDate).toLocaleString() : '';
             const factContent = row.Content || '';
             const displayText = factContent.length > 200 ?
-              `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 200)}...</span>` :
-              `<span class="fact-text">${factContent}</span>`;
+              `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 200))}...</span>` :
+              `<span class="fact-text">${escapeHtml(factContent)}</span>`;
             tr.innerHTML = `
-              <td>${sessionStart}</td>
-              <td>${reviewTime}</td>
-              <td>${row.CategoryName || ''}</td>
+              <td>${escapeHtml(sessionStart)}</td>
+              <td>${escapeHtml(reviewTime)}</td>
+              <td>${escapeHtml(row.CategoryName || '')}</td>
               <td>${displayText}</td>
             `;
             tbody.appendChild(tr);
@@ -1529,6 +1773,8 @@
           case '2':
           case '3':
           case '4':
+          case '5':
+          case '6':
             e.preventDefault();
             const tabIndex = parseInt(e.key) - 1;
             const tabs = qsa('.tab-btn');
@@ -1631,7 +1877,7 @@
             title: {
               display: true,
               text: 'Duration (minutes)',
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
@@ -1746,7 +1992,7 @@
             title: {
               display: true,
               text: 'Timeout Count',
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
@@ -2032,7 +2278,7 @@
             title: {
               display: true,
               text: 'Reviews / Facts',
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             grid: {
               color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
@@ -2079,6 +2325,606 @@
     });
   }
   
+  // Currency conversion helper
+  function convertCurrency(amountUSD, toCurrency) {
+    if (toCurrency === 'GBP') {
+      return amountUSD * USD_TO_GBP_RATE;
+    }
+    return amountUSD;
+  }
+
+  function formatCurrency(amount, currency) {
+    const symbol = currency === 'GBP' ? '£' : '$';
+    return `${symbol}${amount.toFixed(4)}`;
+  }
+
+  // AI Usage Analytics Functions
+  function renderAIUsageMetrics(summary) {
+    if (!summary) return;
+
+    // Cache the summary for currency conversion
+    cachedAIData = { ...cachedAIData, summary };
+
+    const totalCalls = summary.TotalCalls || 0;
+    const totalTokens = summary.TotalTokens || 0;
+    const totalCostUSD = parseFloat(summary.TotalCost || 0);
+    const avgCostUSD = parseFloat(summary.AvgCost || 0);
+    const avgLatency = summary.AvgLatency || 0;
+    const successCount = summary.SuccessCount || 0;
+    const failedCount = summary.FailedCount || 0;
+    const successRate = totalCalls > 0 ? ((successCount / totalCalls) * 100).toFixed(1) : 0;
+    const avgReadingTime = summary.AvgReadingTime || 0;
+    const minReadingTime = summary.MinReadingTime || 0;
+    const maxReadingTime = summary.MaxReadingTime || 0;
+
+    // Convert costs based on current currency
+    const totalCost = convertCurrency(totalCostUSD, currentCurrency);
+    const avgCost = convertCurrency(avgCostUSD, currentCurrency);
+
+    setText('#total-ai-calls', totalCalls.toLocaleString());
+    setText('#total-ai-tokens', totalTokens.toLocaleString());
+    setText('#total-ai-cost', formatCurrency(totalCost, currentCurrency));
+    setText('#avg-ai-cost', formatCurrency(avgCost, currentCurrency));
+    setText('#avg-ai-latency', avgLatency > 0 ? `${Math.round(avgLatency)}ms` : '--');
+    setText('#ai-success-rate', `${successRate}%`);
+
+    // Reading time stats
+    setText('#avg-ai-reading-time', avgReadingTime > 0 ? `${Math.round(avgReadingTime)}s` : '--');
+    setText('#min-ai-reading-time', minReadingTime > 0 ? `${Math.round(minReadingTime)}s` : '--');
+    setText('#max-ai-reading-time', maxReadingTime > 0 ? `${Math.round(maxReadingTime)}s` : '--');
+  }
+
+  function renderAICostTimeline(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+
+    // Cache payload for currency re-render
+    cachedAIData = { ...cachedAIData, costTimeline: payload };
+
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+
+    // Convert data based on current currency
+    const currencySymbol = currentCurrency === 'GBP' ? '£' : '$';
+    const convertedPayload = {
+      ...payload,
+      datasets: payload.datasets.map(ds => ({
+        ...ds,
+        data: ds.data.map(v => convertCurrency(v, currentCurrency)),
+        label: ds.label.replace(/\$|£/, currencySymbol)
+      }))
+    };
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: convertedPayload,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            display: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            title: {
+              display: true,
+              text: 'Date',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
+            }
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: `Cost (${currencySymbol})`,
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              callback: function(value) {
+                return currencySymbol + value.toFixed(4);
+              }
+            },
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              usePointStyle: true
+            }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                return context.dataset.label + ': ' + currencySymbol + context.parsed.y.toFixed(4);
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderAIUsageTrend(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+
+    // Cache payload for currency re-render
+    cachedAIData = { ...cachedAIData, usageTrend: payload };
+
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+
+    const currencySymbol = currentCurrency === 'GBP' ? '£' : '$';
+
+    // Add calls data as a line with currency conversion
+    const trendPayload = {
+      labels: payload.labels,
+      datasets: [
+        {
+          label: `Daily Cost (${currencySymbol})`,
+          data: (payload.datasets[0]?.data || []).map(v => convertCurrency(v, currentCurrency)),
+          type: 'bar',
+          backgroundColor: '#10b981',
+          yAxisID: 'y'
+        },
+        {
+          label: `Cumulative Cost (${currencySymbol})`,
+          data: (payload.datasets[1]?.data || []).map(v => convertCurrency(v, currentCurrency)),
+          type: 'line',
+          borderColor: '#3b82f6',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          tension: 0.4,
+          yAxisID: 'y'
+        }
+      ]
+    };
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: trendPayload,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            display: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            title: {
+              display: true,
+              text: 'Date',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
+            }
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: `Cost (${currencySymbol})`,
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              callback: function(value) {
+                return currencySymbol + value.toFixed(4);
+              }
+            },
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              usePointStyle: true
+            }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                return context.dataset.label + ': ' + currencySymbol + context.parsed.y.toFixed(4);
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderAIMostExplainedTable(data) {
+    const tbody = qs('#ai-most-explained-table tbody');
+    if (!tbody) return;
+
+    aiMostExplainedData = data || [];
+    // Cache for currency re-render
+    cachedAIData = { ...cachedAIData, mostExplained: data };
+    tbody.innerHTML = '';
+
+    const currencySymbol = currentCurrency === 'GBP' ? '£' : '$';
+
+    (data || []).forEach((row, index) => {
+      const tr = document.createElement('tr');
+      const factContent = row.Content || '';
+      const displayText = factContent.length > 100
+        ? `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 100))}...</span>`
+        : `<span class="fact-text">${escapeHtml(factContent)}</span>`;
+      const costUSD = parseFloat(row.TotalCost || 0);
+      const cost = convertCurrency(costUSD, currentCurrency);
+
+      let medalClass = '';
+      if (index === 0) medalClass = 'medal-gold';
+      else if (index === 1) medalClass = 'medal-silver';
+      else if (index === 2) medalClass = 'medal-bronze';
+
+      tr.innerHTML = `
+        <td>${displayText}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
+        <td style="text-align: center;" class="${medalClass}">${row.CallCount || 0}</td>
+        <td style="text-align: center;">${currencySymbol}${cost.toFixed(4)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderAIRecentUsageTable(data) {
+    const tbody = qs('#ai-usage-log-table tbody');
+    if (!tbody) return;
+
+    aiRecentUsageData = data || [];
+    // Cache for currency re-render
+    cachedAIData = { ...cachedAIData, recentUsage: data };
+    tbody.innerHTML = '';
+
+    const currencySymbol = currentCurrency === 'GBP' ? '£' : '$';
+
+    (data || []).forEach(row => {
+      const tr = document.createElement('tr');
+      const time = row.CreatedAt ? new Date(row.CreatedAt).toLocaleString() : '';
+      const factContent = row.FactContent || '';
+      const displayText = factContent.length > 60
+        ? `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 60))}...</span>`
+        : `<span class="fact-text">${escapeHtml(factContent)}</span>`;
+      const costUSD = parseFloat(row.Cost || 0);
+      const cost = convertCurrency(costUSD, currentCurrency);
+      const latency = row.LatencyMs || 0;
+      const status = row.Status || 'UNKNOWN';
+      const statusClass = status === 'SUCCESS' ? 'status-success' : 'status-failed';
+
+      const model = row.Model || '--';
+
+      tr.innerHTML = `
+        <td>${escapeHtml(time)}</td>
+        <td>${displayText}</td>
+        <td style="text-align: center;">${row.TotalTokens || 0}</td>
+        <td style="text-align: center;">${currencySymbol}${cost.toFixed(7)}</td>
+        <td style="text-align: center;">${latency}ms</td>
+        <td style="text-align: center;"><span class="${statusClass}">${escapeHtml(status)}</span></td>
+        <td style="text-align: center;">${escapeHtml(model)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // AI Provider Comparison Table
+  function renderAIProviderComparisonTable(data) {
+    const tbody = qs('#ai-provider-comparison-table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const currencySymbol = currentCurrency === 'GBP' ? '£' : '$';
+
+    (data || []).forEach(row => {
+      const tr = document.createElement('tr');
+      const totalCostUSD = parseFloat(row.TotalCost || 0);
+      const avgCostUSD = parseFloat(row.AvgCost || 0);
+      const totalCost = convertCurrency(totalCostUSD, currentCurrency);
+      const avgCost = convertCurrency(avgCostUSD, currentCurrency);
+      const successCount = parseInt(row.SuccessCount || 0);
+      const failedCount = parseInt(row.FailedCount || 0);
+      const totalCalls = successCount + failedCount;
+      const successRate = totalCalls > 0 ? ((successCount / totalCalls) * 100).toFixed(1) : '0.0';
+
+      tr.innerHTML = `
+        <td><strong>${escapeHtml(row.Provider || 'Unknown')}</strong></td>
+        <td style="text-align: center;">${row.CallCount || 0}</td>
+        <td style="text-align: center;">${currencySymbol}${totalCost.toFixed(4)}</td>
+        <td style="text-align: center;">${currencySymbol}${avgCost.toFixed(6)}</td>
+        <td style="text-align: center;">${Math.round(row.AvgLatency || 0)}ms</td>
+        <td style="text-align: center;"><span class="${parseFloat(successRate) >= 95 ? 'status-success' : 'status-failed'}">${successRate}%</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Category Completion Rate Chart
+  function renderCategoryCompletionRate(key, canvasId, data) {
+    const ctx = qs(`#${canvasId}`)?.getContext('2d');
+    if (!ctx || !data || data.length === 0) return;
+    destroyChart(key);
+
+    const labels = data.map(d => d.CategoryName || 'Unknown');
+    const completionRates = data.map(d => parseFloat(d.CompletionRate || 0));
+    const knownCounts = data.map(d => parseInt(d.KnownFacts || 0));
+    const totalCounts = data.map(d => parseInt(d.TotalFacts || 0));
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Completion Rate (%)',
+          data: completionRates,
+          backgroundColor: completionRates.map(rate => {
+            if (rate >= 75) return isDarkMode ? '#34d399' : '#10b981';
+            if (rate >= 50) return isDarkMode ? '#fbbf24' : '#f59e0b';
+            if (rate >= 25) return isDarkMode ? '#fb923c' : '#f97316';
+            return isDarkMode ? '#f87171' : '#ef4444';
+          }),
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            beginAtZero: true,
+            max: 100,
+            grid: { color: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)' },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b', callback: v => v + '%' },
+            title: { display: true, text: 'Completion %', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b' },
+            title: { display: true, text: 'Category', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                const idx = context.dataIndex;
+                return `${completionRates[idx].toFixed(1)}% (${knownCounts[idx]}/${totalCounts[idx]} facts)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Learning Velocity Chart
+  function renderLearningVelocity(key, canvasId, data) {
+    const ctx = qs(`#${canvasId}`)?.getContext('2d');
+    if (!ctx || !data || data.length === 0) return;
+    destroyChart(key);
+
+    const labels = data.map(d => d.CategoryName || 'Unknown');
+    const avgDays = data.map(d => parseInt(d.AvgDaysToKnow || 0));
+    const minDays = data.map(d => parseInt(d.MinDaysToKnow || 0));
+    const maxDays = data.map(d => parseInt(d.MaxDaysToKnow || 0));
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Avg Days',
+            data: avgDays,
+            backgroundColor: isDarkMode ? '#60a5fa' : '#3b82f6',
+            borderRadius: 6,
+          },
+          {
+            label: 'Min Days',
+            data: minDays,
+            backgroundColor: isDarkMode ? '#34d399' : '#10b981',
+            borderRadius: 6,
+          },
+          {
+            label: 'Max Days',
+            data: maxDays,
+            backgroundColor: isDarkMode ? '#f87171' : '#ef4444',
+            borderRadius: 6,
+          }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)' },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b' },
+            title: { display: true, text: 'Days', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b' },
+            title: { display: true, text: 'Category', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: isDarkMode ? '#cbd5e1' : '#475569', padding: 15 }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1,
+          }
+        }
+      }
+    });
+  }
+
+  // Peak Productivity Chart
+  function renderPeakProductivity(key, canvasId, data) {
+    const ctx = qs(`#${canvasId}`)?.getContext('2d');
+    if (!ctx || !data || data.length === 0) return;
+    destroyChart(key);
+
+    // Create full 24-hour array
+    const hourlyData = new Array(24).fill(0);
+    data.forEach(d => {
+      const hour = parseInt(d.Hour || 0);
+      hourlyData[hour] = parseFloat(d.AvgEfficiency || 0);
+    });
+
+    const labels = Array.from({length: 24}, (_, i) => {
+      const h = i % 12 || 12;
+      const ampm = i < 12 ? 'AM' : 'PM';
+      return `${h}${ampm}`;
+    });
+
+    // Find peak hours
+    const maxEfficiency = Math.max(...hourlyData);
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Facts/Minute',
+          data: hourlyData,
+          backgroundColor: hourlyData.map(v => {
+            if (v === maxEfficiency && v > 0) return isDarkMode ? '#34d399' : '#10b981';
+            if (v >= maxEfficiency * 0.75) return isDarkMode ? '#60a5fa' : '#3b82f6';
+            if (v > 0) return isDarkMode ? '#94a3b8' : '#cbd5e1';
+            return isDarkMode ? '#374151' : '#e5e7eb';
+          }),
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b', maxRotation: 45, minRotation: 45 },
+            title: { display: true, text: 'Hour of Day', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)' },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b' },
+            title: { display: true, text: 'Facts/Min', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                return `Efficiency: ${context.parsed.y.toFixed(2)} facts/min`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Update XP Progress Bar
+  function updateXPProgressBar(gamification) {
+    if (!gamification) return;
+
+    const level = gamification.level || 1;
+    const xp = gamification.xp || 0;
+    const xpIntoLevel = gamification.xp_into_level || 0;
+    const xpToNext = gamification.xp_to_next || 0;
+    const nextLevelReq = gamification.next_level_requirement || 100;
+    const maxXP = 1000000;
+
+    const progressPercent = nextLevelReq > 0 ? Math.min(100, (xpIntoLevel / nextLevelReq) * 100) : 100;
+
+    setText('#xp-level-badge', `Lv ${level}`);
+    setText('#xp-current', xpIntoLevel.toLocaleString());
+    setText('#xp-required', nextLevelReq.toLocaleString());
+    setText('#xp-total', `${xp.toLocaleString()} / ${maxXP.toLocaleString()}`);
+
+    const progressBar = qs('#xp-progress-bar');
+    if (progressBar) {
+      progressBar.style.width = `${progressPercent}%`;
+    }
+
+    if (level >= 100) {
+      setText('#xp-to-next', 'MAX LEVEL!');
+    } else if (xpToNext <= 0) {
+      setText('#xp-to-next', 'Unlock more achievements to level up');
+    } else {
+      setText('#xp-to-next', `${xpToNext.toLocaleString()} XP to next level`);
+    }
+  }
+
   // Add CSS for animations
   function injectAnimationStyles() {
     const style = document.createElement('style');
@@ -2110,16 +2956,67 @@
     document.head.appendChild(style);
   }
   
+  // Function to re-render AI data with new currency
+  function updateAICurrency() {
+    if (!cachedAIData) return;
+
+    // Re-render metrics
+    if (cachedAIData.summary) {
+      renderAIUsageMetrics(cachedAIData.summary);
+    }
+
+    // Re-render charts
+    if (cachedAIData.costTimeline) {
+      renderAICostTimeline('ai_cost_timeline', 'ai-cost-timeline', cachedAIData.costTimeline);
+    }
+    if (cachedAIData.usageTrend) {
+      renderAIUsageTrend('ai_usage_trend', 'ai-usage-trend', cachedAIData.usageTrend);
+    }
+
+    // Re-render tables
+    if (cachedAIData.mostExplained) {
+      renderAIMostExplainedTable(cachedAIData.mostExplained);
+    }
+    if (cachedAIData.recentUsage) {
+      renderAIRecentUsageTable(cachedAIData.recentUsage);
+    }
+  }
+
+  // Setup currency toggle
+  function setupCurrencyToggle() {
+    const toggle = qs('#currency-toggle');
+    if (!toggle) return;
+
+    // Set initial state
+    toggle.setAttribute('data-currency', currentCurrency);
+
+    toggle.addEventListener('click', () => {
+      // Toggle currency
+      currentCurrency = currentCurrency === 'USD' ? 'GBP' : 'USD';
+      toggle.setAttribute('data-currency', currentCurrency);
+
+      // Add a subtle animation
+      toggle.style.transform = 'scale(0.98)';
+      setTimeout(() => {
+        toggle.style.transform = '';
+      }, 100);
+
+      // Update all AI data displays
+      updateAICurrency();
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     setupTabs();
     setupExpandModal();
     setupSmoothScroll();
     setupKeyboardShortcuts();
+    setupCurrencyToggle();
     injectAnimationStyles();
-    
+
     // Theme change listener
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme);
-    
+
     // Refresh button with animation
     const refreshBtn = qs('#refresh-btn');
     refreshBtn?.addEventListener('click', () => {
@@ -2128,7 +3025,7 @@
       load();
       startCountdown(300);
     });
-    
+
     // Initial load
     load().then(() => startCountdown(300));
   });

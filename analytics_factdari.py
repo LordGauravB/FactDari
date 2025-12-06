@@ -484,7 +484,7 @@ def chart_data():
         
         # New chart for Progress tab
         'monthlyProgress': fetch_query("""
-            SELECT 
+            SELECT
                 YEAR(ReviewDate) as Year,
                 MONTH(ReviewDate) as Month,
                 COUNT(*) as TotalReviews,
@@ -497,6 +497,202 @@ def chart_data():
               AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
             GROUP BY YEAR(ReviewDate), MONTH(ReviewDate)
             ORDER BY YEAR(ReviewDate), MONTH(ReviewDate)
+        """, (profile_id,)),
+
+        # AI Usage Analytics
+        'aiUsageSummary': fetch_query("""
+            SELECT
+                COUNT(*) as TotalCalls,
+                COALESCE(SUM(InputTokens), 0) as TotalInputTokens,
+                COALESCE(SUM(OutputTokens), 0) as TotalOutputTokens,
+                COALESCE(SUM(TotalTokens), 0) as TotalTokens,
+                COALESCE(SUM(Cost), 0) as TotalCost,
+                COALESCE(AVG(Cost), 0) as AvgCost,
+                COALESCE(AVG(LatencyMs), 0) as AvgLatency,
+                SUM(CASE WHEN Status = 'SUCCESS' THEN 1 ELSE 0 END) as SuccessCount,
+                SUM(CASE WHEN Status = 'FAILED' THEN 1 ELSE 0 END) as FailedCount,
+                COALESCE(AVG(ReadingDurationSec), 0) as AvgReadingTime,
+                COALESCE(MIN(ReadingDurationSec), 0) as MinReadingTime,
+                COALESCE(MAX(ReadingDurationSec), 0) as MaxReadingTime
+            FROM AIUsageLogs
+            WHERE ProfileID = ?
+        """, (profile_id,)),
+
+        'aiCostTimeline': fetch_query("""
+            SELECT
+                CONVERT(varchar, CreatedAt, 23) as Date,
+                COUNT(*) as Calls,
+                COALESCE(SUM(Cost), 0) as DailyCost,
+                COALESCE(SUM(TotalTokens), 0) as DailyTokens
+            FROM AIUsageLogs
+            WHERE ProfileID = ? AND CreatedAt >= ?
+            GROUP BY CONVERT(varchar, CreatedAt, 23)
+            ORDER BY CONVERT(varchar, CreatedAt, 23)
+        """, (profile_id, thirty_days_ago)),
+
+        'aiTokenDistribution': fetch_query("""
+            SELECT
+                COALESCE(SUM(InputTokens), 0) as InputTokens,
+                COALESCE(SUM(OutputTokens), 0) as OutputTokens
+            FROM AIUsageLogs
+            WHERE ProfileID = ?
+        """, (profile_id,)),
+
+        'aiUsageByCategory': fetch_query("""
+            SELECT
+                COALESCE(c.CategoryName, 'Unknown') as CategoryName,
+                COUNT(*) as CallCount,
+                COALESCE(SUM(ai.Cost), 0) as TotalCost
+            FROM AIUsageLogs ai
+            LEFT JOIN Facts f ON ai.FactID = f.FactID
+            LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE ai.ProfileID = ?
+            GROUP BY c.CategoryName
+            ORDER BY COUNT(*) DESC
+        """, (profile_id,)),
+
+        'aiLatencyDistribution': fetch_query("""
+            SELECT
+                CASE
+                    WHEN LatencyMs < 500 THEN '< 0.5s'
+                    WHEN LatencyMs < 1000 THEN '0.5-1s'
+                    WHEN LatencyMs < 2000 THEN '1-2s'
+                    WHEN LatencyMs < 5000 THEN '2-5s'
+                    ELSE '> 5s'
+                END as LatencyRange,
+                COUNT(*) as CallCount
+            FROM AIUsageLogs
+            WHERE ProfileID = ? AND LatencyMs IS NOT NULL
+            GROUP BY
+                CASE
+                    WHEN LatencyMs < 500 THEN '< 0.5s'
+                    WHEN LatencyMs < 1000 THEN '0.5-1s'
+                    WHEN LatencyMs < 2000 THEN '1-2s'
+                    WHEN LatencyMs < 5000 THEN '2-5s'
+                    ELSE '> 5s'
+                END
+            ORDER BY MIN(LatencyMs)
+        """, (profile_id,)),
+
+        'aiMostExplainedFacts': fetch_query("""
+            SELECT TOP 10
+                COALESCE(f.Content, 'Deleted Fact') as Content,
+                COALESCE(c.CategoryName, 'Unknown') as CategoryName,
+                COUNT(*) as CallCount,
+                COALESCE(SUM(ai.Cost), 0) as TotalCost
+            FROM AIUsageLogs ai
+            LEFT JOIN Facts f ON ai.FactID = f.FactID
+            LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE ai.ProfileID = ?
+            GROUP BY f.Content, c.CategoryName
+            ORDER BY COUNT(*) DESC
+        """, (profile_id,)),
+
+        'aiRecentUsage': fetch_query("""
+            SELECT TOP 50
+                ai.CreatedAt,
+                COALESCE(LEFT(f.Content, 100), 'Deleted Fact') as FactContent,
+                ai.TotalTokens,
+                ai.Cost,
+                ai.LatencyMs,
+                ai.Status,
+                ai.ModelName as Model
+            FROM AIUsageLogs ai
+            LEFT JOIN Facts f ON ai.FactID = f.FactID
+            WHERE ai.ProfileID = ?
+            ORDER BY ai.CreatedAt DESC
+        """, (profile_id,)),
+
+        # Category Completion Rate - % of facts marked as "known" per category
+        'categoryCompletionRate': fetch_query("""
+            SELECT
+                c.CategoryName,
+                COUNT(f.FactID) as TotalFacts,
+                SUM(CASE WHEN pf.IsEasy = 1 THEN 1 ELSE 0 END) as KnownFacts,
+                CASE
+                    WHEN COUNT(f.FactID) > 0
+                    THEN CAST(SUM(CASE WHEN pf.IsEasy = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(f.FactID) as DECIMAL(5,2))
+                    ELSE 0
+                END as CompletionRate
+            FROM Categories c
+            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
+            LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
+            GROUP BY c.CategoryName
+            HAVING COUNT(f.FactID) > 0
+            ORDER BY CompletionRate DESC
+        """, (profile_id,)),
+
+        # Learning Velocity - Time from fact creation to first marked as known
+        'learningVelocity': fetch_query("""
+            SELECT
+                c.CategoryName,
+                AVG(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) as AvgDaysToKnow,
+                MIN(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) as MinDaysToKnow,
+                MAX(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) as MaxDaysToKnow,
+                COUNT(*) as KnownFactsCount
+            FROM Facts f
+            JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE pf.IsEasy = 1 AND pf.LastViewedByUser IS NOT NULL
+            GROUP BY c.CategoryName
+            HAVING COUNT(*) > 0
+            ORDER BY AVG(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) ASC
+        """, (profile_id,)),
+
+        # Peak Productivity Times - Session efficiency by hour of day
+        'peakProductivityTimes': fetch_query("""
+            SELECT
+                DATEPART(hour, s.StartTime) as Hour,
+                COUNT(*) as SessionCount,
+                AVG(s.DurationSeconds) as AvgDuration,
+                AVG(CAST(sub.UniqueFactsReviewed as FLOAT)) as AvgFactsReviewed,
+                CASE
+                    WHEN AVG(s.DurationSeconds) > 0
+                    THEN CAST(AVG(CAST(sub.UniqueFactsReviewed as FLOAT)) * 60.0 / AVG(s.DurationSeconds) as DECIMAL(10,2))
+                    ELSE 0
+                END as AvgEfficiency
+            FROM ReviewSessions s
+            INNER JOIN (
+                SELECT
+                    rl.SessionID,
+                    COUNT(DISTINCT rl.FactID) as UniqueFactsReviewed
+                FROM ReviewLogs rl
+                WHERE rl.Action IS NULL OR rl.Action = 'view'
+                GROUP BY rl.SessionID
+            ) sub ON s.SessionID = sub.SessionID
+            WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
+              AND s.ProfileID = ?
+            GROUP BY DATEPART(hour, s.StartTime)
+            ORDER BY DATEPART(hour, s.StartTime)
+        """, (profile_id,)),
+
+        # Action Breakdown - Distribution of action types
+        'actionBreakdown': fetch_query("""
+            SELECT
+                COALESCE(rl.Action, 'view') as ActionType,
+                COUNT(*) as ActionCount
+            FROM ReviewLogs rl
+            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            WHERE rs.ProfileID = ? OR rl.SessionID IS NULL
+            GROUP BY COALESCE(rl.Action, 'view')
+            ORDER BY COUNT(*) DESC
+        """, (profile_id,)),
+
+        # AI Provider Comparison - Compare costs/latency by provider
+        'aiProviderComparison': fetch_query("""
+            SELECT
+                COALESCE(Provider, 'Unknown') as Provider,
+                COUNT(*) as CallCount,
+                COALESCE(SUM(Cost), 0) as TotalCost,
+                COALESCE(AVG(Cost), 0) as AvgCost,
+                COALESCE(AVG(LatencyMs), 0) as AvgLatency,
+                COALESCE(SUM(TotalTokens), 0) as TotalTokens,
+                SUM(CASE WHEN Status = 'SUCCESS' THEN 1 ELSE 0 END) as SuccessCount,
+                SUM(CASE WHEN Status = 'FAILED' THEN 1 ELSE 0 END) as FailedCount
+            FROM AIUsageLogs
+            WHERE ProfileID = ?
+            GROUP BY Provider
+            ORDER BY COUNT(*) DESC
         """, (profile_id,))
     }
 
@@ -699,7 +895,30 @@ def chart_data():
         'gamification': gamify,
         'achievements_summary': achievements_summary,
         'recent_achievements': recent_achievements,
-        'achievements': achievements_full
+        'achievements': achievements_full,
+        # AI Usage Analytics
+        'ai_usage_summary': data['aiUsageSummary'][0] if data['aiUsageSummary'] else {},
+        'ai_cost_timeline': format_ai_cost_timeline(data['aiCostTimeline']),
+        'ai_token_distribution': format_ai_token_distribution(data['aiTokenDistribution']),
+        'ai_usage_by_category': format_pie_chart(data['aiUsageByCategory'], 'CategoryName', 'CallCount'),
+        'ai_latency_distribution': format_pie_chart(data['aiLatencyDistribution'], 'LatencyRange', 'CallCount'),
+        'ai_most_explained_facts': format_table_data(data['aiMostExplainedFacts']),
+        'ai_recent_usage': format_table_data(data['aiRecentUsage']),
+        'ai_provider_comparison': format_table_data(data['aiProviderComparison']),
+        # New analytics
+        'category_completion_rate': format_table_data(data['categoryCompletionRate']),
+        'learning_velocity': format_table_data(data['learningVelocity']),
+        'peak_productivity_times': format_table_data(data['peakProductivityTimes']),
+        'action_breakdown': format_pie_chart(data['actionBreakdown'], 'ActionType', 'ActionCount'),
+        # Lifetime stats from profile
+        'lifetime_stats': {
+            'total_adds': int((profile or {}).get('TotalAdds', 0) or 0),
+            'total_edits': int((profile or {}).get('TotalEdits', 0) or 0),
+            'total_deletes': int((profile or {}).get('TotalDeletes', 0) or 0),
+            'total_reviews': int((profile or {}).get('TotalReviews', 0) or 0),
+            'current_streak': int((profile or {}).get('CurrentStreak', 0) or 0),
+            'longest_streak': int((profile or {}).get('LongestStreak', 0) or 0),
+        }
     }
 
     # If all=true, also include ALL facts (including those with 0 reviews)
@@ -1186,9 +1405,9 @@ def format_monthly_progress(data):
     reviews = []
     unique_facts = []
     active_days = []
-    
+
     month_names = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    
+
     for row in data:
         year = row.get('Year', 2024)
         month = row.get('Month', 1)
@@ -1196,7 +1415,7 @@ def format_monthly_progress(data):
         reviews.append(row.get('TotalReviews', 0))
         unique_facts.append(row.get('UniqueFactsReviewed', 0))
         active_days.append(row.get('ActiveDays', 0))
-    
+
     return {
         'labels': labels,
         'datasets': [
@@ -1230,6 +1449,60 @@ def format_monthly_progress(data):
         ]
     }
 
+def format_ai_cost_timeline(data):
+    """Format AI cost timeline data for chart"""
+    labels = []
+    costs = []
+    tokens = []
+    calls = []
+    cumulative_cost = []
+    running_total = 0
+
+    for row in data:
+        labels.append(row.get('Date', ''))
+        cost = float(row.get('DailyCost', 0) or 0)
+        costs.append(round(cost, 4))
+        tokens.append(row.get('DailyTokens', 0))
+        calls.append(row.get('Calls', 0))
+        running_total += cost
+        cumulative_cost.append(round(running_total, 4))
+
+    return {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'Daily Cost ($)',
+                'data': costs,
+                'type': 'bar',
+                'backgroundColor': '#10b981',
+                'yAxisID': 'y'
+            },
+            {
+                'label': 'Cumulative Cost ($)',
+                'data': cumulative_cost,
+                'type': 'line',
+                'borderColor': '#3b82f6',
+                'backgroundColor': 'transparent',
+                'borderWidth': 2,
+                'tension': 0.4,
+                'yAxisID': 'y'
+            }
+        ]
+    }
+
+def format_ai_token_distribution(data):
+    """Format AI token distribution for doughnut chart"""
+    if not data or not data[0]:
+        return {'labels': [], 'data': []}
+    row = data[0]
+    return {
+        'labels': ['Input Tokens', 'Output Tokens'],
+        'data': [row.get('InputTokens', 0), row.get('OutputTokens', 0)]
+    }
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Use environment variable for debug mode (default: False for production safety)
+    import os
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
+    app.run(debug=debug_mode)
 

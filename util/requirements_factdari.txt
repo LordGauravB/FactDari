@@ -18,3 +18,8 @@ blinker==1.8.2
 
 # Windows-specific
 pywin32==306           # Windows system integration (optional, for Windows users)
+
+# Testing
+pytest==8.3.3          # Testing framework
+pytest-cov==5.0.0      # Coverage reporting
+pytest-mock==3.14.0    # Mocking utilities

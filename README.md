@@ -1,6 +1,6 @@
 # FactDari
 
-A lightweight desktop widget application for displaying and managing facts, designed to help you learn and review information throughout your day. FactDari sits on your desktop and provides quick access to categorized facts with built-in analytics tracking.
+A lightweight desktop widget application for displaying and managing facts, designed to help you learn and review information throughout your day. FactDari sits on your desktop and provides quick access to categorised facts with built-in analytics tracking.
 
 ## Features
 
@@ -15,6 +15,7 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - **Navigation Controls**: Easy navigation through facts with previous/next buttons
 - **Search & Filter**: Filter facts by category, favorites, or knowledge status
 - **Dark Theme**: Eye-friendly dark interface with customizable transparency
+- **AI Explanations**: Get AI-powered explanations for any fact using Together AI (DeepSeek model)
 
 ## Key Functionality
 
@@ -26,15 +27,69 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - Speech synthesis for audio learning
 - Automatic review logging
 - Click the level text to view achievements
+- AI-powered fact explanations with usage tracking
 
 ### Analytics Dashboard
-- Category distribution charts
-- Daily review activity tracking
-- Most and least reviewed facts
-- Review patterns over time
-- Favorite facts statistics
-- Knowledge progress tracking
-- Interactive charts with Chart.js
+
+The analytics dashboard provides comprehensive visualizations of your learning patterns. All charts and tables are interactive with Chart.js.
+
+| Feature | Description |
+|---------|-------------|
+| **Overview Tab** | |
+| Category Distribution | Pie chart showing facts per category |
+| Favorite Categories | Doughnut chart of favorites by category |
+| Known Categories | Doughnut chart of known facts by category |
+| Categories Viewed Today | Pie chart of today's reviewed categories |
+| Knowledge Progress | Doughnut showing known vs unknown ratio |
+| Weekly Review Pattern | Radar chart of reviews by day of week (lifetime) |
+| Peak Review Hours | Horizontal bar of top 5 active hours (lifetime) |
+| Category Growth Trend | Bar chart of lifetime facts per category |
+| **Progress Tab** | |
+| Facts Added Timeline | Bar + cumulative line of last 10 dates |
+| Category Reviews | Horizontal bar of total reviews per category (lifetime) |
+| Monthly Progress | Mixed chart of reviews, unique facts, active days (last 6 months) |
+| Category Completion Rate | Percentage of facts marked as "known" per category |
+| Learning Velocity | Average days from fact creation to marked as "known" |
+| Action Breakdown | Pie chart of action types (view, add, edit, delete) |
+| Peak Productivity Hours | Session efficiency (facts/min) by hour of day |
+| **Insights Tab** | |
+| Most Reviewed Facts | Table with medals for top 10 (expandable to all) |
+| Least Reviewed Facts | Table with days since last review (expandable) |
+| All Favorite Facts | Random 10 favorites table (expandable) |
+| All Known Facts | Random 10 known facts table (expandable) |
+| Review Activity Heatmap | Hour × Day grid for last 30 days |
+| Reviews Per Day | Line chart with unique facts and total reviews (last 30 days) |
+| **Session Analytics Tab** | |
+| Session Metrics | Cards for avg/total/max duration, session count, facts/session, best efficiency |
+| Session Duration Distribution | Pie chart bucketed from < 1min to > 1hr |
+| Review Time Per Fact | Stats display (avg/min/max) from ReviewLogs |
+| Daily Session Duration | Multi-line trend chart (last 30 days) |
+| Category Review Time | Horizontal bar of avg review time by category |
+| Session Efficiency | Table of top 100 sessions with facts/min and reviews/min |
+| Recent Sessions | Table of last 100 sessions |
+| Last 50 Card Reviews | Table of recent reviews (expandable to 500) |
+| Timeout Analysis | Combo chart of daily timeout counts and percentage |
+| Session Actions | Bar chart and table of add/edit/delete per session |
+| **Achievements Tab** | |
+| Recent Achievements | Table of last 10 unlocked achievements |
+| All Achievements | Badge grid with unlock status, progress bars, filter tabs |
+| **AI Usage Tab** | |
+| AI Usage Metrics | Cards for total calls, tokens, cost, avg cost, latency, success rate |
+| AI Cost Timeline | Bar + cumulative line of daily costs (last 30 days) |
+| Token Distribution | Doughnut of input vs output tokens |
+| AI Usage by Category | Pie chart of AI calls per fact category |
+| AI Usage Trend | Line chart of daily calls and tokens |
+| AI Reading Time | Stats display (avg/min/max reading duration) |
+| API Latency Distribution | Pie chart bucketed from < 0.5s to > 5s |
+| AI Provider Comparison | Table comparing providers by cost, latency, success rate |
+| Most Explained Facts | Table of top 10 facts by AI call count |
+| Recent AI Usage Log | Table of last 50 AI API calls with model details |
+| **Global Features** | |
+| XP Progress Bar | Visual level progression with XP breakdown |
+| Key Metrics | Cards for total facts, viewed today, streak, categories, favorites, known |
+| Lifetime Stats | Cards for facts added/edited/deleted, total reviews, current/best streak |
+| Currency Toggle | USD/GBP conversion for all AI cost displays |
+| Auto-Refresh | Data refreshes every 5 minutes with countdown timer |
 
 ## Installation
 
@@ -45,7 +100,13 @@ A lightweight desktop widget application for displaying and managing facts, desi
    ```
 3. Set up the SQL Server database using the script in `database_setup/factdari_setup.sql`
 4. Configure your database connection in `config.py`
-5. Run the application:
+5. (Optional) Set your Together AI API key for AI explanations:
+   ```
+   # Windows (PowerShell)
+   $env:FACTDARI_TOGETHER_API_KEY = "your-api-key"
+   # Or set permanently via System Environment Variables
+   ```
+6. Run the application:
    ```
    python factdari.py
    ```
@@ -61,6 +122,28 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - **Mark Known**: Use the checkmark to track your knowledge progress
 - **Filter**: Use the category dropdown to filter facts
 - **Listen**: Click the speaker icon for text-to-speech
+- **AI Explain**: Click the AI icon (or press `x`) to get an AI-generated explanation of the current fact
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `h` | Go to Home page |
+| `r` | Start Reviewing |
+| `←` / `p` | Previous fact |
+| `→` / `n` / `Space` | Next fact |
+| `a` | Add new fact |
+| `e` | Edit current fact |
+| `d` | Delete current fact |
+| `f` | Toggle favorite |
+| `k` | Toggle known/easy |
+| `x` | AI explain fact |
+| `v` | Speak fact (TTS) |
+| `g` | Open Analytics |
+| `c` | Manage Categories |
+| `l` | View Achievements |
+| `i` | Show Shortcuts |
+| `s` | Set static position |
 
 ### Analytics
 - Run the analytics server:
@@ -139,10 +222,16 @@ Below are sample screenshots of the desktop widget and the analytics dashboard. 
   Progress over time: monthly reviews/unique facts/active days with a combined chart, and facts‑added timeline for growth.
 
 - Achievements
-  
+
   ![Analytics Achievements](Resources/application_images/Analytics_Page_Achievements.png)
-  
+
   Achievement catalog with unlock status, thresholds, rewards, and recent unlocks—mirrors in‑app achievements UI.
+
+- AI Usage
+
+  ![Analytics AIUsage](Resources/application_images/Analytics_Page_AIUsage.png)
+
+  AI analytics dashboard showing total API calls, token usage (input/output), cost tracking over time, latency distribution, most explained facts, and recent usage log with model details.
 
 ### Startup Configuration
 For Windows users, use the VBS script to configure automatic startup:
@@ -156,18 +245,21 @@ util/RunFactDari.vbs
 - **Backend**: SQL Server database for fact storage
 - **Analytics**: Flask web server with Chart.js visualizations
 - **Speech**: pyttsx3 for text-to-speech functionality
+- **AI**: Together AI API with DeepSeek-V3.1 model for fact explanations
 - **Configuration**: Centralized config.py for all settings
 - **Gamification**: SQL-backed XP/levels, daily streak tracking, and achievements (see `gamification.py`)
 
 ## Database Schema
 
 - **Categories**: Manages categories for facts (active flag + metadata)
-- **Facts**: Stores fact content, category link, review counts, favorites/known flags
-- **ReviewSessions**: Tracks review sessions (start/end, duration, timeout, per-session action counters)
-- **ReviewLogs**: One row per view/action (per-view duration, optional session link, action snapshots)
-- **GamificationProfile**: Single-row profile for XP, level, streaks, and lifetime counters
-- **Achievements**: Catalog of unlockable achievements (code, threshold, reward)
-- **AchievementUnlocks**: Records which achievements have been unlocked
+- **Facts**: Stores fact content, category link, global view counts, and computed content key for duplicate prevention
+- **ProfileFacts**: Per-profile fact state (personal review count, favorite flag, known/easy flag, last viewed date)
+- **ReviewSessions**: Tracks review sessions (start/end, duration, timeout flag, per-session action counters)
+- **ReviewLogs**: One row per view/action (per-view duration, optional session link, action type, content snapshots for deleted facts)
+- **GamificationProfile**: Single-row profile for XP, level, streaks, lifetime counters, and AI usage totals
+- **Achievements**: Catalog of unlockable achievements (code, category, threshold, reward XP)
+- **AchievementUnlocks**: Records which achievements have been unlocked (with notification flag)
+- **AIUsageLogs**: Tracks AI explanation requests (tokens, cost, latency, status, model/provider, reading duration)
 
 ## Configuration
 
@@ -195,6 +287,12 @@ Edit `config.py` to customize:
 - `FACTDARI_XP_REVIEW_BONUS_CAP` (default: `5`): max time-based bonus
 - `FACTDARI_XP_FAVORITE` (default: `1`), `FACTDARI_XP_KNOWN` (default: `10`), `FACTDARI_XP_ADD` (default: `2`), `FACTDARI_XP_EDIT` (default: `1`), `FACTDARI_XP_DELETE` (default: `0`)
 - `FACTDARI_XP_DAILY_CHECKIN` (default: `2`): XP on daily streak check-in
+
+### AI Configuration
+- `FACTDARI_TOGETHER_API_KEY` or `TOGETHER_API_KEY` or `TOGETHER_API_TOKEN`: Your Together AI API key (required for AI explanations)
+- The AI feature uses the DeepSeek-V3.1 model via Together AI
+- Cost tracking is automatic based on token usage
+- All AI usage is logged to the `AIUsageLogs` table for analytics
 
 ### Leveling Configuration
 - `FACTDARI_LEVEL_TOTAL_XP_L100` (default: `1000000`): total XP to reach Level 100
@@ -257,6 +355,53 @@ Before making the repository public:
 - SQL Server (or SQL Server Express)
 - Windows OS (for desktop widget functionality)
 - Required Python packages (see requirements_factdari.txt)
+
+## Testing
+
+The project includes a comprehensive test suite using pytest.
+
+### Running Tests
+
+```bash
+# Install test dependencies
+pip install pytest pytest-cov pytest-mock
+
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_config.py
+
+# Run specific test class
+pytest tests/test_gamification.py::TestLevelCalculation
+
+# Run with coverage report
+pytest --cov=. --cov-report=html
+
+# Run only fast tests (exclude slow/integration tests)
+pytest -m "not slow and not integration"
+```
+
+### Test Structure
+
+```
+tests/
+├── __init__.py           # Test package init
+├── conftest.py           # Shared fixtures and configuration
+├── test_config.py        # Tests for config.py
+├── test_gamification.py  # Tests for gamification.py
+├── test_analytics.py     # Tests for analytics_factdari.py
+└── test_factdari.py      # Tests for factdari.py helpers
+```
+
+### Test Categories
+
+- **Unit Tests**: Test individual functions and methods in isolation
+- **Integration Tests**: Test database interactions (marked with `@pytest.mark.integration`)
+- **UI Tests**: Test tkinter UI components (marked with `@pytest.mark.ui`)
 
 ## License
 
