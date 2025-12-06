@@ -37,6 +37,14 @@
   function qs(sel) { return document.querySelector(sel); }
   function qsa(sel) { return Array.from(document.querySelectorAll(sel)); }
 
+  // HTML escape function to prevent XSS attacks
+  function escapeHtml(text) {
+    if (text == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+  }
+
   async function fetchData() {
     const res = await fetch('/api/chart-data');
     if (!res.ok) throw new Error('Failed to fetch chart data');
@@ -117,8 +125,8 @@
               else if (index === 2) medalClass = 'medal-bronze';
             }
             html = `
-              <td><span class="fact-text">${factContent}</span></td>
-              <td>${row.CategoryName || ''}</td>
+              <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+              <td>${escapeHtml(row.CategoryName || '')}</td>
               <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
             `;
           } else {
@@ -129,8 +137,8 @@
               else if (index === 2) medalClass = 'medal-bronze';
             }
             html = `
-              <td><span class="fact-text">${factContent}</span></td>
-              <td>${row.CategoryName || ''}</td>
+              <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+              <td>${escapeHtml(row.CategoryName || '')}</td>
               <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
               <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
             `;
@@ -168,6 +176,15 @@
     setText('#active-categories', totalCategories);
     setText('#favorites-count', favoritesCount);
     setText('#known-facts-count', knownFactsCount);
+
+    // Update Lifetime Stats Grid
+    const lifetimeStats = data.lifetime_stats || {};
+    setText('#lifetime-adds', lifetimeStats.total_adds || 0);
+    setText('#lifetime-edits', lifetimeStats.total_edits || 0);
+    setText('#lifetime-deletes', lifetimeStats.total_deletes || 0);
+    setText('#lifetime-reviews', lifetimeStats.total_reviews || 0);
+    setText('#current-streak-value', lifetimeStats.current_streak || 0);
+    setText('#longest-streak-value', lifetimeStats.longest_streak || 0);
   }
 
   function destroyChart(key) { if (charts[key]) { charts[key].destroy(); charts[key] = null; } }
@@ -539,9 +556,10 @@
     mostToShow.forEach((row, index) => {
       const tr = document.createElement('tr');
       const factContent = row.Content || '';
+      const escapedContent = escapeHtml(factContent);
       const displayText = factContent.length > 150 ?
-        `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 150)}...</span>` :
-        `<span class="fact-text">${factContent}</span>`;
+        `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 150))}...</span>` :
+        `<span class="fact-text">${escapedContent}</span>`;
       let medalClass = '';
       if (showMedals) {
         if (index === 0) medalClass = 'medal-gold';
@@ -550,7 +568,7 @@
       }
       tr.innerHTML = `
         <td>${displayText}</td>
-        <td>${row.CategoryName || ''}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
         <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
       `;
       mostTbody.appendChild(tr);
@@ -566,9 +584,10 @@
     leastToShow.forEach((row, index) => {
       const tr = document.createElement('tr');
       const factContent = row.Content || '';
+      const escapedContent = escapeHtml(factContent);
       const displayText = factContent.length > 150 ?
-        `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 150)}...</span>` :
-        `<span class="fact-text">${factContent}</span>`;
+        `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 150))}...</span>` :
+        `<span class="fact-text">${escapedContent}</span>`;
       let medalClass = '';
       if (showMedals) {
         if (index === 0) medalClass = 'medal-gold';
@@ -577,7 +596,7 @@
       }
       tr.innerHTML = `
         <td>${displayText}</td>
-        <td>${row.CategoryName || ''}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
         <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
         <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
       `;
@@ -600,8 +619,8 @@
         else if (index === 2) medalClass = 'medal-bronze';
       }
       tr.innerHTML = `
-        <td><span class="fact-text">${factContent}</span></td>
-        <td>${row.CategoryName || ''}</td>
+        <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
         <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
         <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
       `;
@@ -637,8 +656,8 @@
       const tr = document.createElement('tr');
       const when = row.UnlockDate ? new Date(row.UnlockDate).toLocaleString() : '';
       tr.innerHTML = `
-        <td>${when}</td>
-        <td>${row.Name || ''}</td>
+        <td>${escapeHtml(when)}</td>
+        <td>${escapeHtml(row.Name || '')}</td>
         <td style="text-align:center;">${row.RewardXP || 0} XP</td>
       `;
       tbody.appendChild(tr);
@@ -672,12 +691,12 @@
       const reviewTime = row.ReviewDate ? new Date(row.ReviewDate).toLocaleString() : '';
       const factContent = row.Content || '';
       const displayText = factContent.length > 150 ?
-        `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 150)}...</span>` :
-        `<span class="fact-text">${factContent}</span>`;
+        `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 150))}...</span>` :
+        `<span class="fact-text">${escapeHtml(factContent)}</span>`;
       tr.innerHTML = `
-        <td>${sessionStart}</td>
-        <td>${reviewTime}</td>
-        <td>${row.CategoryName || ''}</td>
+        <td>${escapeHtml(sessionStart)}</td>
+        <td>${escapeHtml(reviewTime)}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
         <td>${displayText}</td>
       `;
       tbody.appendChild(tr);
@@ -857,8 +876,8 @@
         else if (index === 2) medalClass = 'medal-bronze';
       }
       tr.innerHTML = `
-        <td><span class="fact-text">${factContent}</span></td>
-        <td>${row.CategoryName || ''}</td>
+        <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
         <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
         <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
       `;
@@ -1071,9 +1090,8 @@
         renderPeakProductivity('peak_productivity', 'peak-productivity', data.peak_productivity_times);
         pieChart('action_breakdown', 'action-breakdown', data.action_breakdown);
 
-        // Update XP progress bar and lifetime stats
+        // Update XP progress bar
         updateXPProgressBar(data.gamification);
-        updateLifetimeStats(data.lifetime_stats);
       }, 100);
       
       hideLoadingState();
@@ -1183,22 +1201,22 @@
             headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
-            
+
             // Create body with ALL facts
             const tbody = document.createElement('tbody');
             fullMostReviewedData.forEach((row, index) => {
               const tr = document.createElement('tr');
               const factContent = row.Content || '';
-              
+
               // Add medal class for top 3
               let medalClass = '';
               if (index === 0) medalClass = 'medal-gold';
               else if (index === 1) medalClass = 'medal-silver';
               else if (index === 2) medalClass = 'medal-bronze';
-              
+
               tr.innerHTML = `
-                <td><span class="fact-text">${factContent}</span></td>
-                <td>${row.CategoryName || ''}</td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
                 <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
               `;
               tbody.appendChild(tr);
@@ -1206,27 +1224,27 @@
             table.appendChild(tbody);
             // Enable sorting in modal for Most Reviewed
             makeModalTableSortable(table, fullMostReviewedData, 'most');
-            
+
           } else if (key === 'least-reviewed-table') {
             headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th><th>Days Since</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
-            
+
             // Create body with ALL facts
             const tbody = document.createElement('tbody');
             fullLeastReviewedData.forEach((row, index) => {
               const tr = document.createElement('tr');
               const factContent = row.Content || '';
-              
+
               // Add medal class for top 3
               let medalClass = '';
               if (index === 0) medalClass = 'medal-gold';
               else if (index === 1) medalClass = 'medal-silver';
               else if (index === 2) medalClass = 'medal-bronze';
-              
+
               tr.innerHTML = `
-                <td><span class="fact-text">${factContent}</span></td>
-                <td>${row.CategoryName || ''}</td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
                 <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
                 <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
               `;
@@ -1235,27 +1253,27 @@
             table.appendChild(tbody);
             // Enable sorting in modal for Least Reviewed
             makeModalTableSortable(table, fullLeastReviewedData, 'least');
-            
+
           } else if (key === 'favorite-facts-table') {
             headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th><th>Days Since</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
-            
+
             // Create body with ALL favorite facts
             const tbody = document.createElement('tbody');
             fullFavoriteData.forEach((row, index) => {
               const tr = document.createElement('tr');
               const factContent = row.Content || '';
-              
+
               // Add medal class for top 3
               let medalClass = '';
               if (index === 0) medalClass = 'medal-gold';
               else if (index === 1) medalClass = 'medal-silver';
               else if (index === 2) medalClass = 'medal-bronze';
-              
+
               tr.innerHTML = `
-                <td><span class="fact-text">${factContent}</span></td>
-                <td>${row.CategoryName || ''}</td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
                 <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
                 <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
               `;
@@ -1264,7 +1282,7 @@
             table.appendChild(tbody);
             // Enable sorting in modal for Favorite Facts
             makeModalTableSortable(table, fullFavoriteData, 'favorite');
-            
+
           } else if (key === 'known-facts-table') {
             headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Reviews</th><th>Days Since</th>';
             thead.appendChild(headerRow);
@@ -1283,8 +1301,8 @@
               else if (index === 2) medalClass = 'medal-bronze';
 
               tr.innerHTML = `
-                <td><span class="fact-text">${factContent}</span></td>
-                <td>${row.CategoryName || ''}</td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
                 <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
                 <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
               `;
@@ -1311,8 +1329,8 @@
               else if (index === 2) medalClass = 'medal-bronze';
 
               tr.innerHTML = `
-                <td><span class="fact-text">${factContent}</span></td>
-                <td>${row.CategoryName || ''}</td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
                 <td style="text-align: center;" class="${medalClass}">${row.CallCount || 0}</td>
                 <td style="text-align: center;">$${cost.toFixed(4)}</td>
               `;
@@ -1337,13 +1355,13 @@
               const model = row.Model || '--';
 
               tr.innerHTML = `
-                <td>${time}</td>
-                <td><span class="fact-text">${factContent}</span></td>
+                <td>${escapeHtml(time)}</td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
                 <td style="text-align: center;">${row.TotalTokens || 0}</td>
                 <td style="text-align: center;">$${cost.toFixed(7)}</td>
                 <td style="text-align: center;">${latency}ms</td>
-                <td style="text-align: center;"><span class="${statusClass}">${status}</span></td>
-                <td style="text-align: center;">${model}</td>
+                <td style="text-align: center;"><span class="${statusClass}">${escapeHtml(status)}</span></td>
+                <td style="text-align: center;">${escapeHtml(model)}</td>
               `;
               tbody.appendChild(tr);
             });
@@ -1662,12 +1680,12 @@
             const reviewTime = row.ReviewDate ? new Date(row.ReviewDate).toLocaleString() : '';
             const factContent = row.Content || '';
             const displayText = factContent.length > 200 ?
-              `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 200)}...</span>` :
-              `<span class="fact-text">${factContent}</span>`;
+              `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 200))}...</span>` :
+              `<span class="fact-text">${escapeHtml(factContent)}</span>`;
             tr.innerHTML = `
-              <td>${sessionStart}</td>
-              <td>${reviewTime}</td>
-              <td>${row.CategoryName || ''}</td>
+              <td>${escapeHtml(sessionStart)}</td>
+              <td>${escapeHtml(reviewTime)}</td>
+              <td>${escapeHtml(row.CategoryName || '')}</td>
               <td>${displayText}</td>
             `;
             tbody.appendChild(tr);
@@ -2576,8 +2594,8 @@
       const tr = document.createElement('tr');
       const factContent = row.Content || '';
       const displayText = factContent.length > 100
-        ? `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 100)}...</span>`
-        : `<span class="fact-text">${factContent}</span>`;
+        ? `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 100))}...</span>`
+        : `<span class="fact-text">${escapeHtml(factContent)}</span>`;
       const costUSD = parseFloat(row.TotalCost || 0);
       const cost = convertCurrency(costUSD, currentCurrency);
 
@@ -2588,7 +2606,7 @@
 
       tr.innerHTML = `
         <td>${displayText}</td>
-        <td>${row.CategoryName || ''}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
         <td style="text-align: center;" class="${medalClass}">${row.CallCount || 0}</td>
         <td style="text-align: center;">${currencySymbol}${cost.toFixed(4)}</td>
       `;
@@ -2612,8 +2630,8 @@
       const time = row.CreatedAt ? new Date(row.CreatedAt).toLocaleString() : '';
       const factContent = row.FactContent || '';
       const displayText = factContent.length > 60
-        ? `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 60)}...</span>`
-        : `<span class="fact-text">${factContent}</span>`;
+        ? `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 60))}...</span>`
+        : `<span class="fact-text">${escapeHtml(factContent)}</span>`;
       const costUSD = parseFloat(row.Cost || 0);
       const cost = convertCurrency(costUSD, currentCurrency);
       const latency = row.LatencyMs || 0;
@@ -2623,13 +2641,13 @@
       const model = row.Model || '--';
 
       tr.innerHTML = `
-        <td>${time}</td>
+        <td>${escapeHtml(time)}</td>
         <td>${displayText}</td>
         <td style="text-align: center;">${row.TotalTokens || 0}</td>
         <td style="text-align: center;">${currencySymbol}${cost.toFixed(7)}</td>
         <td style="text-align: center;">${latency}ms</td>
-        <td style="text-align: center;"><span class="${statusClass}">${status}</span></td>
-        <td style="text-align: center;">${model}</td>
+        <td style="text-align: center;"><span class="${statusClass}">${escapeHtml(status)}</span></td>
+        <td style="text-align: center;">${escapeHtml(model)}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -2655,7 +2673,7 @@
       const successRate = totalCalls > 0 ? ((successCount / totalCalls) * 100).toFixed(1) : '0.0';
 
       tr.innerHTML = `
-        <td><strong>${row.Provider || 'Unknown'}</strong></td>
+        <td><strong>${escapeHtml(row.Provider || 'Unknown')}</strong></td>
         <td style="text-align: center;">${row.CallCount || 0}</td>
         <td style="text-align: center;">${currencySymbol}${totalCost.toFixed(4)}</td>
         <td style="text-align: center;">${currencySymbol}${avgCost.toFixed(6)}</td>
@@ -2905,18 +2923,6 @@
     } else {
       setText('#xp-to-next', `${xpToNext.toLocaleString()} XP to next level`);
     }
-  }
-
-  // Update Lifetime Stats
-  function updateLifetimeStats(stats) {
-    if (!stats) return;
-
-    setText('#lifetime-adds', (stats.total_adds || 0).toLocaleString());
-    setText('#lifetime-edits', (stats.total_edits || 0).toLocaleString());
-    setText('#lifetime-deletes', (stats.total_deletes || 0).toLocaleString());
-    setText('#lifetime-reviews', (stats.total_reviews || 0).toLocaleString());
-    setText('#current-streak-value', (stats.current_streak || 0).toLocaleString());
-    setText('#longest-streak-value', (stats.longest_streak || 0).toLocaleString());
   }
 
   // Add CSS for animations

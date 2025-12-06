@@ -14,6 +14,7 @@ import random
 import threading
 import requests
 import time
+import re
 from ctypes import wintypes
 from PIL import Image, ImageTk
 from datetime import datetime, timedelta
@@ -1068,15 +1069,18 @@ class FactDariApp:
         explain_box.config(state="disabled")
         explain_box.pack(fill="both", expand=True, pady=4)
 
-        def update_text(text):
-            explain_box.config(state="normal")
-            explain_box.delete("1.0", "end")
-            explain_box.insert("1.0", text.strip())
-            explain_box.config(state="disabled")
+        def update_text(text, use_markdown=False):
+            if use_markdown:
+                self._render_markdown_to_text(explain_box, text)
+            else:
+                explain_box.config(state="normal")
+                explain_box.delete("1.0", "end")
+                explain_box.insert("1.0", text.strip())
+                explain_box.config(state="disabled")
 
         def mark_explanation_ready(text):
             nonlocal reading_started_at
-            update_text(text)
+            update_text(text, use_markdown=True)
             if track_reading_time and reading_started_at is None:
                 try:
                     reading_started_at = time.perf_counter()
@@ -1114,14 +1118,14 @@ class FactDariApp:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You explain short facts clearly in simple language. Keep it concise: 2 short paragraphs max."
+                        "content": "Explain facts simply in 2 short paragraphs. Include a relatable analogy."
                     },
                     {
                         "role": "user",
-                        "content": f"Explain this fact in simple words and briefly elaborate:\n\n{fact_text}"
+                        "content": f"Explain simply and wit an analogy in the second short paragraph:\n\n{fact_text}"
                     }
                 ],
-                "max_tokens": 320,
+                "max_tokens": 500,
                 "temperature": 0.35,
             }
             headers = {
@@ -1181,6 +1185,62 @@ class FactDariApp:
         prompt_cost = (prompt_val / 1000.0) * float(getattr(self, 'ai_prompt_cost_per_1k', 0) or 0)
         completion_cost = (completion_val / 1000.0) * float(getattr(self, 'ai_completion_cost_per_1k', 0) or 0)
         return round(prompt_cost + completion_cost, 9)
+
+    def _render_markdown_to_text(self, text_widget, markdown_text):
+        """Render markdown text with formatting tags in a tkinter Text widget.
+
+        Supports: **bold**, *italic*, ### headers, and cleans up markdown syntax.
+        """
+        text_widget.config(state="normal")
+        text_widget.delete("1.0", "end")
+
+        # Configure text tags for formatting
+        font_family = self.NORMAL_FONT[0] if isinstance(self.NORMAL_FONT, tuple) else "Segoe UI"
+        font_size = self.NORMAL_FONT[1] if isinstance(self.NORMAL_FONT, tuple) and len(self.NORMAL_FONT) > 1 else 10
+
+        text_widget.tag_configure("bold", font=(font_family, font_size, "bold"))
+        text_widget.tag_configure("italic", font=(font_family, font_size, "italic"))
+        text_widget.tag_configure("header", font=(font_family, font_size + 2, "bold"))
+
+        lines = markdown_text.strip().split('\n')
+
+        for i, line in enumerate(lines):
+            # Handle headers (### Header)
+            header_match = re.match(r'^#{1,6}\s+(.+)$', line)
+            if header_match:
+                header_text = header_match.group(1).strip()
+                text_widget.insert("end", header_text, "header")
+                text_widget.insert("end", "\n\n")
+                continue
+
+            # Process inline formatting (**bold** and *italic*)
+            pos = 0
+            # Pattern for **bold** or *italic* (bold first to avoid conflicts)
+            pattern = re.compile(r'(\*\*(.+?)\*\*|\*(.+?)\*)')
+            last_end = 0
+
+            for match in pattern.finditer(line):
+                # Insert text before the match
+                if match.start() > last_end:
+                    text_widget.insert("end", line[last_end:match.start()])
+
+                # Check if bold (**) or italic (*)
+                if match.group(2):  # Bold match
+                    text_widget.insert("end", match.group(2), "bold")
+                elif match.group(3):  # Italic match
+                    text_widget.insert("end", match.group(3), "italic")
+
+                last_end = match.end()
+
+            # Insert remaining text after last match
+            if last_end < len(line):
+                text_widget.insert("end", line[last_end:])
+
+            # Add newline (double for paragraph breaks on empty lines)
+            if i < len(lines) - 1:
+                text_widget.insert("end", "\n")
+
+        text_widget.config(state="disabled")
 
     def _record_ai_usage(self, usage_info: dict, fact_id: int, session_id=None, reading_duration_sec: int = 0):
         """Persist AI usage row and roll totals into gamification profile.

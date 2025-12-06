@@ -1501,5 +1501,8 @@ def format_ai_token_distribution(data):
     }
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Use environment variable for debug mode (default: False for production safety)
+    import os
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
+    app.run(debug=debug_mode)
 
