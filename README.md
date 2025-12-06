@@ -15,6 +15,7 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - **Navigation Controls**: Easy navigation through facts with previous/next buttons
 - **Search & Filter**: Filter facts by category, favorites, or knowledge status
 - **Dark Theme**: Eye-friendly dark interface with customizable transparency
+- **AI Explanations**: Get AI-powered explanations for any fact using Together AI (DeepSeek model)
 
 ## Key Functionality
 
@@ -26,6 +27,7 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - Speech synthesis for audio learning
 - Automatic review logging
 - Click the level text to view achievements
+- AI-powered fact explanations with usage tracking
 
 ### Analytics Dashboard
 - Category distribution charts
@@ -35,6 +37,12 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - Favorite facts statistics
 - Knowledge progress tracking
 - Interactive charts with Chart.js
+- AI usage analytics (costs, tokens, latency)
+- Session duration and efficiency metrics
+- Category completion rates
+- Learning velocity tracking
+- Peak productivity analysis
+- Monthly progress charts
 
 ## Installation
 
@@ -45,7 +53,13 @@ A lightweight desktop widget application for displaying and managing facts, desi
    ```
 3. Set up the SQL Server database using the script in `database_setup/factdari_setup.sql`
 4. Configure your database connection in `config.py`
-5. Run the application:
+5. (Optional) Set your Together AI API key for AI explanations:
+   ```
+   # Windows (PowerShell)
+   $env:FACTDARI_TOGETHER_API_KEY = "your-api-key"
+   # Or set permanently via System Environment Variables
+   ```
+6. Run the application:
    ```
    python factdari.py
    ```
@@ -61,6 +75,28 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - **Mark Known**: Use the checkmark to track your knowledge progress
 - **Filter**: Use the category dropdown to filter facts
 - **Listen**: Click the speaker icon for text-to-speech
+- **AI Explain**: Click the AI icon (or press `x`) to get an AI-generated explanation of the current fact
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `h` | Go to Home page |
+| `r` | Start Reviewing |
+| `←` / `p` | Previous fact |
+| `→` / `n` / `Space` | Next fact |
+| `a` | Add new fact |
+| `e` | Edit current fact |
+| `d` | Delete current fact |
+| `f` | Toggle favorite |
+| `k` | Toggle known/easy |
+| `x` | AI explain fact |
+| `v` | Speak fact (TTS) |
+| `g` | Open Analytics |
+| `c` | Manage Categories |
+| `l` | View Achievements |
+| `i` | Show Shortcuts |
+| `s` | Set static position |
 
 ### Analytics
 - Run the analytics server:
@@ -139,10 +175,14 @@ Below are sample screenshots of the desktop widget and the analytics dashboard. 
   Progress over time: monthly reviews/unique facts/active days with a combined chart, and facts‑added timeline for growth.
 
 - Achievements
-  
+
   ![Analytics Achievements](Resources/application_images/Analytics_Page_Achievements.png)
-  
+
   Achievement catalog with unlock status, thresholds, rewards, and recent unlocks—mirrors in‑app achievements UI.
+
+- AI Usage
+
+  AI analytics dashboard showing total API calls, token usage (input/output), cost tracking over time, latency distribution, most explained facts, and recent usage log with model details.
 
 ### Startup Configuration
 For Windows users, use the VBS script to configure automatic startup:
@@ -156,18 +196,21 @@ util/RunFactDari.vbs
 - **Backend**: SQL Server database for fact storage
 - **Analytics**: Flask web server with Chart.js visualizations
 - **Speech**: pyttsx3 for text-to-speech functionality
+- **AI**: Together AI API with DeepSeek-V3.1 model for fact explanations
 - **Configuration**: Centralized config.py for all settings
 - **Gamification**: SQL-backed XP/levels, daily streak tracking, and achievements (see `gamification.py`)
 
 ## Database Schema
 
 - **Categories**: Manages categories for facts (active flag + metadata)
-- **Facts**: Stores fact content, category link, review counts, favorites/known flags
-- **ReviewSessions**: Tracks review sessions (start/end, duration, timeout, per-session action counters)
-- **ReviewLogs**: One row per view/action (per-view duration, optional session link, action snapshots)
-- **GamificationProfile**: Single-row profile for XP, level, streaks, and lifetime counters
-- **Achievements**: Catalog of unlockable achievements (code, threshold, reward)
-- **AchievementUnlocks**: Records which achievements have been unlocked
+- **Facts**: Stores fact content, category link, global view counts, and computed content key for duplicate prevention
+- **ProfileFacts**: Per-profile fact state (personal review count, favorite flag, known/easy flag, last viewed date)
+- **ReviewSessions**: Tracks review sessions (start/end, duration, timeout flag, per-session action counters)
+- **ReviewLogs**: One row per view/action (per-view duration, optional session link, action type, content snapshots for deleted facts)
+- **GamificationProfile**: Single-row profile for XP, level, streaks, lifetime counters, and AI usage totals
+- **Achievements**: Catalog of unlockable achievements (code, category, threshold, reward XP)
+- **AchievementUnlocks**: Records which achievements have been unlocked (with notification flag)
+- **AIUsageLogs**: Tracks AI explanation requests (tokens, cost, latency, status, model/provider, reading duration)
 
 ## Configuration
 
@@ -195,6 +238,12 @@ Edit `config.py` to customize:
 - `FACTDARI_XP_REVIEW_BONUS_CAP` (default: `5`): max time-based bonus
 - `FACTDARI_XP_FAVORITE` (default: `1`), `FACTDARI_XP_KNOWN` (default: `10`), `FACTDARI_XP_ADD` (default: `2`), `FACTDARI_XP_EDIT` (default: `1`), `FACTDARI_XP_DELETE` (default: `0`)
 - `FACTDARI_XP_DAILY_CHECKIN` (default: `2`): XP on daily streak check-in
+
+### AI Configuration
+- `FACTDARI_TOGETHER_API_KEY` or `TOGETHER_API_KEY` or `TOGETHER_API_TOKEN`: Your Together AI API key (required for AI explanations)
+- The AI feature uses the DeepSeek-V3.1 model via Together AI
+- Cost tracking is automatic based on token usage
+- All AI usage is logged to the `AIUsageLogs` table for analytics
 
 ### Leveling Configuration
 - `FACTDARI_LEVEL_TOTAL_XP_L100` (default: `1000000`): total XP to reach Level 100
