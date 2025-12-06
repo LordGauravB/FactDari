@@ -1321,7 +1321,7 @@
                 <td>${time}</td>
                 <td><span class="fact-text">${factContent}</span></td>
                 <td style="text-align: center;">${row.TotalTokens || 0}</td>
-                <td style="text-align: center;">$${cost.toFixed(4)}</td>
+                <td style="text-align: center;">$${cost.toFixed(7)}</td>
                 <td style="text-align: center;">${latency}ms</td>
                 <td style="text-align: center;"><span class="${statusClass}">${status}</span></td>
               `;
@@ -1793,7 +1793,7 @@
             title: {
               display: true,
               text: 'Duration (minutes)',
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
@@ -1908,7 +1908,7 @@
             title: {
               display: true,
               text: 'Timeout Count',
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
@@ -2194,7 +2194,7 @@
             title: {
               display: true,
               text: 'Reviews / Facts',
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             grid: {
               color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
@@ -2346,7 +2346,7 @@
             title: {
               display: true,
               text: `Cost (${currencySymbol})`,
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b',
@@ -2456,7 +2456,7 @@
             title: {
               display: true,
               text: `Cost (${currencySymbol})`,
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b',
@@ -2558,7 +2558,7 @@
         <td>${time}</td>
         <td>${displayText}</td>
         <td style="text-align: center;">${row.TotalTokens || 0}</td>
-        <td style="text-align: center;">${currencySymbol}${cost.toFixed(4)}</td>
+        <td style="text-align: center;">${currencySymbol}${cost.toFixed(7)}</td>
         <td style="text-align: center;">${latency}ms</td>
         <td style="text-align: center;"><span class="${statusClass}">${status}</span></td>
       `;
