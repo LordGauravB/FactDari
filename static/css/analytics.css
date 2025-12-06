@@ -2077,6 +2077,14 @@ article[title="AI success rate"] .metric-icon::before {
   margin-top: 4px;
 }
 
+/* Achievement count badge */
+.achievements-count {
+  font-size: 0.75em;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
 /* Achievement filter tabs - Enhanced */
 .achievement-filter-tabs {
   display: flex;

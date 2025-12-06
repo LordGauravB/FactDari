@@ -737,6 +737,17 @@
     allAchievementsData = Array.isArray(rows) ? rows.slice() : [];
     currentAchievementFilter = filter;
 
+    // Calculate unlocked/locked counts
+    const unlockedCount = allAchievementsData.filter(r => r.Unlocked).length;
+    const lockedCount = allAchievementsData.filter(r => !r.Unlocked).length;
+    const totalCount = allAchievementsData.length;
+
+    // Update the count display
+    const countEl = qs('#achievements-count');
+    if (countEl) {
+      countEl.textContent = `(${unlockedCount}/${totalCount} Unlocked)`;
+    }
+
     // Sort: unlocked first, then by name
     allAchievementsData.sort((a, b) => {
       if (a.Unlocked !== b.Unlocked) {
