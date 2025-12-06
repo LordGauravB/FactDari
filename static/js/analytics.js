@@ -1,4 +1,4 @@
-// Enhanced FactDari Analytics JavaScript
+﻿// Enhanced FactDari Analytics JavaScript
 (() => {
   'use strict';
   
@@ -1314,7 +1314,7 @@
             table.appendChild(tbody);
 
           } else if (key === 'ai-usage-log-table') {
-            headerRow.innerHTML = '<th>Time</th><th>Fact</th><th>Tokens</th><th>Cost</th><th>Latency</th><th>Status</th>';
+            headerRow.innerHTML = '<th>Time</th><th>Fact</th><th>Tokens</th><th>Cost</th><th>Latency</th><th>Status</th><th>Model</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
 
@@ -1327,6 +1327,7 @@
               const latency = row.LatencyMs || 0;
               const status = row.Status || 'UNKNOWN';
               const statusClass = status === 'SUCCESS' ? 'status-success' : 'status-failed';
+              const model = row.Model || '--';
 
               tr.innerHTML = `
                 <td>${time}</td>
@@ -1335,6 +1336,7 @@
                 <td style="text-align: center;">$${cost.toFixed(7)}</td>
                 <td style="text-align: center;">${latency}ms</td>
                 <td style="text-align: center;"><span class="${statusClass}">${status}</span></td>
+                <td style="text-align: center;">${model}</td>
               `;
               tbody.appendChild(tr);
             });
@@ -2565,6 +2567,8 @@
       const status = row.Status || 'UNKNOWN';
       const statusClass = status === 'SUCCESS' ? 'status-success' : 'status-failed';
 
+      const model = row.Model || '--';
+
       tr.innerHTML = `
         <td>${time}</td>
         <td>${displayText}</td>
@@ -2572,6 +2576,7 @@
         <td style="text-align: center;">${currencySymbol}${cost.toFixed(7)}</td>
         <td style="text-align: center;">${latency}ms</td>
         <td style="text-align: center;"><span class="${statusClass}">${status}</span></td>
+        <td style="text-align: center;">${model}</td>
       `;
       tbody.appendChild(tr);
     });

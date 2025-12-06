@@ -595,7 +595,8 @@ def chart_data():
                 ai.TotalTokens,
                 ai.Cost,
                 ai.LatencyMs,
-                ai.Status
+                ai.Status,
+                ai.ModelName as Model
             FROM AIUsageLogs ai
             LEFT JOIN Facts f ON ai.FactID = f.FactID
             WHERE ai.ProfileID = ?
