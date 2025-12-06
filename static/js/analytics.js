@@ -168,12 +168,6 @@
     setText('#active-categories', totalCategories);
     setText('#favorites-count', favoritesCount);
     setText('#known-facts-count', knownFactsCount);
-    // Update navbar gamification stats
-    setText('#nav-level-value', `Lv ${level}`);
-    const gated = (level < 100) && (xpToNext <= 0);
-    const xpText = gated ? `${xp} (achievements required)` : (xpToNext > 0 ? `${xp} (${xpToNext}->)` : `${xp} (MAX)`);
-    setText('#nav-xp-value', xpText);
-    setText('#nav-achievements-count', `${ach.unlocked || 0}/${ach.total || 0}`);
   }
 
   function destroyChart(key) { if (charts[key]) { charts[key].destroy(); charts[key] = null; } }
@@ -1069,6 +1063,17 @@
         renderAIUsageTrend('ai_usage_trend', 'ai-usage-trend', data.ai_cost_timeline);
         renderAIMostExplainedTable(data.ai_most_explained_facts);
         renderAIRecentUsageTable(data.ai_recent_usage);
+        renderAIProviderComparisonTable(data.ai_provider_comparison);
+
+        // New analytics charts
+        renderCategoryCompletionRate('category_completion_rate', 'category-completion-rate', data.category_completion_rate);
+        renderLearningVelocity('learning_velocity', 'learning-velocity', data.learning_velocity);
+        renderPeakProductivity('peak_productivity', 'peak-productivity', data.peak_productivity_times);
+        pieChart('action_breakdown', 'action-breakdown', data.action_breakdown);
+
+        // Update XP progress bar and lifetime stats
+        updateXPProgressBar(data.gamification);
+        updateLifetimeStats(data.lifetime_stats);
       }, 100);
       
       hideLoadingState();
@@ -1154,7 +1159,9 @@
         // Handle tables and heatmap differently
         if (key === 'most-reviewed-table' || key === 'least-reviewed-table' ||
             key === 'favorite-facts-table' || key === 'known-facts-table' ||
-            key === 'ai-most-explained-table' || key === 'ai-usage-log-table') {
+            key === 'ai-most-explained-table' || key === 'ai-usage-log-table' ||
+            key === 'ai-provider-comparison' || key === 'session-actions-table' ||
+            key === 'achievements-table') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
           
@@ -1341,6 +1348,42 @@
               tbody.appendChild(tr);
             });
             table.appendChild(tbody);
+
+          } else if (key === 'ai-provider-comparison') {
+            headerRow.innerHTML = '<th>Provider</th><th>Calls</th><th>Total Cost</th><th>Avg Cost</th><th>Avg Latency</th><th>Success Rate</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            const providerData = qs('#ai-provider-comparison-table tbody');
+            if (providerData) {
+              tbody.innerHTML = providerData.innerHTML;
+            }
+            table.appendChild(tbody);
+
+          } else if (key === 'session-actions-table') {
+            headerRow.innerHTML = '<th>Time</th><th>Fact</th><th>Action</th><th>Category</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            const actionsData = qs('#session-actions-table tbody');
+            if (actionsData) {
+              tbody.innerHTML = actionsData.innerHTML;
+            }
+            table.appendChild(tbody);
+
+          } else if (key === 'achievements-table') {
+            headerRow.innerHTML = '<th>When</th><th>Achievement</th><th>Reward</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            const achievementsData = qs('#achievements-table tbody');
+            if (achievementsData) {
+              tbody.innerHTML = achievementsData.innerHTML;
+            }
+            table.appendChild(tbody);
           }
 
           tableContainer.appendChild(table);
@@ -1365,6 +1408,12 @@
             title.textContent = `Most Explained Facts by AI (${aiMostExplainedData.length} total)`;
           } else if (key === 'ai-usage-log-table') {
             title.textContent = `Recent AI Usage Log (${aiRecentUsageData.length} entries)`;
+          } else if (key === 'ai-provider-comparison') {
+            title.textContent = 'AI Provider Comparison';
+          } else if (key === 'session-actions-table') {
+            title.textContent = 'Recent Session Actions';
+          } else if (key === 'achievements-table') {
+            title.textContent = 'Recent Achievements';
           }
           modalChartContainer.insertBefore(title, tableContainer);
           
@@ -1443,7 +1492,11 @@
             'ai-token-distribution': 'ai_token_distribution',
             'ai-usage-by-category': 'ai_usage_by_category',
             'ai-latency-distribution': 'ai_latency_distribution',
-            'ai-usage-trend': 'ai_usage_trend'
+            'ai-usage-trend': 'ai_usage_trend',
+            'category-completion-rate': 'category_completion_rate',
+            'learning-velocity': 'learning_velocity',
+            'peak-productivity': 'peak_productivity',
+            'action-breakdown': 'action_breakdown'
           };
           const chartKey = idMap[key];
           if (chartKey) {
@@ -2580,6 +2633,290 @@
       `;
       tbody.appendChild(tr);
     });
+  }
+
+  // AI Provider Comparison Table
+  function renderAIProviderComparisonTable(data) {
+    const tbody = qs('#ai-provider-comparison-table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const currencySymbol = currentCurrency === 'GBP' ? '£' : '$';
+
+    (data || []).forEach(row => {
+      const tr = document.createElement('tr');
+      const totalCostUSD = parseFloat(row.TotalCost || 0);
+      const avgCostUSD = parseFloat(row.AvgCost || 0);
+      const totalCost = convertCurrency(totalCostUSD, currentCurrency);
+      const avgCost = convertCurrency(avgCostUSD, currentCurrency);
+      const successCount = parseInt(row.SuccessCount || 0);
+      const failedCount = parseInt(row.FailedCount || 0);
+      const totalCalls = successCount + failedCount;
+      const successRate = totalCalls > 0 ? ((successCount / totalCalls) * 100).toFixed(1) : '0.0';
+
+      tr.innerHTML = `
+        <td><strong>${row.Provider || 'Unknown'}</strong></td>
+        <td style="text-align: center;">${row.CallCount || 0}</td>
+        <td style="text-align: center;">${currencySymbol}${totalCost.toFixed(4)}</td>
+        <td style="text-align: center;">${currencySymbol}${avgCost.toFixed(6)}</td>
+        <td style="text-align: center;">${Math.round(row.AvgLatency || 0)}ms</td>
+        <td style="text-align: center;"><span class="${parseFloat(successRate) >= 95 ? 'status-success' : 'status-failed'}">${successRate}%</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Category Completion Rate Chart
+  function renderCategoryCompletionRate(key, canvasId, data) {
+    const ctx = qs(`#${canvasId}`)?.getContext('2d');
+    if (!ctx || !data || data.length === 0) return;
+    destroyChart(key);
+
+    const labels = data.map(d => d.CategoryName || 'Unknown');
+    const completionRates = data.map(d => parseFloat(d.CompletionRate || 0));
+    const knownCounts = data.map(d => parseInt(d.KnownFacts || 0));
+    const totalCounts = data.map(d => parseInt(d.TotalFacts || 0));
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Completion Rate (%)',
+          data: completionRates,
+          backgroundColor: completionRates.map(rate => {
+            if (rate >= 75) return isDarkMode ? '#34d399' : '#10b981';
+            if (rate >= 50) return isDarkMode ? '#fbbf24' : '#f59e0b';
+            if (rate >= 25) return isDarkMode ? '#fb923c' : '#f97316';
+            return isDarkMode ? '#f87171' : '#ef4444';
+          }),
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            beginAtZero: true,
+            max: 100,
+            grid: { color: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)' },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b', callback: v => v + '%' },
+            title: { display: true, text: 'Completion %', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b' },
+            title: { display: true, text: 'Category', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                const idx = context.dataIndex;
+                return `${completionRates[idx].toFixed(1)}% (${knownCounts[idx]}/${totalCounts[idx]} facts)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Learning Velocity Chart
+  function renderLearningVelocity(key, canvasId, data) {
+    const ctx = qs(`#${canvasId}`)?.getContext('2d');
+    if (!ctx || !data || data.length === 0) return;
+    destroyChart(key);
+
+    const labels = data.map(d => d.CategoryName || 'Unknown');
+    const avgDays = data.map(d => parseInt(d.AvgDaysToKnow || 0));
+    const minDays = data.map(d => parseInt(d.MinDaysToKnow || 0));
+    const maxDays = data.map(d => parseInt(d.MaxDaysToKnow || 0));
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Avg Days',
+            data: avgDays,
+            backgroundColor: isDarkMode ? '#60a5fa' : '#3b82f6',
+            borderRadius: 6,
+          },
+          {
+            label: 'Min Days',
+            data: minDays,
+            backgroundColor: isDarkMode ? '#34d399' : '#10b981',
+            borderRadius: 6,
+          },
+          {
+            label: 'Max Days',
+            data: maxDays,
+            backgroundColor: isDarkMode ? '#f87171' : '#ef4444',
+            borderRadius: 6,
+          }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)' },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b' },
+            title: { display: true, text: 'Days', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b' },
+            title: { display: true, text: 'Category', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: isDarkMode ? '#cbd5e1' : '#475569', padding: 15 }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1,
+          }
+        }
+      }
+    });
+  }
+
+  // Peak Productivity Chart
+  function renderPeakProductivity(key, canvasId, data) {
+    const ctx = qs(`#${canvasId}`)?.getContext('2d');
+    if (!ctx || !data || data.length === 0) return;
+    destroyChart(key);
+
+    // Create full 24-hour array
+    const hourlyData = new Array(24).fill(0);
+    data.forEach(d => {
+      const hour = parseInt(d.Hour || 0);
+      hourlyData[hour] = parseFloat(d.AvgEfficiency || 0);
+    });
+
+    const labels = Array.from({length: 24}, (_, i) => {
+      const h = i % 12 || 12;
+      const ampm = i < 12 ? 'AM' : 'PM';
+      return `${h}${ampm}`;
+    });
+
+    // Find peak hours
+    const maxEfficiency = Math.max(...hourlyData);
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Facts/Minute',
+          data: hourlyData,
+          backgroundColor: hourlyData.map(v => {
+            if (v === maxEfficiency && v > 0) return isDarkMode ? '#34d399' : '#10b981';
+            if (v >= maxEfficiency * 0.75) return isDarkMode ? '#60a5fa' : '#3b82f6';
+            if (v > 0) return isDarkMode ? '#94a3b8' : '#cbd5e1';
+            return isDarkMode ? '#374151' : '#e5e7eb';
+          }),
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b', maxRotation: 45, minRotation: 45 },
+            title: { display: true, text: 'Hour of Day', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)' },
+            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b' },
+            title: { display: true, text: 'Facts/Min', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                return `Efficiency: ${context.parsed.y.toFixed(2)} facts/min`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Update XP Progress Bar
+  function updateXPProgressBar(gamification) {
+    if (!gamification) return;
+
+    const level = gamification.level || 1;
+    const xp = gamification.xp || 0;
+    const xpIntoLevel = gamification.xp_into_level || 0;
+    const xpToNext = gamification.xp_to_next || 0;
+    const nextLevelReq = gamification.next_level_requirement || 100;
+    const maxXP = 1000000;
+
+    const progressPercent = nextLevelReq > 0 ? Math.min(100, (xpIntoLevel / nextLevelReq) * 100) : 100;
+
+    setText('#xp-level-badge', `Lv ${level}`);
+    setText('#xp-current', xpIntoLevel.toLocaleString());
+    setText('#xp-required', nextLevelReq.toLocaleString());
+    setText('#xp-total', `${xp.toLocaleString()} / ${maxXP.toLocaleString()}`);
+
+    const progressBar = qs('#xp-progress-bar');
+    if (progressBar) {
+      progressBar.style.width = `${progressPercent}%`;
+    }
+
+    if (level >= 100) {
+      setText('#xp-to-next', 'MAX LEVEL!');
+    } else if (xpToNext <= 0) {
+      setText('#xp-to-next', 'Unlock more achievements to level up');
+    } else {
+      setText('#xp-to-next', `${xpToNext.toLocaleString()} XP to next level`);
+    }
+  }
+
+  // Update Lifetime Stats
+  function updateLifetimeStats(stats) {
+    if (!stats) return;
+
+    setText('#lifetime-adds', (stats.total_adds || 0).toLocaleString());
+    setText('#lifetime-edits', (stats.total_edits || 0).toLocaleString());
+    setText('#lifetime-deletes', (stats.total_deletes || 0).toLocaleString());
+    setText('#lifetime-reviews', (stats.total_reviews || 0).toLocaleString());
+    setText('#current-streak-value', (stats.current_streak || 0).toLocaleString());
+    setText('#longest-streak-value', (stats.longest_streak || 0).toLocaleString());
   }
 
   // Add CSS for animations

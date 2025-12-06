@@ -601,6 +601,98 @@ def chart_data():
             LEFT JOIN Facts f ON ai.FactID = f.FactID
             WHERE ai.ProfileID = ?
             ORDER BY ai.CreatedAt DESC
+        """, (profile_id,)),
+
+        # Category Completion Rate - % of facts marked as "known" per category
+        'categoryCompletionRate': fetch_query("""
+            SELECT
+                c.CategoryName,
+                COUNT(f.FactID) as TotalFacts,
+                SUM(CASE WHEN pf.IsEasy = 1 THEN 1 ELSE 0 END) as KnownFacts,
+                CASE
+                    WHEN COUNT(f.FactID) > 0
+                    THEN CAST(SUM(CASE WHEN pf.IsEasy = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(f.FactID) as DECIMAL(5,2))
+                    ELSE 0
+                END as CompletionRate
+            FROM Categories c
+            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
+            LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
+            GROUP BY c.CategoryName
+            HAVING COUNT(f.FactID) > 0
+            ORDER BY CompletionRate DESC
+        """, (profile_id,)),
+
+        # Learning Velocity - Time from fact creation to first marked as known
+        'learningVelocity': fetch_query("""
+            SELECT
+                c.CategoryName,
+                AVG(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) as AvgDaysToKnow,
+                MIN(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) as MinDaysToKnow,
+                MAX(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) as MaxDaysToKnow,
+                COUNT(*) as KnownFactsCount
+            FROM Facts f
+            JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE pf.IsEasy = 1 AND pf.LastViewedByUser IS NOT NULL
+            GROUP BY c.CategoryName
+            HAVING COUNT(*) > 0
+            ORDER BY AVG(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) ASC
+        """, (profile_id,)),
+
+        # Peak Productivity Times - Session efficiency by hour of day
+        'peakProductivityTimes': fetch_query("""
+            SELECT
+                DATEPART(hour, s.StartTime) as Hour,
+                COUNT(*) as SessionCount,
+                AVG(s.DurationSeconds) as AvgDuration,
+                AVG(CAST(sub.UniqueFactsReviewed as FLOAT)) as AvgFactsReviewed,
+                CASE
+                    WHEN AVG(s.DurationSeconds) > 0
+                    THEN CAST(AVG(CAST(sub.UniqueFactsReviewed as FLOAT)) * 60.0 / AVG(s.DurationSeconds) as DECIMAL(10,2))
+                    ELSE 0
+                END as AvgEfficiency
+            FROM ReviewSessions s
+            INNER JOIN (
+                SELECT
+                    rl.SessionID,
+                    COUNT(DISTINCT rl.FactID) as UniqueFactsReviewed
+                FROM ReviewLogs rl
+                WHERE rl.Action IS NULL OR rl.Action = 'view'
+                GROUP BY rl.SessionID
+            ) sub ON s.SessionID = sub.SessionID
+            WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
+              AND s.ProfileID = ?
+            GROUP BY DATEPART(hour, s.StartTime)
+            ORDER BY DATEPART(hour, s.StartTime)
+        """, (profile_id,)),
+
+        # Action Breakdown - Distribution of action types
+        'actionBreakdown': fetch_query("""
+            SELECT
+                COALESCE(rl.Action, 'view') as ActionType,
+                COUNT(*) as ActionCount
+            FROM ReviewLogs rl
+            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            WHERE rs.ProfileID = ? OR rl.SessionID IS NULL
+            GROUP BY COALESCE(rl.Action, 'view')
+            ORDER BY COUNT(*) DESC
+        """, (profile_id,)),
+
+        # AI Provider Comparison - Compare costs/latency by provider
+        'aiProviderComparison': fetch_query("""
+            SELECT
+                COALESCE(Provider, 'Unknown') as Provider,
+                COUNT(*) as CallCount,
+                COALESCE(SUM(Cost), 0) as TotalCost,
+                COALESCE(AVG(Cost), 0) as AvgCost,
+                COALESCE(AVG(LatencyMs), 0) as AvgLatency,
+                COALESCE(SUM(TotalTokens), 0) as TotalTokens,
+                SUM(CASE WHEN Status = 'SUCCESS' THEN 1 ELSE 0 END) as SuccessCount,
+                SUM(CASE WHEN Status = 'FAILED' THEN 1 ELSE 0 END) as FailedCount
+            FROM AIUsageLogs
+            WHERE ProfileID = ?
+            GROUP BY Provider
+            ORDER BY COUNT(*) DESC
         """, (profile_id,))
     }
 
@@ -811,7 +903,22 @@ def chart_data():
         'ai_usage_by_category': format_pie_chart(data['aiUsageByCategory'], 'CategoryName', 'CallCount'),
         'ai_latency_distribution': format_pie_chart(data['aiLatencyDistribution'], 'LatencyRange', 'CallCount'),
         'ai_most_explained_facts': format_table_data(data['aiMostExplainedFacts']),
-        'ai_recent_usage': format_table_data(data['aiRecentUsage'])
+        'ai_recent_usage': format_table_data(data['aiRecentUsage']),
+        'ai_provider_comparison': format_table_data(data['aiProviderComparison']),
+        # New analytics
+        'category_completion_rate': format_table_data(data['categoryCompletionRate']),
+        'learning_velocity': format_table_data(data['learningVelocity']),
+        'peak_productivity_times': format_table_data(data['peakProductivityTimes']),
+        'action_breakdown': format_pie_chart(data['actionBreakdown'], 'ActionType', 'ActionCount'),
+        # Lifetime stats from profile
+        'lifetime_stats': {
+            'total_adds': int((profile or {}).get('TotalAdds', 0) or 0),
+            'total_edits': int((profile or {}).get('TotalEdits', 0) or 0),
+            'total_deletes': int((profile or {}).get('TotalDeletes', 0) or 0),
+            'total_reviews': int((profile or {}).get('TotalReviews', 0) or 0),
+            'current_streak': int((profile or {}).get('CurrentStreak', 0) or 0),
+            'longest_streak': int((profile or {}).get('LongestStreak', 0) or 0),
+        }
     }
 
     # If all=true, also include ALL facts (including those with 0 reviews)

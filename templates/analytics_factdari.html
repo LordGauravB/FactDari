@@ -46,23 +46,6 @@
                         <span class="brand-analytics">Analytics</span>
                     </h1>
                 </div>
-                <div class="gamification-stats">
-                    <div class="stat-item" title="Your current level">
-                        <span class="stat-icon">🏆</span>
-                        <span class="stat-value" id="nav-level-value">Lv 1</span>
-                        <span class="stat-label">Level</span>
-                    </div>
-                    <div class="stat-item" title="XP and progress to next level">
-                        <span class="stat-icon">⚡</span>
-                        <span class="stat-value" id="nav-xp-value">6 (94→)</span>
-                        <span class="stat-label">XP (to next)</span>
-                    </div>
-                    <div class="stat-item" title="Achievements unlocked">
-                        <span class="stat-icon">🥇</span>
-                        <span class="stat-value" id="nav-achievements-count">0/80</span>
-                        <span class="stat-label">Achievements</span>
-                    </div>
-                </div>
                 <div class="nav-actions">
                     <!-- Currency Toggle -->
                     <button id="currency-toggle" class="currency-toggle" title="Toggle between USD and GBP (for AI costs)">
@@ -96,6 +79,33 @@
 
         <!-- Main Container -->
         <div class="container">
+            <!-- XP Progress Bar Section -->
+            <section class="xp-progress-section" aria-label="XP Progress">
+                <div class="xp-progress-container">
+                    <div class="xp-progress-header">
+                        <div class="xp-level-info">
+                            <span class="xp-level-badge" id="xp-level-badge">Lv 1</span>
+                            <span class="xp-level-text">Level Progress</span>
+                        </div>
+                        <div class="xp-header-right">
+                            <div class="xp-total" title="Total XP earned (Max: 1,000,000)">
+                                <span class="xp-total-label">Total XP:</span>
+                                <span class="xp-total-value" id="xp-total">0</span>
+                            </div>
+                            <div class="xp-numbers">
+                                <span id="xp-current">0</span> / <span id="xp-required">100</span> XP
+                            </div>
+                        </div>
+                    </div>
+                    <div class="xp-progress-bar-wrapper">
+                        <div class="xp-progress-bar" id="xp-progress-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="xp-progress-footer">
+                        <span id="xp-to-next">100 XP to next level</span>
+                    </div>
+                </div>
+            </section>
+
             <!-- Key Metrics Section -->
             <section class="metrics-section" aria-label="Key metrics">
                 <div class="metrics-grid">
@@ -144,6 +154,58 @@
                         <div class="metric-content">
                             <div class="metric-value" id="known-facts-count">0</div>
                             <div class="metric-label">Known Facts</div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- Lifetime Stats Section -->
+            <section class="lifetime-stats-section" aria-label="Lifetime statistics">
+                <h3 class="section-title">Lifetime Statistics</h3>
+                <div class="lifetime-stats-grid">
+                    <article class="lifetime-stat-card" title="Total facts added">
+                        <div class="lifetime-stat-icon">➕</div>
+                        <div class="lifetime-stat-content">
+                            <div class="lifetime-stat-value" id="lifetime-adds">0</div>
+                            <div class="lifetime-stat-label">Facts Added</div>
+                        </div>
+                    </article>
+                    <article class="lifetime-stat-card" title="Total facts edited">
+                        <div class="lifetime-stat-icon">✏️</div>
+                        <div class="lifetime-stat-content">
+                            <div class="lifetime-stat-value" id="lifetime-edits">0</div>
+                            <div class="lifetime-stat-label">Facts Edited</div>
+                        </div>
+                    </article>
+                    <article class="lifetime-stat-card" title="Total facts deleted">
+                        <div class="lifetime-stat-icon">🗑️</div>
+                        <div class="lifetime-stat-content">
+                            <div class="lifetime-stat-value" id="lifetime-deletes">0</div>
+                            <div class="lifetime-stat-label">Facts Deleted</div>
+                        </div>
+                    </article>
+                    <article class="lifetime-stat-card" title="Total reviews completed">
+                        <div class="lifetime-stat-icon">📖</div>
+                        <div class="lifetime-stat-content">
+                            <div class="lifetime-stat-value" id="lifetime-reviews">0</div>
+                            <div class="lifetime-stat-label">Total Reviews</div>
+                        </div>
+                    </article>
+                    <article class="lifetime-stat-card streak-card" title="Current vs Longest streak">
+                        <div class="lifetime-stat-icon">🔥</div>
+                        <div class="lifetime-stat-content">
+                            <div class="streak-comparison">
+                                <div class="streak-item">
+                                    <span class="streak-label">Curr</span>
+                                    <span class="streak-value current" id="current-streak-value">0</span>
+                                </div>
+                                <div class="streak-divider">/</div>
+                                <div class="streak-item">
+                                    <span class="streak-label">Best</span>
+                                    <span class="streak-value best" id="longest-streak-value">0</span>
+                                </div>
+                            </div>
+                            <div class="lifetime-stat-label">Day Streak</div>
                         </div>
                     </article>
                 </div>
@@ -418,6 +480,86 @@
                             </div>
                             <div class="chart-description">
                                 Monthly reviews, unique facts, and active days (last 6 months)
+                            </div>
+                        </article>
+
+                        <!-- Category Completion Rate -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Category Completion Rate</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="category-completion-rate" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="category-completion-rate"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Percentage of facts marked as "known" per category
+                            </div>
+                        </article>
+
+                        <!-- Learning Velocity -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Learning Velocity</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="learning-velocity" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="learning-velocity"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Average days from fact creation to marked as "known" by category
+                            </div>
+                        </article>
+
+                        <!-- Action Breakdown -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Action Breakdown</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="action-breakdown" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="action-breakdown"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Distribution of actions (view, add, edit, delete)
+                            </div>
+                        </article>
+
+                        <!-- Peak Productivity Times -->
+                        <article class="chart-card">
+                            <header class="chart-header">
+                                <h3>Peak Productivity Hours</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="peak-productivity" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container">
+                                <canvas id="peak-productivity"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Session efficiency (facts/min) by hour of day
                             </div>
                         </article>
 
@@ -880,6 +1022,13 @@
                         <article class="chart-card span-2">
                             <header class="chart-header">
                                 <h3>Recent Session Actions</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="session-actions-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </header>
                             <div class="chart-container table-chart">
                                 <div class="table-container">
@@ -910,6 +1059,13 @@
                         <article class="chart-card span-2">
                             <header class="chart-header">
                                 <h3>Recent Achievements</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="achievements-table" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </header>
                             <div class="chart-container table-chart">
                                 <div class="table-container">
@@ -1130,6 +1286,40 @@
                             </div>
                             <div class="chart-description">
                                 Distribution of API response times
+                            </div>
+                        </article>
+
+                        <!-- AI Provider Comparison -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>AI Provider Comparison</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="ai-provider-comparison" aria-label="Expand table">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="ai-provider-comparison-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Provider</th>
+                                                <th>Calls</th>
+                                                <th>Total Cost</th>
+                                                <th>Avg Cost</th>
+                                                <th>Avg Latency</th>
+                                                <th>Success Rate</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="chart-description">
+                                Compare costs and performance across AI providers
                             </div>
                         </article>
 

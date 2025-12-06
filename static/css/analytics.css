@@ -280,62 +280,6 @@ body {
   gap: 20px;
 }
 
-/* Gamification Stats in Navbar - Enhanced */
-.gamification-stats {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  background: var(--bg-secondary);
-  border-radius: var(--radius);
-  border: 1px solid var(--border-light);
-}
-
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: var(--card);
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  transition: var(--transition-fast);
-  cursor: default;
-}
-
-.stat-item:hover {
-  border-color: var(--primary-light);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
-}
-
-.stat-icon {
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-}
-
-.stat-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.3px;
-}
-
-.stat-label {
-  font-size: 10px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-left: 2px;
-  font-weight: 500;
-}
-
 .auto-refresh-timer {
   font-size: 13px;
   color: var(--text-secondary);
@@ -587,6 +531,310 @@ body {
   font-size: 13px;
   margin-top: 4px;
   letter-spacing: 0.2px;
+}
+
+/* XP Progress Bar Section */
+.xp-progress-section {
+  margin: 24px 0;
+}
+
+.xp-progress-container {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.xp-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.xp-level-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.xp-level-badge {
+  background: var(--primary-gradient);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.xp-level-text {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.xp-header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.xp-total {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+
+.xp-total-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.xp-total-value {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--success);
+  font-variant-numeric: tabular-nums;
+}
+
+.xp-numbers {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.xp-numbers span {
+  color: var(--primary);
+}
+
+.xp-progress-bar-wrapper {
+  height: 12px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+}
+
+.xp-progress-bar {
+  height: 100%;
+  background: var(--primary-gradient);
+  border-radius: 6px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.xp-progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.xp-progress-footer {
+  margin-top: 10px;
+  text-align: right;
+}
+
+.xp-progress-footer span {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Lifetime Stats Section */
+.lifetime-stats-section {
+  margin: 24px 0;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lifetime-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+}
+
+.lifetime-stat-card {
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
+  transition: var(--transition);
+}
+
+.lifetime-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.lifetime-stat-icon {
+  font-size: 24px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.lifetime-stat-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.lifetime-stat-value {
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.lifetime-stat-label {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* Streak comparison card */
+.streak-card {
+  background: linear-gradient(135deg, var(--card), var(--bg-secondary));
+}
+
+.streak-comparison {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.streak-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.streak-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.streak-value {
+  font-weight: 700;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.streak-value.current {
+  color: var(--warning);
+}
+
+.streak-value.best {
+  color: var(--success);
+}
+
+.streak-divider {
+  font-size: 18px;
+  color: var(--border);
+  font-weight: 300;
+}
+
+/* Responsive lifetime stats */
+@media (max-width: 1200px) {
+  .lifetime-stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .lifetime-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .xp-progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .xp-header-right {
+    align-self: stretch;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 540px) {
+  .xp-header-right {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .xp-total {
+    align-self: stretch;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 480px) {
+  .lifetime-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* AI Provider Comparison Table */
+#ai-provider-comparison-table th:first-child,
+#ai-provider-comparison-table td:first-child {
+  width: 25%;
+}
+
+#ai-provider-comparison-table th:nth-child(2),
+#ai-provider-comparison-table td:nth-child(2),
+#ai-provider-comparison-table th:nth-child(3),
+#ai-provider-comparison-table td:nth-child(3),
+#ai-provider-comparison-table th:nth-child(4),
+#ai-provider-comparison-table td:nth-child(4),
+#ai-provider-comparison-table th:nth-child(5),
+#ai-provider-comparison-table td:nth-child(5),
+#ai-provider-comparison-table th:nth-child(6),
+#ai-provider-comparison-table td:nth-child(6) {
+  width: 15%;
+  text-align: center;
 }
 
 /* Tabs - Modern segmented control style */
@@ -1217,10 +1465,6 @@ body {
   .metrics-grid {
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
-  }
-
-  .gamification-stats {
-    display: none;
   }
 }
 
