@@ -18,6 +18,10 @@
   // AI usage datasets
   let aiMostExplainedData = [];
   let aiRecentUsageData = [];
+  // Currency settings
+  let currentCurrency = 'USD';
+  const USD_TO_GBP_RATE = 0.79; // Approximate conversion rate
+  let cachedAIData = null; // Store AI data for currency conversion
   // Current datasets and sort state for main tables
   let currentMostData = [];
   let currentLeastData = [];
@@ -2237,14 +2241,30 @@
     });
   }
   
+  // Currency conversion helper
+  function convertCurrency(amountUSD, toCurrency) {
+    if (toCurrency === 'GBP') {
+      return amountUSD * USD_TO_GBP_RATE;
+    }
+    return amountUSD;
+  }
+
+  function formatCurrency(amount, currency) {
+    const symbol = currency === 'GBP' ? '£' : '$';
+    return `${symbol}${amount.toFixed(4)}`;
+  }
+
   // AI Usage Analytics Functions
   function renderAIUsageMetrics(summary) {
     if (!summary) return;
 
+    // Cache the summary for currency conversion
+    cachedAIData = { ...cachedAIData, summary };
+
     const totalCalls = summary.TotalCalls || 0;
     const totalTokens = summary.TotalTokens || 0;
-    const totalCost = parseFloat(summary.TotalCost || 0);
-    const avgCost = parseFloat(summary.AvgCost || 0);
+    const totalCostUSD = parseFloat(summary.TotalCost || 0);
+    const avgCostUSD = parseFloat(summary.AvgCost || 0);
     const avgLatency = summary.AvgLatency || 0;
     const successCount = summary.SuccessCount || 0;
     const failedCount = summary.FailedCount || 0;
@@ -2253,10 +2273,14 @@
     const minReadingTime = summary.MinReadingTime || 0;
     const maxReadingTime = summary.MaxReadingTime || 0;
 
+    // Convert costs based on current currency
+    const totalCost = convertCurrency(totalCostUSD, currentCurrency);
+    const avgCost = convertCurrency(avgCostUSD, currentCurrency);
+
     setText('#total-ai-calls', totalCalls.toLocaleString());
     setText('#total-ai-tokens', totalTokens.toLocaleString());
-    setText('#total-ai-cost', `$${totalCost.toFixed(4)}`);
-    setText('#avg-ai-cost', `$${avgCost.toFixed(4)}`);
+    setText('#total-ai-cost', formatCurrency(totalCost, currentCurrency));
+    setText('#avg-ai-cost', formatCurrency(avgCost, currentCurrency));
     setText('#avg-ai-latency', avgLatency > 0 ? `${Math.round(avgLatency)}ms` : '--');
     setText('#ai-success-rate', `${successRate}%`);
 
@@ -2271,13 +2295,27 @@
     if (!canvas || !payload) return;
     const ctx = canvas.getContext('2d');
 
+    // Cache payload for currency re-render
+    cachedAIData = { ...cachedAIData, costTimeline: payload };
+
     if (charts[key]) {
       charts[key].destroy();
     }
 
+    // Convert data based on current currency
+    const currencySymbol = currentCurrency === 'GBP' ? '£' : '$';
+    const convertedPayload = {
+      ...payload,
+      datasets: payload.datasets.map(ds => ({
+        ...ds,
+        data: ds.data.map(v => convertCurrency(v, currentCurrency)),
+        label: ds.label.replace(/\$|£/, currencySymbol)
+      }))
+    };
+
     charts[key] = new Chart(ctx, {
       type: 'bar',
-      data: payload,
+      data: convertedPayload,
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -2307,13 +2345,13 @@
             position: 'left',
             title: {
               display: true,
-              text: 'Cost ($)',
+              text: `Cost (${currencySymbol})`,
               color: isDarkMode ? '#94a3b8' : '#64748b'
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b',
               callback: function(value) {
-                return '$' + value.toFixed(4);
+                return currencySymbol + value.toFixed(4);
               }
             },
             grid: {
@@ -2338,7 +2376,7 @@
             borderWidth: 1,
             callbacks: {
               label: function(context) {
-                return context.dataset.label + ': $' + context.parsed.y.toFixed(4);
+                return context.dataset.label + ': ' + currencySymbol + context.parsed.y.toFixed(4);
               }
             }
           }
@@ -2352,24 +2390,29 @@
     if (!canvas || !payload) return;
     const ctx = canvas.getContext('2d');
 
+    // Cache payload for currency re-render
+    cachedAIData = { ...cachedAIData, usageTrend: payload };
+
     if (charts[key]) {
       charts[key].destroy();
     }
 
-    // Add calls data as a line
+    const currencySymbol = currentCurrency === 'GBP' ? '£' : '$';
+
+    // Add calls data as a line with currency conversion
     const trendPayload = {
       labels: payload.labels,
       datasets: [
         {
-          label: 'Daily Cost ($)',
-          data: payload.datasets[0]?.data || [],
+          label: `Daily Cost (${currencySymbol})`,
+          data: (payload.datasets[0]?.data || []).map(v => convertCurrency(v, currentCurrency)),
           type: 'bar',
           backgroundColor: '#10b981',
           yAxisID: 'y'
         },
         {
-          label: 'Cumulative Cost ($)',
-          data: payload.datasets[1]?.data || [],
+          label: `Cumulative Cost (${currencySymbol})`,
+          data: (payload.datasets[1]?.data || []).map(v => convertCurrency(v, currentCurrency)),
           type: 'line',
           borderColor: '#3b82f6',
           backgroundColor: 'transparent',
@@ -2412,11 +2455,14 @@
             position: 'left',
             title: {
               display: true,
-              text: 'Cost ($)',
+              text: `Cost (${currencySymbol})`,
               color: isDarkMode ? '#94a3b8' : '#64748b'
             },
             ticks: {
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              callback: function(value) {
+                return currencySymbol + value.toFixed(4);
+              }
             },
             grid: {
               color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
@@ -2437,7 +2483,12 @@
             titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
             bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
             borderColor: isDarkMode ? '#334155' : '#e2e8f0',
-            borderWidth: 1
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                return context.dataset.label + ': ' + currencySymbol + context.parsed.y.toFixed(4);
+              }
+            }
           }
         }
       }
@@ -2449,7 +2500,11 @@
     if (!tbody) return;
 
     aiMostExplainedData = data || [];
+    // Cache for currency re-render
+    cachedAIData = { ...cachedAIData, mostExplained: data };
     tbody.innerHTML = '';
+
+    const currencySymbol = currentCurrency === 'GBP' ? '£' : '$';
 
     (data || []).forEach((row, index) => {
       const tr = document.createElement('tr');
@@ -2457,7 +2512,8 @@
       const displayText = factContent.length > 100
         ? `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 100)}...</span>`
         : `<span class="fact-text">${factContent}</span>`;
-      const cost = parseFloat(row.TotalCost || 0);
+      const costUSD = parseFloat(row.TotalCost || 0);
+      const cost = convertCurrency(costUSD, currentCurrency);
 
       let medalClass = '';
       if (index === 0) medalClass = 'medal-gold';
@@ -2468,7 +2524,7 @@
         <td>${displayText}</td>
         <td>${row.CategoryName || ''}</td>
         <td style="text-align: center;" class="${medalClass}">${row.CallCount || 0}</td>
-        <td style="text-align: center;">$${cost.toFixed(4)}</td>
+        <td style="text-align: center;">${currencySymbol}${cost.toFixed(4)}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -2479,7 +2535,11 @@
     if (!tbody) return;
 
     aiRecentUsageData = data || [];
+    // Cache for currency re-render
+    cachedAIData = { ...cachedAIData, recentUsage: data };
     tbody.innerHTML = '';
+
+    const currencySymbol = currentCurrency === 'GBP' ? '£' : '$';
 
     (data || []).forEach(row => {
       const tr = document.createElement('tr');
@@ -2488,7 +2548,8 @@
       const displayText = factContent.length > 60
         ? `<span class="fact-text" title="${factContent.replace(/"/g, '&quot;')}">${factContent.substring(0, 60)}...</span>`
         : `<span class="fact-text">${factContent}</span>`;
-      const cost = parseFloat(row.Cost || 0);
+      const costUSD = parseFloat(row.Cost || 0);
+      const cost = convertCurrency(costUSD, currentCurrency);
       const latency = row.LatencyMs || 0;
       const status = row.Status || 'UNKNOWN';
       const statusClass = status === 'SUCCESS' ? 'status-success' : 'status-failed';
@@ -2497,7 +2558,7 @@
         <td>${time}</td>
         <td>${displayText}</td>
         <td style="text-align: center;">${row.TotalTokens || 0}</td>
-        <td style="text-align: center;">$${cost.toFixed(4)}</td>
+        <td style="text-align: center;">${currencySymbol}${cost.toFixed(4)}</td>
         <td style="text-align: center;">${latency}ms</td>
         <td style="text-align: center;"><span class="${statusClass}">${status}</span></td>
       `;
@@ -2536,16 +2597,67 @@
     document.head.appendChild(style);
   }
   
+  // Function to re-render AI data with new currency
+  function updateAICurrency() {
+    if (!cachedAIData) return;
+
+    // Re-render metrics
+    if (cachedAIData.summary) {
+      renderAIUsageMetrics(cachedAIData.summary);
+    }
+
+    // Re-render charts
+    if (cachedAIData.costTimeline) {
+      renderAICostTimeline('ai_cost_timeline', 'ai-cost-timeline', cachedAIData.costTimeline);
+    }
+    if (cachedAIData.usageTrend) {
+      renderAIUsageTrend('ai_usage_trend', 'ai-usage-trend', cachedAIData.usageTrend);
+    }
+
+    // Re-render tables
+    if (cachedAIData.mostExplained) {
+      renderAIMostExplainedTable(cachedAIData.mostExplained);
+    }
+    if (cachedAIData.recentUsage) {
+      renderAIRecentUsageTable(cachedAIData.recentUsage);
+    }
+  }
+
+  // Setup currency toggle
+  function setupCurrencyToggle() {
+    const toggle = qs('#currency-toggle');
+    if (!toggle) return;
+
+    // Set initial state
+    toggle.setAttribute('data-currency', currentCurrency);
+
+    toggle.addEventListener('click', () => {
+      // Toggle currency
+      currentCurrency = currentCurrency === 'USD' ? 'GBP' : 'USD';
+      toggle.setAttribute('data-currency', currentCurrency);
+
+      // Add a subtle animation
+      toggle.style.transform = 'scale(0.98)';
+      setTimeout(() => {
+        toggle.style.transform = '';
+      }, 100);
+
+      // Update all AI data displays
+      updateAICurrency();
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     setupTabs();
     setupExpandModal();
     setupSmoothScroll();
     setupKeyboardShortcuts();
+    setupCurrencyToggle();
     injectAnimationStyles();
-    
+
     // Theme change listener
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme);
-    
+
     // Refresh button with animation
     const refreshBtn = qs('#refresh-btn');
     refreshBtn?.addEventListener('click', () => {
@@ -2554,7 +2666,7 @@
       load();
       startCountdown(300);
     });
-    
+
     // Initial load
     load().then(() => startCountdown(300));
   });

@@ -1623,6 +1623,120 @@ article[title="Best review efficiency (facts per minute)"] .metric-icon::before 
     font-variant-numeric: tabular-nums;
 }
 
+/* Currency Toggle Styles - Navbar version */
+.currency-toggle {
+  display: flex;
+  align-items: center;
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  cursor: pointer;
+  transition: var(--transition);
+  gap: 0;
+}
+
+.currency-toggle:hover {
+  border-color: var(--primary-light);
+  box-shadow: var(--shadow-sm), var(--shadow-glow);
+}
+
+.currency-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: calc(var(--radius-sm) - 3px);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: var(--transition);
+  z-index: 1;
+  position: relative;
+}
+
+.currency-option.active {
+  color: white;
+}
+
+.currency-symbol {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.currency-code {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.currency-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 1px;
+}
+
+.currency-slider {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 4px);
+  height: calc(100% - 6px);
+  background: var(--primary-gradient);
+  border-radius: calc(var(--radius-sm) - 3px);
+  transition: var(--transition);
+  box-shadow: var(--shadow-sm);
+  z-index: 0;
+}
+
+.currency-toggle[data-currency="GBP"] .currency-slider {
+  transform: translateX(calc(100% + 2px));
+}
+
+.currency-toggle[data-currency="GBP"] .currency-option[data-currency="GBP"] {
+  color: white;
+}
+
+.currency-toggle[data-currency="GBP"] .currency-option[data-currency="USD"] {
+  color: var(--muted);
+}
+
+.currency-toggle[data-currency="USD"] .currency-option[data-currency="USD"],
+.currency-toggle:not([data-currency]) .currency-option[data-currency="USD"] {
+  color: white;
+}
+
+/* Responsive currency toggle */
+@media (max-width: 768px) {
+  .currency-toggle {
+    padding: 2px;
+  }
+
+  .currency-option {
+    padding: 5px 8px;
+    gap: 3px;
+  }
+
+  .currency-symbol {
+    font-size: 13px;
+  }
+
+  .currency-code {
+    display: none;
+  }
+
+  .currency-divider {
+    height: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .currency-toggle {
+    order: -1;
+  }
+}
+
 /* AI Usage Analytics Styles */
 /* AI Usage metric icons */
 article[title="Total AI API calls made"] .metric-icon::before {
