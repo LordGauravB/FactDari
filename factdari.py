@@ -1901,19 +1901,37 @@ class FactDariApp:
             return
         profile_id = self.get_active_profile_id()
         new_status = not self.current_fact_is_easy
-        success = self.execute_update(
-            """
-            MERGE ProfileFacts AS target
-            USING (SELECT ? AS ProfileID, ? AS FactID) AS src
-            ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
-            WHEN MATCHED THEN
-                UPDATE SET IsEasy = ?, LastViewedByUser = COALESCE(target.LastViewedByUser, GETDATE())
-            WHEN NOT MATCHED THEN
-                INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
-                VALUES (src.ProfileID, src.FactID, 0, 0, ?, GETDATE());
-            """,
-            (profile_id, self.current_fact_id, 1 if new_status else 0, 1 if new_status else 0)
-        )
+        if new_status:
+            # Marking as known: set KnownSince only if not already set
+            success = self.execute_update(
+                """
+                MERGE ProfileFacts AS target
+                USING (SELECT ? AS ProfileID, ? AS FactID) AS src
+                ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
+                WHEN MATCHED THEN
+                    UPDATE SET IsEasy = 1, LastViewedByUser = COALESCE(target.LastViewedByUser, GETDATE()),
+                               KnownSince = COALESCE(target.KnownSince, GETDATE())
+                WHEN NOT MATCHED THEN
+                    INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser, KnownSince)
+                    VALUES (src.ProfileID, src.FactID, 0, 0, 1, GETDATE(), GETDATE());
+                """,
+                (profile_id, self.current_fact_id)
+            )
+        else:
+            # Unmarking as known: leave KnownSince unchanged for historical tracking
+            success = self.execute_update(
+                """
+                MERGE ProfileFacts AS target
+                USING (SELECT ? AS ProfileID, ? AS FactID) AS src
+                ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
+                WHEN MATCHED THEN
+                    UPDATE SET IsEasy = 0, LastViewedByUser = COALESCE(target.LastViewedByUser, GETDATE())
+                WHEN NOT MATCHED THEN
+                    INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
+                    VALUES (src.ProfileID, src.FactID, 0, 0, 0, GETDATE());
+                """,
+                (profile_id, self.current_fact_id)
+            )
         if success:
             self.current_fact_is_easy = new_status
             if new_status:

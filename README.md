@@ -86,7 +86,7 @@ The analytics dashboard provides comprehensive visualizations of your learning p
 | Recent AI Usage Log | Table of last 50 AI API calls with model details |
 | **Global Features** | |
 | XP Progress Bar | Visual level progression with XP breakdown |
-| Key Metrics | Cards for total facts, viewed today, streak, categories, favorites, known |
+| Key Metrics | Cards for total facts, viewed today, streak, active categories, favorites, known |
 | Lifetime Stats | Cards for facts added/edited/deleted, total reviews, current/best streak |
 | Currency Toggle | USD/GBP conversion for all AI cost displays |
 | Auto-Refresh | Data refreshes every 5 minutes with countdown timer |
@@ -99,7 +99,7 @@ All metric cards across the dashboard feature an information icon (ℹ️) that 
 - **Formula**: The SQL query or calculation used to derive the value
 
 Available on:
-- **Key Metrics**: Total Facts, Viewed Today, Review Streak, Categories, Favorites, Known Facts
+- **Key Metrics**: Total Facts, Viewed Today, Review Streak, Active Categories, Favorites, Known Facts
 - **Lifetime Stats**: Facts Added, Facts Edited, Facts Deleted, Total Reviews, Day Streak
 - **Session Metrics**: Average Session, Total Time, Longest Session, Total Sessions, Avg Facts/Session, Best Efficiency
 - **AI Usage Metrics**: Total AI Calls, Total Tokens, Total Cost, Avg Cost/Call, Avg Latency, Success Rate
@@ -266,7 +266,7 @@ util/RunFactDari.vbs
 
 - **Categories**: Manages categories for facts (active flag + metadata)
 - **Facts**: Stores fact content, category link, global view counts, and computed content key for duplicate prevention
-- **ProfileFacts**: Per-profile fact state (personal review count, favorite flag, known/easy flag, last viewed date)
+- **ProfileFacts**: Per-profile fact state (personal review count, favorite flag, known/easy flag, last viewed date, and `KnownSince` timestamp for learning velocity tracking)
 - **ReviewSessions**: Tracks review sessions (start/end, duration, timeout flag, per-session action counters)
 - **ReviewLogs**: One row per view/action (per-view duration, optional session link, action type, content snapshots for deleted facts)
 - **GamificationProfile**: Single-row profile for XP, level, streaks, lifetime counters, and AI usage totals

@@ -84,6 +84,7 @@ CREATE TABLE ProfileFacts (
     IsFavorite BIT NOT NULL CONSTRAINT DF_ProfileFacts_IsFavorite DEFAULT 0,
     IsEasy BIT NOT NULL CONSTRAINT DF_ProfileFacts_IsEasy DEFAULT 0,
     LastViewedByUser DATETIME NULL,
+    KnownSince DATETIME NULL,
     CONSTRAINT UX_ProfileFacts_Profile_Fact UNIQUE (ProfileID, FactID)
 );
 CREATE INDEX IX_ProfileFacts_ProfileID ON ProfileFacts(ProfileID);

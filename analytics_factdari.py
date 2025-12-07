@@ -50,13 +50,21 @@ def chart_data():
     return_all = request.args.get('all', 'false').lower() == 'true'
     
     data = {
-        # Category distribution
+        # Category distribution (active categories only)
         'categoryDistribution': fetch_query("""
             SELECT c.CategoryName, COUNT(f.FactID) as FactCount
             FROM Categories c
             LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
+            WHERE c.IsActive = 1
             GROUP BY c.CategoryName
             ORDER BY COUNT(f.FactID) DESC
+        """),
+
+        # Count of active categories
+        'activeCategoriesCount': fetch_query("""
+            SELECT COUNT(*) as ActiveCount
+            FROM Categories
+            WHERE IsActive = 1
         """),
         
         # Facts viewed per day (last 30 days)
@@ -273,7 +281,17 @@ def chart_data():
             FROM ProfileFacts
             WHERE ProfileID = ? AND IsEasy = 1
         """, (profile_id,)),
-        
+
+        # Count of distinct facts viewed today
+        'viewedTodayCount': fetch_query("""
+            SELECT COUNT(DISTINCT rl.FactID) as ViewedTodayCount
+            FROM ReviewLogs rl
+            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE())
+              AND (rl.Action IS NULL OR rl.Action = 'view')
+              AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+        """, (profile_id,)),
+
         # Duration-based analytics
         'sessionDurationStats': fetch_query("""
             SELECT 
@@ -346,7 +364,7 @@ def chart_data():
         """, (profile_id,)),
         
         'avgReviewTimePerFact': fetch_query("""
-            SELECT 
+            SELECT
                 AVG(SessionDuration) as AvgTimePerReview,
                 MIN(SessionDuration) as MinTimePerReview,
                 MAX(SessionDuration) as MaxTimePerReview,
@@ -354,11 +372,12 @@ def chart_data():
             FROM ReviewLogs rl
             LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.SessionDuration IS NOT NULL AND rl.SessionDuration > 0
+              AND (rl.Action IS NULL OR rl.Action = 'view')
               AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
         """, (profile_id,)),
         
         'categoryReviewTime': fetch_query("""
-            SELECT 
+            SELECT
                 c.CategoryName,
                 AVG(rl.SessionDuration) as AvgReviewTime,
                 SUM(rl.SessionDuration) as TotalReviewTime,
@@ -368,6 +387,7 @@ def chart_data():
             JOIN ReviewLogs rl ON f.FactID = rl.FactID
             LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.SessionDuration IS NOT NULL AND rl.SessionDuration > 0
+              AND (rl.Action IS NULL OR rl.Action = 'view')
               AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
             GROUP BY c.CategoryName
             ORDER BY AVG(rl.SessionDuration) DESC
@@ -429,12 +449,12 @@ def chart_data():
         
         # New analytics for Overview tab
         'knownVsUnknownRatio': fetch_query("""
-            SELECT 
-                SUM(CASE WHEN pf.IsEasy = 1 THEN 1 ELSE 0 END) as KnownFacts,
-                SUM(CASE WHEN pf.IsEasy = 0 THEN 1 ELSE 0 END) as UnknownFacts,
-                COUNT(*) as TotalFacts
-            FROM ProfileFacts pf
-            WHERE pf.ProfileID = ?
+            SELECT
+                SUM(CASE WHEN pf.IsEasy = 1 THEN 1 ELSE 0 END) AS KnownFacts,
+                SUM(CASE WHEN pf.IsEasy <> 1 OR pf.IsEasy IS NULL THEN 1 ELSE 0 END) AS UnknownFacts,
+                COUNT(*) AS TotalFacts
+            FROM Facts f
+            LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
         """, (profile_id,)),
         
         'weeklyReviewPattern': fetch_query("""
@@ -472,13 +492,13 @@ def chart_data():
         """, (profile_id,)),
         
         'categoryGrowthTrend': fetch_query("""
-            SELECT 
+            SELECT
                 c.CategoryName,
                 COUNT(f.FactID) as AllTime
             FROM Categories c
             LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
             GROUP BY c.CategoryName
-            HAVING COUNT(*) > 0
+            HAVING COUNT(f.FactID) > 0
             ORDER BY COUNT(f.FactID) DESC
         """),
         
@@ -626,17 +646,17 @@ def chart_data():
         'learningVelocity': fetch_query("""
             SELECT
                 c.CategoryName,
-                AVG(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) as AvgDaysToKnow,
-                MIN(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) as MinDaysToKnow,
-                MAX(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) as MaxDaysToKnow,
-                COUNT(*) as KnownFactsCount
-            FROM Facts f
-            JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
+                AVG(DATEDIFF(day, f.DateAdded, pf.KnownSince)) AS AvgDaysToKnow,
+                MIN(DATEDIFF(day, f.DateAdded, pf.KnownSince)) AS MinDaysToKnow,
+                MAX(DATEDIFF(day, f.DateAdded, pf.KnownSince)) AS MaxDaysToKnow,
+                COUNT(*) AS KnownFactsCount
+            FROM ProfileFacts pf
+            JOIN Facts f ON pf.FactID = f.FactID
             JOIN Categories c ON f.CategoryID = c.CategoryID
-            WHERE pf.IsEasy = 1 AND pf.LastViewedByUser IS NOT NULL
+            WHERE pf.ProfileID = ? AND pf.IsEasy = 1 AND pf.KnownSince IS NOT NULL
             GROUP BY c.CategoryName
             HAVING COUNT(*) > 0
-            ORDER BY AVG(DATEDIFF(day, f.DateAdded, pf.LastViewedByUser)) ASC
+            ORDER BY AVG(DATEDIFF(day, f.DateAdded, pf.KnownSince)) ASC
         """, (profile_id,)),
 
         # Peak Productivity Times - Session efficiency by hour of day
@@ -859,6 +879,7 @@ def chart_data():
     # Format data for frontend
     formatted_data = {
         'category_distribution': format_pie_chart(data['categoryDistribution'], 'CategoryName', 'FactCount'),
+        'active_categories_count': data['activeCategoriesCount'][0]['ActiveCount'] if data['activeCategoriesCount'] else 0,
         'reviews_per_day': format_line_chart(data['factsViewedPerDay']),
         'most_reviewed_facts': format_table_data(data['mostReviewedFacts']),
         'least_reviewed_facts': format_table_data(data['leastReviewedFacts']),
@@ -871,6 +892,7 @@ def chart_data():
         'category_reviews': format_bar_chart(data['categoryReviews'], 'CategoryName', 'TotalReviews'),
         'favorites_count': data['favoritesCount'][0]['FavoriteCount'] if data['favoritesCount'] else 0,
         'known_facts_count': data['knownFactsCount'][0]['KnownCount'] if data['knownFactsCount'] else 0,
+        'viewed_today_count': data['viewedTodayCount'][0]['ViewedTodayCount'] if data['viewedTodayCount'] else 0,
         # Include favorite/known fact tables for the frontend
         'allFavoriteFacts': format_table_data(data['allFavoriteFacts']),
         'allKnownFacts': format_table_data(data['allKnownFacts']),
@@ -880,7 +902,7 @@ def chart_data():
         'best_efficiency': data['bestEfficiency'][0] if data['bestEfficiency'] else {},
         'session_duration_distribution': format_pie_chart(data['sessionDurationDistribution'], 'DurationRange', 'SessionCount'),
         'avg_review_time_per_fact': data['avgReviewTimePerFact'][0] if data['avgReviewTimePerFact'] else {},
-        'category_review_time': format_bar_chart(data['categoryReviewTime'], 'CategoryName', 'AvgReviewTime'),
+        'category_review_time': format_bar_chart(data['categoryReviewTime'], 'CategoryName', 'AvgReviewTime', 'Avg Review Time (s)'),
         'daily_session_duration': format_duration_line_chart(data['dailySessionDuration']),
         'session_efficiency': format_table_data(data['sessionEfficiency']),
         'timeout_analysis': format_timeout_chart(data['timeoutAnalysis']),
@@ -1072,6 +1094,18 @@ def chart_data():
 
 def calculate_review_streak(profile_id: int):
     """Calculate the current review streak for a profile"""
+    # Fetch longest streak from GamificationProfile
+    profile_longest = 0
+    try:
+        profile_row = fetch_query(
+            "SELECT LongestStreak FROM GamificationProfile WHERE ProfileID = ?",
+            (profile_id,)
+        )
+        if profile_row:
+            profile_longest = int(profile_row[0].get('LongestStreak', 0) or 0)
+    except Exception:
+        pass
+
     query = """
     SELECT DISTINCT CONVERT(date, rl.ReviewDate) as ReviewDate
     FROM ReviewLogs rl
@@ -1080,12 +1114,12 @@ def calculate_review_streak(profile_id: int):
       AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
     ORDER BY CONVERT(date, rl.ReviewDate) DESC
     """
-    
+
     review_dates = fetch_query(query, (profile_id,))
-    
+
     if not review_dates:
-        return {'current_streak': 0, 'longest_streak': 0, 'last_review': None}
-    
+        return {'current_streak': 0, 'longest_streak': profile_longest, 'last_review': None}
+
     # Coerce DB values to date objects
     def to_date(val):
         if isinstance(val, datetime):
@@ -1103,7 +1137,7 @@ def calculate_review_streak(profile_id: int):
     # Determine starting day for streak (today or yesterday)
     start = ordered_dates[0]
     if start not in (today, yesterday):
-        return {'current_streak': 0, 'longest_streak': 0, 'last_review': start.isoformat()}
+        return {'current_streak': 0, 'longest_streak': profile_longest, 'last_review': start.isoformat()}
 
     # Count consecutive days backward from the start day
     current_streak = 1
@@ -1113,15 +1147,12 @@ def calculate_review_streak(profile_id: int):
             current_streak += 1
         else:
             break
-    
-    # Calculate longest streak (simplified)
-    longest_streak = current_streak  # For now, just use current
-    
+
     last_review = ordered_dates[0].isoformat() if ordered_dates else None
-    
+
     return {
         'current_streak': current_streak,
-        'longest_streak': longest_streak,
+        'longest_streak': profile_longest,
         'last_review': last_review
     }
 
@@ -1219,12 +1250,12 @@ def format_heatmap(data):
         'hours': list(range(24))
     }
 
-def format_bar_chart(data, label_field, value_field):
+def format_bar_chart(data, label_field, value_field, legend_label='Total Reviews'):
     """Format data for bar charts"""
     return {
         'labels': [row[label_field] for row in data],
         'datasets': [{
-            'label': 'Total Reviews',
+            'label': legend_label,
             'data': [row[value_field] for row in data],
             'backgroundColor': '#9C27B0'
         }]
@@ -1469,6 +1500,10 @@ def format_ai_cost_timeline(data):
 
     return {
         'labels': labels,
+        'costs': costs,
+        'cumulative_cost': cumulative_cost,
+        'tokens': tokens,
+        'calls': calls,
         'datasets': [
             {
                 'label': 'Daily Cost ($)',

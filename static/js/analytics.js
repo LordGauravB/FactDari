@@ -156,11 +156,8 @@
 
   function updateMetrics(data) {
     const totalFacts = (data.category_distribution?.data || []).reduce((a,b)=>a+b,0);
-    const totalCategories = (data.category_distribution?.labels || []).length;
-    const today = (()=>{
-      const arr = data.reviews_per_day?.datasets?.[0]?.data || [];
-      return arr.length ? arr[arr.length-1] : 0;
-    })();
+    const totalCategories = data.active_categories_count || 0;
+    const today = data.viewed_today_count || 0;
     const streak = data.review_streak?.current_streak || 0;
     const favoritesCount = data.favorites_count || 0;
     const knownFactsCount = data.known_facts_count || 0;
@@ -2474,35 +2471,34 @@
     if (!canvas || !payload) return;
     const ctx = canvas.getContext('2d');
 
-    // Cache payload for currency re-render
+    // Cache payload for re-render
     cachedAIData = { ...cachedAIData, usageTrend: payload };
 
     if (charts[key]) {
       charts[key].destroy();
     }
 
-    const currencySymbol = currentCurrency === 'GBP' ? '£' : '$';
-
-    // Add calls data as a line with currency conversion
+    // Use calls and tokens data (not costs - that's shown in the cost timeline chart)
     const trendPayload = {
       labels: payload.labels,
       datasets: [
         {
-          label: `Daily Cost (${currencySymbol})`,
-          data: (payload.datasets[0]?.data || []).map(v => convertCurrency(v, currentCurrency)),
+          label: 'Daily Calls',
+          data: payload.calls || [],
           type: 'bar',
-          backgroundColor: '#10b981',
+          backgroundColor: '#8b5cf6',
           yAxisID: 'y'
         },
         {
-          label: `Cumulative Cost (${currencySymbol})`,
-          data: (payload.datasets[1]?.data || []).map(v => convertCurrency(v, currentCurrency)),
+          label: 'Daily Tokens',
+          data: payload.tokens || [],
           type: 'line',
-          borderColor: '#3b82f6',
-          backgroundColor: 'transparent',
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
           borderWidth: 2,
           tension: 0.4,
-          yAxisID: 'y'
+          fill: true,
+          yAxisID: 'y1'
         }
       ]
     };
@@ -2539,17 +2535,31 @@
             position: 'left',
             title: {
               display: true,
-              text: `Cost (${currencySymbol})`,
+              text: 'Calls',
               color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b',
-              callback: function(value) {
-                return currencySymbol + value.toFixed(4);
-              }
+              stepSize: 1
             },
             grid: {
               color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Tokens',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            grid: {
+              drawOnChartArea: false
             }
           }
         },
@@ -2570,7 +2580,11 @@
             borderWidth: 1,
             callbacks: {
               label: function(context) {
-                return context.dataset.label + ': ' + currencySymbol + context.parsed.y.toFixed(4);
+                const value = context.parsed.y;
+                if (context.dataset.label === 'Daily Tokens') {
+                  return context.dataset.label + ': ' + value.toLocaleString();
+                }
+                return context.dataset.label + ': ' + value;
               }
             }
           }
@@ -3028,9 +3042,9 @@
     },
     'categories': {
       icon: '📊',
-      title: 'Categories',
-      description: 'The number of fact categories in your collection. Categories help organize your facts into meaningful groups.',
-      formula: 'SELECT COUNT(*) FROM Categories'
+      title: 'Active Categories',
+      description: 'The number of active fact categories in your collection. Categories help organize your facts into meaningful groups. Inactive categories are excluded.',
+      formula: 'SELECT COUNT(*) FROM Categories WHERE IsActive = 1'
     },
     'favorites': {
       icon: '⭐',
