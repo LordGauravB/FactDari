@@ -3006,9 +3006,197 @@
     });
   }
 
+  // Metric info data definitions
+  const metricInfoData = {
+    'total-facts': {
+      icon: '📚',
+      title: 'Total Facts',
+      description: 'The total number of facts currently stored in your collection. This represents all unique pieces of knowledge you\'ve added.',
+      formula: 'SELECT COUNT(*) FROM Facts'
+    },
+    'viewed-today': {
+      icon: '👁️',
+      title: 'Viewed Today',
+      description: 'The total number of distinct facts you have reviewed today. Each fact is only counted once, even if you\'ve viewed it multiple times today.',
+      formula: 'SELECT COUNT(DISTINCT FactID) FROM ReviewLogs WHERE ReviewDate = TODAY AND Action = \'view\''
+    },
+    'review-streak': {
+      icon: '🔥',
+      title: 'Review Streak',
+      description: 'The number of consecutive days you have reviewed at least one fact. Your streak resets to 0 if you miss a day without any reviews.',
+      formula: 'Count consecutive days (including today) where ReviewLogs has at least 1 view entry, going backwards until a gap is found.'
+    },
+    'categories': {
+      icon: '📊',
+      title: 'Categories',
+      description: 'The number of fact categories in your collection. Categories help organize your facts into meaningful groups.',
+      formula: 'SELECT COUNT(*) FROM Categories'
+    },
+    'favorites': {
+      icon: '⭐',
+      title: 'Favorites',
+      description: 'The number of facts you\'ve marked as favorites. Favorite facts can be easily accessed and reviewed separately.',
+      formula: 'SELECT COUNT(*) FROM ProfileFacts WHERE IsFavorite = 1'
+    },
+    'known-facts': {
+      icon: '✅',
+      title: 'Known Facts',
+      description: 'The number of facts you\'ve marked as "known". These are facts you\'ve mastered and feel confident about.',
+      formula: 'SELECT COUNT(*) FROM ProfileFacts WHERE IsEasy = 1'
+    },
+    'lifetime-adds': {
+      icon: '➕',
+      title: 'Facts Added',
+      description: 'The total number of facts you\'ve added to your collection since you started using FactDari. This counter increments each time you create a new fact.',
+      formula: 'SELECT TotalAdds FROM GamificationProfile'
+    },
+    'lifetime-edits': {
+      icon: '✏️',
+      title: 'Facts Edited',
+      description: 'The total number of times you\'ve edited existing facts. Each edit to a fact\'s content increments this counter.',
+      formula: 'SELECT TotalEdits FROM GamificationProfile'
+    },
+    'lifetime-deletes': {
+      icon: '🗑️',
+      title: 'Facts Deleted',
+      description: 'The total number of facts you\'ve deleted from your collection. Deleted facts are removed but this counter preserves your activity history.',
+      formula: 'SELECT TotalDeletes FROM GamificationProfile'
+    },
+    'lifetime-reviews': {
+      icon: '📖',
+      title: 'Total Reviews',
+      description: 'The total number of fact reviews you\'ve completed. Each time you view a fact for at least 2 seconds, it counts as one review.',
+      formula: 'SELECT TotalReviews FROM GamificationProfile'
+    },
+    'lifetime-streak': {
+      icon: '🔥',
+      title: 'Day Streak',
+      description: 'Your current streak shows consecutive days with at least one review. Your best streak is the longest consecutive run you\'ve achieved. Missing a day resets your current streak to 0.',
+      formula: 'SELECT CurrentStreak, LongestStreak FROM GamificationProfile'
+    },
+    'avg-session': {
+      icon: '⏱️',
+      title: 'Average Session',
+      description: 'The average duration of your review sessions in minutes. Only sessions with recorded duration greater than 0 are included in this calculation.',
+      formula: 'SELECT AVG(DurationSeconds) / 60 FROM ReviewSessions WHERE DurationSeconds > 0'
+    },
+    'total-time': {
+      icon: '⏳',
+      title: 'Total Time',
+      description: 'The cumulative time you\'ve spent reviewing facts across all sessions, displayed in hours. This represents your total learning investment.',
+      formula: 'SELECT SUM(DurationSeconds) / 3600 FROM ReviewSessions WHERE DurationSeconds > 0'
+    },
+    'longest-session': {
+      icon: '🏁',
+      title: 'Longest Session',
+      description: 'The duration of your longest single review session in minutes. This is your personal best for sustained focus.',
+      formula: 'SELECT MAX(DurationSeconds) / 60 FROM ReviewSessions WHERE DurationSeconds > 0'
+    },
+    'total-sessions': {
+      icon: '📈',
+      title: 'Total Sessions',
+      description: 'The total number of review sessions you\'ve completed. A session starts when you begin reviewing and ends when you press Home, the app times out due to inactivity, or the app closes.',
+      formula: 'SELECT COUNT(*) FROM ReviewSessions WHERE DurationSeconds > 0'
+    },
+    'avg-facts-session': {
+      icon: '📊',
+      title: 'Avg Facts/Session',
+      description: 'The average number of unique facts you review per session. Higher values indicate more productive sessions.',
+      formula: 'SELECT AVG(FactCount) FROM (SELECT COUNT(DISTINCT FactID) as FactCount FROM ReviewLogs GROUP BY SessionID)'
+    },
+    'best-efficiency': {
+      icon: '⚡',
+      title: 'Best Efficiency',
+      description: 'Your highest review efficiency measured in facts per minute. This is calculated as (unique facts reviewed × 60) / session duration in seconds.',
+      formula: 'SELECT MAX(COUNT(DISTINCT FactID) * 60.0 / DurationSeconds) FROM ReviewLogs JOIN ReviewSessions'
+    },
+    'total-ai-calls': {
+      icon: '🤖',
+      title: 'Total AI Calls',
+      description: 'The total number of AI API calls made to generate explanations for your facts. Each time you request an AI explanation, it counts as one call.',
+      formula: 'SELECT COUNT(*) FROM AIUsageLogs'
+    },
+    'total-ai-tokens': {
+      icon: '🔢',
+      title: 'Total Tokens',
+      description: 'The total number of tokens consumed across all AI calls. Tokens are the basic units of text processing - both your input (the fact) and the AI\'s output (the explanation) consume tokens.',
+      formula: 'SELECT SUM(TotalTokens) FROM AIUsageLogs'
+    },
+    'total-ai-cost': {
+      icon: '💰',
+      title: 'Total Cost',
+      description: 'The cumulative cost of all AI API calls. Cost is calculated based on the number of input and output tokens used, with rates varying by AI provider and model.',
+      formula: 'SELECT SUM(Cost) FROM AIUsageLogs'
+    },
+    'avg-ai-cost': {
+      icon: '📊',
+      title: 'Avg Cost/Call',
+      description: 'The average cost per AI API call. This helps you understand your typical spending per explanation request.',
+      formula: 'SELECT AVG(Cost) FROM AIUsageLogs'
+    },
+    'avg-ai-latency': {
+      icon: '⚡',
+      title: 'Avg Latency',
+      description: 'The average response time for AI API calls in milliseconds. Lower latency means faster explanations. This depends on the AI provider, model, and network conditions.',
+      formula: 'SELECT AVG(LatencyMs) FROM AIUsageLogs'
+    },
+    'ai-success-rate': {
+      icon: '✅',
+      title: 'Success Rate',
+      description: 'The percentage of AI API calls that completed successfully. Failed calls may be due to network issues, API errors, or rate limiting.',
+      formula: 'SELECT (SUM(CASE WHEN Status = \'SUCCESS\' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) FROM AIUsageLogs'
+    }
+  };
+
+  function setupMetricInfoModal() {
+    const modal = qs('#metric-info-modal');
+    const closeBtn = modal?.querySelector('.modal-close');
+    const iconEl = modal?.querySelector('.metric-info-icon');
+    const titleEl = modal?.querySelector('.metric-info-title');
+    const descEl = modal?.querySelector('.metric-info-description');
+    const formulaEl = modal?.querySelector('.metric-info-formula');
+
+    if (!modal) return;
+
+    // Handle info button clicks
+    qsa('.metric-info-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const metricKey = btn.dataset.metric;
+        const info = metricInfoData[metricKey];
+
+        if (info) {
+          if (iconEl) iconEl.textContent = info.icon;
+          if (titleEl) titleEl.textContent = info.title;
+          if (descEl) descEl.textContent = info.description;
+          if (formulaEl) formulaEl.textContent = info.formula;
+          modal.style.display = 'flex';
+        }
+      });
+    });
+
+    // Close modal handlers
+    const closeModal = () => {
+      modal.style.display = 'none';
+    };
+
+    closeBtn?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    // ESC key to close
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.style.display === 'flex') {
+        closeModal();
+      }
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     setupTabs();
     setupExpandModal();
+    setupMetricInfoModal();
     setupSmoothScroll();
     setupKeyboardShortcuts();
     setupCurrencyToggle();
