@@ -90,6 +90,19 @@ The analytics dashboard provides comprehensive visualizations of your learning p
 | Lifetime Stats | Cards for facts added/edited/deleted, total reviews, current/best streak |
 | Currency Toggle | USD/GBP conversion for all AI cost displays |
 | Auto-Refresh | Data refreshes every 5 minutes with countdown timer |
+| Metric Info Icons | Clickable info buttons on metric cards showing descriptions and SQL formulas |
+
+### Metric Info Icons
+
+All metric cards across the dashboard feature an information icon (ℹ️) that opens a modal with:
+- **Description**: Plain-English explanation of what the metric measures
+- **Formula**: The SQL query or calculation used to derive the value
+
+Available on:
+- **Key Metrics**: Total Facts, Viewed Today, Review Streak, Categories, Favorites, Known Facts
+- **Lifetime Stats**: Facts Added, Facts Edited, Facts Deleted, Total Reviews, Day Streak
+- **Session Metrics**: Average Session, Total Time, Longest Session, Total Sessions, Avg Facts/Session, Best Efficiency
+- **AI Usage Metrics**: Total AI Calls, Total Tokens, Total Cost, Avg Cost/Call, Avg Latency, Success Rate
 
 ## Installation
 
