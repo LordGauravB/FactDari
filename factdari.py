@@ -200,8 +200,9 @@ class FactDariApp:
     
     def load_categories(self):
         """Load categories for the dropdown"""
-        query = "SELECT DISTINCT CategoryName FROM Categories WHERE IsActive = 1 ORDER BY CategoryName"
-        categories = self.fetch_query(query)
+        profile_id = self.get_active_profile_id()
+        query = "SELECT DISTINCT CategoryName FROM Categories WHERE IsActive = 1 AND CreatedBy = ? ORDER BY CategoryName"
+        categories = self.fetch_query(query, (profile_id,))
         base_categories = [category[0] for category in categories] if categories else []
 
         # Build header filters deterministically
@@ -856,7 +857,8 @@ class FactDariApp:
     
     def count_facts(self):
         """Count total facts in the database"""
-        result = self.fetch_query("SELECT COUNT(*) FROM Facts")
+        profile_id = self.get_active_profile_id()
+        result = self.fetch_query("SELECT COUNT(*) FROM Facts WHERE CreatedBy = ?", (profile_id,))
         return result[0][0] if result and len(result) > 0 else 0
     
     def get_facts_viewed_today(self):
@@ -1450,31 +1452,36 @@ class FactDariApp:
                    COALESCE(pf.IsEasy, 0) AS IsEasy
             FROM Facts f
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
+            WHERE f.CreatedBy = ?
         """
 
         facts = []
         if category == "All Categories":
             query = base_select + " ORDER BY NEWID()"
-            facts = self.fetch_query(query, (profile_id,))
+            facts = self.fetch_query(query, (profile_id, profile_id))
         elif category == "Favorites":
-            query = base_select + " WHERE COALESCE(pf.IsFavorite,0) = 1 ORDER BY NEWID()"
-            facts = self.fetch_query(query, (profile_id,))
+            query = base_select + " AND COALESCE(pf.IsFavorite,0) = 1 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id, profile_id))
         elif category == "Known":
-            query = base_select + " WHERE COALESCE(pf.IsEasy,0) = 1 ORDER BY NEWID()"
-            facts = self.fetch_query(query, (profile_id,))
+            query = base_select + " AND COALESCE(pf.IsEasy,0) = 1 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id, profile_id))
         elif category == "Not Known":
-            query = base_select + " WHERE COALESCE(pf.IsEasy,0) = 0 ORDER BY NEWID()"
-            facts = self.fetch_query(query, (profile_id,))
+            query = base_select + " AND COALESCE(pf.IsEasy,0) = 0 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id, profile_id))
         elif category == "Not Favorite":
-            query = base_select + " WHERE COALESCE(pf.IsFavorite,0) = 0 ORDER BY NEWID()"
-            facts = self.fetch_query(query, (profile_id,))
+            query = base_select + " AND COALESCE(pf.IsFavorite,0) = 0 ORDER BY NEWID()"
+            facts = self.fetch_query(query, (profile_id, profile_id))
         else:
             query = base_select + """
-                JOIN Categories c ON f.CategoryID = c.CategoryID
-                WHERE c.CategoryName = ?
+                AND EXISTS (
+                    SELECT 1 FROM Categories c
+                    WHERE c.CategoryID = f.CategoryID
+                      AND c.CategoryName = ?
+                      AND c.CreatedBy = ?
+                )
                 ORDER BY NEWID()
             """
-            facts = self.fetch_query(query, (profile_id, category))
+            facts = self.fetch_query(query, (profile_id, profile_id, category, profile_id))
 
         self.all_facts = facts if facts else []
         self.current_fact_index = 0
@@ -1604,10 +1611,10 @@ class FactDariApp:
 
         # 2) Update the fact's view count and last viewed date
         self.execute_update("""
-            UPDATE Facts 
+            UPDATE Facts
             SET TotalViews = TotalViews + 1
-            WHERE FactID = ?
-        """, (fact_id,))
+            WHERE FactID = ? AND CreatedBy = ?
+        """, (fact_id, self.get_active_profile_id()))
         # Per-profile view count and last viewed
         try:
             pid = self.get_active_profile_id()
@@ -1984,6 +1991,7 @@ class FactDariApp:
         add_window.title("Add New Fact")
         add_window.geometry(f"{self.POPUP_ADD_CARD_SIZE}{self.POPUP_POSITION}")
         add_window.configure(bg=self.BG_COLOR)
+        profile_id = self.get_active_profile_id()
         
         # On close, resume timer then destroy
         def on_close_add():
@@ -1993,9 +2001,12 @@ class FactDariApp:
                 pass
             add_window.destroy()
         add_window.protocol("WM_DELETE_WINDOW", on_close_add)
-        
+
         # Get categories for dropdown
-        categories = self.fetch_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
+        categories = self.fetch_query(
+            "SELECT CategoryName FROM Categories WHERE IsActive = 1 AND CreatedBy = ?",
+            (profile_id,)
+        )
         category_names = [cat[0] for cat in categories] if categories else []
         
         # Create and place widgets
@@ -2038,14 +2049,18 @@ class FactDariApp:
         def save_fact(close_after=True):
             category = cat_var.get()
             content = content_text.get("1.0", "end-1c").strip()
-            
+            profile_id = self.get_active_profile_id()
+
             if not content:
                 self.status_label.config(text="Fact content is required!", fg=self.RED_COLOR)
                 self.clear_status_after_delay(3000)
                 return
             
             # Get category ID
-            cat_result = self.fetch_query("SELECT CategoryID FROM Categories WHERE CategoryName = ?", (category,))
+            cat_result = self.fetch_query(
+                "SELECT CategoryID FROM Categories WHERE CategoryName = ? AND CreatedBy = ?",
+                (category, profile_id)
+            )
             if not cat_result or len(cat_result) == 0:
                 self.status_label.config(text="Category not found!", fg=self.RED_COLOR)
                 self.clear_status_after_delay(3000)
@@ -2060,8 +2075,9 @@ class FactDariApp:
                     SELECT TOP 1 FactID
                     FROM dbo.Facts
                     WHERE ContentKey = CAST(LOWER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(?, CHAR(13), ' '), CHAR(10), ' '), CHAR(9), ' ')))) AS NVARCHAR(450))
+                      AND CreatedBy = ?
                     """,
-                    (content,)
+                    (content, profile_id)
                 )
             except Exception:
                 dup = []
@@ -2073,11 +2089,11 @@ class FactDariApp:
             # Insert the new fact and get its ID
             new_fact_id = self.execute_insert_return_id(
                 """
-                INSERT INTO Facts (CategoryID, Content, DateAdded, TotalViews)
+                INSERT INTO Facts (CategoryID, Content, DateAdded, TotalViews, CreatedBy)
                 OUTPUT INSERTED.FactID
-                VALUES (?, ?, GETDATE(), 0)
+                VALUES (?, ?, GETDATE(), 0, ?)
                 """,
-                (category_id, content)
+                (category_id, content, profile_id)
             )
             
             if new_fact_id:
@@ -2176,6 +2192,7 @@ class FactDariApp:
         """Edit the current fact"""
         if not self.current_fact_id:
             return
+        profile_id = self.get_active_profile_id()
         
         # Pause timer while editing
         self.pause_review_timer()
@@ -2183,11 +2200,11 @@ class FactDariApp:
         # Get current fact data
         query = """
         SELECT f.Content, c.CategoryName
-        FROM Facts f 
+        FROM Facts f
         JOIN Categories c ON f.CategoryID = c.CategoryID
-        WHERE f.FactID = ?
+        WHERE f.FactID = ? AND f.CreatedBy = ? AND c.CreatedBy = ?
         """
-        result = self.fetch_query(query, (self.current_fact_id,))
+        result = self.fetch_query(query, (self.current_fact_id, profile_id, profile_id))
         
         if not result or len(result) == 0:
             self.status_label.config(text="Error: Could not retrieve fact data", fg=self.RED_COLOR)
@@ -2212,7 +2229,10 @@ class FactDariApp:
         edit_window.protocol("WM_DELETE_WINDOW", on_close_edit)
         
         # Get categories for dropdown
-        categories = self.fetch_query("SELECT CategoryName FROM Categories WHERE IsActive = 1")
+        categories = self.fetch_query(
+            "SELECT CategoryName FROM Categories WHERE IsActive = 1 AND CreatedBy = ?",
+            (profile_id,)
+        )
         category_names = [cat[0] for cat in categories] if categories else []
         
         # Create and place widgets
@@ -2260,7 +2280,10 @@ class FactDariApp:
                 return
             
             # Get category ID
-            cat_result = self.fetch_query("SELECT CategoryID FROM Categories WHERE CategoryName = ?", (category,))
+            cat_result = self.fetch_query(
+                "SELECT CategoryID FROM Categories WHERE CategoryName = ? AND CreatedBy = ?",
+                (category, profile_id)
+            )
             if not cat_result or len(cat_result) == 0:
                 self.status_label.config(text="Category not found!", fg=self.RED_COLOR)
                 self.clear_status_after_delay(3000)
@@ -2276,8 +2299,9 @@ class FactDariApp:
                     FROM dbo.Facts
                     WHERE ContentKey = CAST(LOWER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(?, CHAR(13), ' '), CHAR(10), ' '), CHAR(9), ' ')))) AS NVARCHAR(450))
                       AND FactID <> ?
+                      AND CreatedBy = ?
                     """,
-                    (content, self.current_fact_id)
+                    (content, self.current_fact_id, profile_id)
                 )
             except Exception:
                 dup = []
@@ -2289,11 +2313,11 @@ class FactDariApp:
             # Update the fact
             success = self.execute_update(
                 """
-                UPDATE Facts 
+                UPDATE Facts
                 SET CategoryID = ?, Content = ?
-                WHERE FactID = ?
-                """, 
-                (category_id, content, self.current_fact_id)
+                WHERE FactID = ? AND CreatedBy = ?
+                """,
+                (category_id, content, self.current_fact_id, profile_id)
             )
             
             if success:
@@ -2360,6 +2384,7 @@ class FactDariApp:
         """Delete the current fact"""
         if not self.current_fact_id:
             return
+        profile_id = self.get_active_profile_id()
         
         # Pause during confirmation and deletion flow
         self.pause_review_timer()
@@ -2369,8 +2394,8 @@ class FactDariApp:
                 # Capture snapshot before delete
                 try:
                     row = self.fetch_query(
-                        "SELECT Content, CategoryID FROM Facts WHERE FactID = ?",
-                        (self.current_fact_id,)
+                        "SELECT Content, CategoryID FROM Facts WHERE FactID = ? AND CreatedBy = ?",
+                        (self.current_fact_id, profile_id)
                     )
                     content_snapshot = row[0][0] if row else None
                     category_snapshot = row[0][1] if row else None
@@ -2397,7 +2422,10 @@ class FactDariApp:
                     pass
 
                 # Delete the fact
-                success = self.execute_update("DELETE FROM Facts WHERE FactID = ?", (self.current_fact_id,))
+                success = self.execute_update(
+                    "DELETE FROM Facts WHERE FactID = ? AND CreatedBy = ?",
+                    (self.current_fact_id, profile_id)
+                )
                 if success:
                     self.status_label.config(text="Fact deleted!", fg=self.RED_COLOR)
                     self.clear_status_after_delay(3000)
@@ -2521,17 +2549,21 @@ class FactDariApp:
         new_cat = entry_widget.get().strip()
         if not new_cat:
             return
-        
+        profile_id = self.get_active_profile_id()
+
         # Check if category already exists
-        existing = self.fetch_query("SELECT COUNT(*) FROM Categories WHERE CategoryName = ?", (new_cat,))
+        existing = self.fetch_query(
+            "SELECT COUNT(*) FROM Categories WHERE CategoryName = ? AND CreatedBy = ?",
+            (new_cat, profile_id)
+        )
         if existing and existing[0][0] > 0:
             tk.messagebox.showinfo("Error", f"Category '{new_cat}' already exists!")
             return
-        
+
         # Add the new category
         success = self.execute_update(
-            "INSERT INTO Categories (CategoryName, Description) VALUES (?, '')", 
-            (new_cat,)
+            "INSERT INTO Categories (CategoryName, Description, CreatedBy) VALUES (?, '', ?)",
+            (new_cat, profile_id)
         )
         
         if success:
@@ -2568,7 +2600,11 @@ class FactDariApp:
         
         def refresh_category_list():
             cat_listbox.delete(0, tk.END)
-            categories = self.fetch_query("SELECT CategoryName, CategoryID FROM Categories ORDER BY CategoryName")
+            pid = self.get_active_profile_id()
+            categories = self.fetch_query(
+                "SELECT CategoryName, CategoryID FROM Categories WHERE CreatedBy = ? ORDER BY CategoryName",
+                (pid,)
+            )
             for cat in categories:
                 cat_listbox.insert(tk.END, f"{cat[0]} (ID: {cat[1]})")
         
@@ -2604,13 +2640,17 @@ class FactDariApp:
         selection = cat_listbox.curselection()
         if not selection:
             return
+        profile_id = self.get_active_profile_id()
         
         # Extract category ID from selection text
         cat_text = cat_listbox.get(selection[0])
         cat_id = int(cat_text.split("ID: ")[1].rstrip(")"))
         
         # Get current name
-        cat_result = self.fetch_query("SELECT CategoryName FROM Categories WHERE CategoryID = ?", (cat_id,))
+        cat_result = self.fetch_query(
+            "SELECT CategoryName FROM Categories WHERE CategoryID = ? AND CreatedBy = ?",
+            (cat_id, profile_id)
+        )
         if not cat_result or len(cat_result) == 0:
             tk.messagebox.showinfo("Error", "Category not found!")
             return
@@ -2624,8 +2664,8 @@ class FactDariApp:
         
         # Check if the new name already exists
         existing = self.fetch_query(
-            "SELECT COUNT(*) FROM Categories WHERE CategoryName = ? AND CategoryID != ?", 
-            (new_name, cat_id)
+            "SELECT COUNT(*) FROM Categories WHERE CategoryName = ? AND CategoryID != ? AND CreatedBy = ?",
+            (new_name, cat_id, profile_id)
         )
         
         if existing and existing[0][0] > 0:
@@ -2634,8 +2674,8 @@ class FactDariApp:
         
         # Update the category
         success = self.execute_update(
-            "UPDATE Categories SET CategoryName = ? WHERE CategoryID = ?", 
-            (new_name, cat_id)
+            "UPDATE Categories SET CategoryName = ? WHERE CategoryID = ? AND CreatedBy = ?",
+            (new_name, cat_id, profile_id)
         )
         
         if success:
@@ -2649,6 +2689,7 @@ class FactDariApp:
         selection = cat_listbox.curselection()
         if not selection:
             return
+        profile_id = self.get_active_profile_id()
         
         # Extract category ID from selection text
         cat_text = cat_listbox.get(selection[0])
@@ -2657,8 +2698,8 @@ class FactDariApp:
         
         # Check if category has facts
         fact_count_result = self.fetch_query(
-            "SELECT COUNT(*) FROM Facts WHERE CategoryID = ?", 
-            (cat_id,)
+            "SELECT COUNT(*) FROM Facts WHERE CategoryID = ? AND CreatedBy = ?",
+            (cat_id, profile_id)
         )
         
         if not fact_count_result:
@@ -2679,12 +2720,12 @@ class FactDariApp:
         # Delete the category and its facts
         success = self.execute_update("""
             BEGIN TRANSACTION;
-            
-            DELETE FROM Facts WHERE CategoryID = ?;
-            DELETE FROM Categories WHERE CategoryID = ?;
-            
+
+            DELETE FROM Facts WHERE CategoryID = ? AND CreatedBy = ?;
+            DELETE FROM Categories WHERE CategoryID = ? AND CreatedBy = ?;
+
             COMMIT TRANSACTION;
-        """, (cat_id, cat_id))
+        """, (cat_id, profile_id, cat_id, profile_id))
         
         if success:
             refresh_callback()

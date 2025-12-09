@@ -33,6 +33,7 @@ This is a comprehensive reference guide defining every table and column in your 
 | **`Description`** | `NVARCHAR` | **Metadata.** Optional text describing the category (currently unused in UI). |
 | **`IsActive`** | `BIT` | **Soft Delete.** If set to 0, the category won't appear in the dropdown, but historical data remains. |
 | **`CreatedDate`** | `DATETIME` | **Audit.** When the category was created. |
+| **`CreatedBy`** | `INT (FK)` | **Owner.** Points to `GamificationProfile.ProfileID`. All analytics and counts are scoped to the active profile’s categories only. |
 
 ---
 
@@ -48,6 +49,7 @@ This is a comprehensive reference guide defining every table and column in your 
 | **`ContentKey`** | `COMPUTED` | **Deduplication.** A persisted column that lowercases text and removes whitespace. A unique index on this prevents users from adding duplicate facts via `add_new_fact()`. |
 | **`DateAdded`** | `DATE` | **Timeline.** Used in analytics to show "Facts Added Over Time". |
 | **`TotalViews`** | `INT` | **Global Stat.** A counter of how many times this fact has been seen by *anyone* (global popularity). |
+| **`CreatedBy`** | `INT (FK)` | **Owner.** Points to `GamificationProfile.ProfileID`. Used to scope analytics so each profile only sees its own facts. |
 
 ---
 
@@ -95,9 +97,12 @@ This is a comprehensive reference guide defining every table and column in your 
 | **`ReviewDate`** | `DATETIME` | **Timestamp.** Exact moment the card was shown. Used for Heatmap (Hour of Day). |
 | **`SessionDuration`** | `INT` | **Reading Time.** How long the user stared at *this specific card*. The app pauses this timer if a popup opens. |
 | **`SessionID`** | `INT (FK)` | **Parent Link.** Groups this view into a `ReviewSession`. |
+| **`TimedOut`** | `BIT` | **Idle Flag.** Set to `1` if the view ended because the session timed out (`handle_idle_timeout`). Drives the timeout chart. |
 | **`Action`** | `NVARCHAR` | **Type.** 'view', 'add', 'edit', 'delete'. Allows filtering logs by type. |
+| **`FactEdited`** | `BIT` | **Edit Marker.** `1` when the log was created from an edit action. Used to distinguish edits from plain views. |
 | **`FactDeleted`** | `BIT` | **State Flag.** `1` if this log represents a deletion event. |
 | **`FactContentSnapshot`** | `NVARCHAR` | **History.** Copies the text of the fact *at the moment of deletion*. Ensures "Deleted" entries in analytics still show what was deleted even after the `Facts` table row is gone. |
+| **`CategoryIDSnapshot`** | `INT` | **Category History.** Captures the category at the time of the log so analytics can still bucket deleted/edited facts correctly. |
 
 ---
 
@@ -108,12 +113,21 @@ This is a comprehensive reference guide defining every table and column in your 
 | Column | Data Type | Definition & Application Use Case |
 | :--- | :--- | :--- |
 | **`AIUsageID`** | `INT (PK)` | **Identity.** |
+| **`FactID`** | `INT (FK, NULL)` | **Target (optional).** Links the AI call to a fact. NULL if not tied to a fact. |
+| **`SessionID`** | `INT (FK, NULL)` | **Session (optional).** Associates the AI call with an active review session if present. |
+| **`ProfileID`** | `INT (FK)` | **User.** Defaults to 1; used for per-profile cost/stats. |
 | **`OperationType`** | `NVARCHAR` | **Context.** Usually 'EXPLANATION'. |
+| **`Status`** | `NVARCHAR` | **Outcome.** 'SUCCESS' or 'FAILED'. Drives success/failure counts. |
+| **`ModelName`** | `NVARCHAR` | **Model Used.** Stored for debugging/analytics (shown in recent AI table). |
+| **`Provider`** | `NVARCHAR` | **Provider Tag.** Used to group cost/latency by provider. |
 | **`InputTokens`** | `INT` | **Cost Basis.** Number of tokens sent to AI. |
 | **`OutputTokens`** | `INT` | **Cost Basis.** Number of tokens received from AI. |
+| **`TotalTokens`** | `COMPUTED` | **Sum.** `InputTokens + OutputTokens`; used directly in analytics cost charts. |
 | **`Cost`** | `DECIMAL` | **Financial.** Calculated in Python based on `config.AI_PRICING` and stored here. |
+| **`CurrencyCode`** | `CHAR(3)` | **Currency.** Defaults to 'USD'. |
 | **`ReadingDurationSec`** | `INT` | **Engagement.** How long the user kept the AI explanation popup open. |
 | **`LatencyMs`** | `INT` | **Performance.** Time taken for the API to respond. |
+| **`CreatedAt`** | `DATETIME` | **Timestamp.** When the AI call was logged. Used for daily cost/timeline charts. |
 
 ---
 
@@ -123,10 +137,13 @@ This is a comprehensive reference guide defining every table and column in your 
 
 | Column | Data Type | Definition & Application Use Case |
 | :--- | :--- | :--- |
+| **`AchievementID`** | `INT (PK)` | **Identity.** |
 | **`Code`** | `NVARCHAR` | **Unique Key.** e.g., `KNOWN_10`. Used in code to check specific unlocks. |
+| **`Name`** | `NVARCHAR` | **Display.** The human-readable achievement title shown in popups and tables. |
 | **`Category`** | `NVARCHAR` | **Type.** 'streak', 'reviews', 'known', etc. Used to filter which achievements to check after a specific user action. |
 | **`Threshold`** | `INT` | **Logic.** The number required to unlock (e.g., 50 reviews). |
 | **`RewardXP`** | `INT` | **Incentive.** Amount of XP added to `GamificationProfile.XP` upon unlock. |
+| **`CreatedDate`** | `DATETIME` | **Audit.** When the achievement definition was created/seeded. |
 
 ---
 

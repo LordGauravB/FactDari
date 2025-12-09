@@ -1377,7 +1377,7 @@
             table.appendChild(tbody);
 
           } else if (key === 'session-actions-table') {
-            headerRow.innerHTML = '<th>Time</th><th>Fact</th><th>Action</th><th>Category</th>';
+            headerRow.innerHTML = '<th>Start Time</th><th>Added</th><th>Edited</th><th>Deleted</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
 

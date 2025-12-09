@@ -54,18 +54,21 @@ def chart_data():
         'categoryDistribution': fetch_query("""
             SELECT c.CategoryName, COUNT(f.FactID) as FactCount
             FROM Categories c
-            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
+            LEFT JOIN Facts f 
+              ON c.CategoryID = f.CategoryID
+             AND f.CreatedBy = ?
             WHERE c.IsActive = 1
+              AND c.CreatedBy = ?
             GROUP BY c.CategoryName
             ORDER BY COUNT(f.FactID) DESC
-        """),
+        """, (profile_id, profile_id)),
 
         # Count of active categories
         'activeCategoriesCount': fetch_query("""
             SELECT COUNT(*) as ActiveCount
             FROM Categories
-            WHERE IsActive = 1
-        """),
+            WHERE IsActive = 1 AND CreatedBy = ?
+        """, (profile_id,)),
         
         # Facts viewed per day (last 30 days)
         'factsViewedPerDay': fetch_query("""
@@ -74,9 +77,9 @@ def chart_data():
                 COUNT(DISTINCT rl.FactID) as FactsReviewed,
                 COUNT(*) as TotalReviews
             FROM ReviewLogs rl
-            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.ReviewDate >= ? AND (rl.Action IS NULL OR rl.Action = 'view')
-              AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+              AND rs.ProfileID = ?
             GROUP BY CONVERT(varchar, rl.ReviewDate, 23)
             ORDER BY CONVERT(varchar, rl.ReviewDate, 23)
         """, (thirty_days_ago, profile_id)),
@@ -92,9 +95,11 @@ def chart_data():
             FROM Facts f
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
             JOIN Categories c ON f.CategoryID = c.CategoryID
-            WHERE COALESCE(pf.PersonalReviewCount, 0) > 0 OR f.TotalViews > 0
+            WHERE f.CreatedBy = ?
+              AND c.CreatedBy = ?
+              AND (COALESCE(pf.PersonalReviewCount, 0) > 0 OR f.TotalViews > 0)
             ORDER BY COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) DESC, f.TotalViews DESC
-        """, (profile_id,)),
+        """, (profile_id, profile_id, profile_id)),
         
         # Least reviewed facts (include 0 reviews; show zeros first, then oldest last viewed)
         'leastReviewedFacts': fetch_query("""
@@ -111,11 +116,13 @@ def chart_data():
             FROM Facts f
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
             JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE f.CreatedBy = ?
+              AND c.CreatedBy = ?
             ORDER BY 
                 COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) ASC,
                 CASE WHEN pf.LastViewedByUser IS NULL THEN 0 ELSE 1 END ASC,
                 pf.LastViewedByUser ASC
-        """, (profile_id,)),
+        """, (profile_id, profile_id, profile_id)),
         
         # Facts added over time
         'factsAddedOverTime': fetch_query("""
@@ -125,11 +132,12 @@ def chart_data():
                     CONVERT(varchar, DateAdded, 23) as Date,
                     COUNT(FactID) as FactsAdded
                 FROM Facts
+                WHERE CreatedBy = ?
                 GROUP BY CONVERT(varchar, DateAdded, 23)
                 ORDER BY CONVERT(varchar, DateAdded, 23) DESC
             ) as RecentDates
             ORDER BY Date ASC
-        """),
+        """, (profile_id,)),
         
         # Review frequency heatmap data (last 30 days, by hour)
         'reviewHeatmap': fetch_query("""
@@ -139,9 +147,9 @@ def chart_data():
                 DATEPART(weekday, rl.ReviewDate) as DayOfWeek,
                 COUNT(*) as ReviewCount
             FROM ReviewLogs rl
-            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.ReviewDate >= ? AND (rl.Action IS NULL OR rl.Action = 'view')
-              AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+              AND rs.ProfileID = ?
             GROUP BY DATEPART(hour, rl.ReviewDate), DATEPART(weekday, rl.ReviewDate)
             ORDER BY DATEPART(weekday, rl.ReviewDate), DATEPART(hour, rl.ReviewDate)
         """, (thirty_days_ago, profile_id)),
@@ -150,23 +158,25 @@ def chart_data():
         'favoriteCategoryDistribution': fetch_query("""
             SELECT c.CategoryName, COUNT(pf.FactID) as FavoriteCount
             FROM Categories c
-            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
+            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID AND f.CreatedBy = ?
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ? AND pf.IsFavorite = 1
+            WHERE c.CreatedBy = ?
             GROUP BY c.CategoryName
             HAVING COUNT(pf.FactID) > 0
             ORDER BY COUNT(pf.FactID) DESC
-        """, (profile_id,)),
+        """, (profile_id, profile_id, profile_id)),
         
         # Category distribution for known/easy cards
         'knownCategoryDistribution': fetch_query("""
             SELECT c.CategoryName, COUNT(pf.FactID) as KnownCount
             FROM Categories c
-            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
+            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID AND f.CreatedBy = ?
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ? AND pf.IsEasy = 1
+            WHERE c.CreatedBy = ?
             GROUP BY c.CategoryName
             HAVING COUNT(pf.FactID) > 0
             ORDER BY COUNT(pf.FactID) DESC
-        """, (profile_id,)),
+        """, (profile_id, profile_id, profile_id)),
         
         # All favorite facts
         'allFavoriteFacts': fetch_query("""
@@ -184,6 +194,8 @@ def chart_data():
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
             JOIN Categories c ON f.CategoryID = c.CategoryID
             WHERE COALESCE(pf.IsFavorite, 0) = 1
+              AND f.CreatedBy = ?
+              AND c.CreatedBy = ?
             ORDER BY NEWID()
         """ if not return_all else """
             SELECT
@@ -200,8 +212,10 @@ def chart_data():
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
             JOIN Categories c ON f.CategoryID = c.CategoryID
             WHERE COALESCE(pf.IsFavorite, 0) = 1
+              AND f.CreatedBy = ?
+              AND c.CreatedBy = ?
             ORDER BY COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) DESC, f.TotalViews DESC
-        """, (profile_id,) if not return_all else (profile_id,)),
+        """, (profile_id, profile_id, profile_id) if not return_all else (profile_id, profile_id, profile_id)),
         
         # All known facts
         'allKnownFacts': fetch_query("""
@@ -219,6 +233,8 @@ def chart_data():
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
             JOIN Categories c ON f.CategoryID = c.CategoryID
             WHERE COALESCE(pf.IsEasy, 0) = 1
+              AND f.CreatedBy = ?
+              AND c.CreatedBy = ?
             ORDER BY NEWID()
         """ if not return_all else """
             SELECT
@@ -235,8 +251,10 @@ def chart_data():
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
             JOIN Categories c ON f.CategoryID = c.CategoryID
             WHERE COALESCE(pf.IsEasy, 0) = 1
+              AND f.CreatedBy = ?
+              AND c.CreatedBy = ?
             ORDER BY COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) DESC, f.TotalViews DESC
-        """, (profile_id,) if not return_all else (profile_id,)),
+        """, (profile_id, profile_id, profile_id) if not return_all else (profile_id, profile_id, profile_id)),
         
         # Categories viewed today
         'categoriesViewedToday': fetch_query("""
@@ -244,13 +262,15 @@ def chart_data():
             FROM Categories c
             INNER JOIN Facts f ON c.CategoryID = f.CategoryID
             INNER JOIN ReviewLogs rl ON f.FactID = rl.FactID
-            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE())
               AND (rl.Action IS NULL OR rl.Action = 'view')
-              AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+              AND rs.ProfileID = ?
+              AND c.CreatedBy = ?
+              AND f.CreatedBy = ?
             GROUP BY c.CategoryName
             ORDER BY COUNT(DISTINCT rl.FactID) DESC
-        """, (profile_id,)),
+        """, (profile_id, profile_id, profile_id)),
         
         # Review streak data
         'reviewStreak': calculate_review_streak(profile_id),
@@ -262,11 +282,12 @@ def chart_data():
                 SUM(COALESCE(pf.PersonalReviewCount, 0)) as TotalReviews,
                 AVG(COALESCE(pf.PersonalReviewCount, 0)) as AvgReviewsPerFact
             FROM Categories c
-            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
+            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID AND f.CreatedBy = ?
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
+            WHERE c.CreatedBy = ?
             GROUP BY c.CategoryName
             ORDER BY SUM(COALESCE(pf.PersonalReviewCount, 0)) DESC
-        """, (profile_id,)),
+        """, (profile_id, profile_id, profile_id)),
         
         # Count of favorite facts
         'favoritesCount': fetch_query("""
@@ -286,10 +307,10 @@ def chart_data():
         'viewedTodayCount': fetch_query("""
             SELECT COUNT(DISTINCT rl.FactID) as ViewedTodayCount
             FROM ReviewLogs rl
-            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE())
               AND (rl.Action IS NULL OR rl.Action = 'view')
-              AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+              AND rs.ProfileID = ?
         """, (profile_id,)),
 
         # Duration-based analytics
@@ -370,10 +391,10 @@ def chart_data():
                 MAX(SessionDuration) as MaxTimePerReview,
                 COUNT(*) as TotalReviews
             FROM ReviewLogs rl
-            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.SessionDuration IS NOT NULL AND rl.SessionDuration > 0
               AND (rl.Action IS NULL OR rl.Action = 'view')
-              AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+              AND rs.ProfileID = ?
         """, (profile_id,)),
         
         'categoryReviewTime': fetch_query("""
@@ -383,15 +404,16 @@ def chart_data():
                 SUM(rl.SessionDuration) as TotalReviewTime,
                 COUNT(rl.ReviewLogID) as ReviewCount
             FROM Categories c
-            JOIN Facts f ON c.CategoryID = f.CategoryID
+            JOIN Facts f ON c.CategoryID = f.CategoryID AND f.CreatedBy = ?
             JOIN ReviewLogs rl ON f.FactID = rl.FactID
-            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.SessionDuration IS NOT NULL AND rl.SessionDuration > 0
               AND (rl.Action IS NULL OR rl.Action = 'view')
-              AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+              AND rs.ProfileID = ?
+              AND c.CreatedBy = ?
             GROUP BY c.CategoryName
             ORDER BY AVG(rl.SessionDuration) DESC
-        """, (profile_id,)),
+        """, (profile_id, profile_id, profile_id)),
         
         'dailySessionDuration': fetch_query("""
             SELECT 
@@ -440,9 +462,9 @@ def chart_data():
                 COUNT(*) as TotalReviews,
                 CAST(COUNT(CASE WHEN rl.TimedOut = 1 THEN 1 END) * 100.0 / COUNT(*) as DECIMAL(5,2)) as TimeoutPercentage
             FROM ReviewLogs rl
-            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.ReviewDate >= ? AND (rl.Action IS NULL OR rl.Action = 'view')
-              AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+              AND rs.ProfileID = ?
             GROUP BY CONVERT(varchar, rl.ReviewDate, 23)
             ORDER BY CONVERT(varchar, rl.ReviewDate, 23)
         """, (thirty_days_ago, profile_id)),
@@ -455,7 +477,8 @@ def chart_data():
                 COUNT(*) AS TotalFacts
             FROM Facts f
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
-        """, (profile_id,)),
+            WHERE f.CreatedBy = ?
+        """, (profile_id, profile_id)),
         
         'weeklyReviewPattern': fetch_query("""
             SET DATEFIRST 7;
@@ -472,9 +495,8 @@ def chart_data():
                 COUNT(*) as ReviewCount,
                 COUNT(DISTINCT FactID) as UniqueFactsCount
             FROM ReviewLogs rl
-            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
-            WHERE (rl.Action IS NULL OR rl.Action = 'view')
-              AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+            JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            WHERE (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
             GROUP BY DATEPART(weekday, ReviewDate)
             ORDER BY DATEPART(weekday, ReviewDate)
         """, (profile_id,)),
@@ -484,9 +506,8 @@ def chart_data():
                 DATEPART(hour, ReviewDate) as Hour,
                 COUNT(*) as ReviewCount
             FROM ReviewLogs rl
-            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
-            WHERE (rl.Action IS NULL OR rl.Action = 'view')
-              AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+            JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            WHERE (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
             GROUP BY DATEPART(hour, ReviewDate)
             ORDER BY COUNT(*) DESC
         """, (profile_id,)),
@@ -496,11 +517,12 @@ def chart_data():
                 c.CategoryName,
                 COUNT(f.FactID) as AllTime
             FROM Categories c
-            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
+            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID AND f.CreatedBy = ?
+            WHERE c.CreatedBy = ?
             GROUP BY c.CategoryName
             HAVING COUNT(f.FactID) > 0
             ORDER BY COUNT(f.FactID) DESC
-        """),
+        """, (profile_id, profile_id)),
         
         # New chart for Progress tab
         'monthlyProgress': fetch_query("""
@@ -511,10 +533,9 @@ def chart_data():
                 COUNT(DISTINCT FactID) as UniqueFactsReviewed,
                 COUNT(DISTINCT CONVERT(date, ReviewDate)) as ActiveDays
             FROM ReviewLogs rl
-            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.ReviewDate >= DATEADD(month, -6, GETDATE())
-              AND (rl.Action IS NULL OR rl.Action = 'view')
-              AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+              AND (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
             GROUP BY YEAR(ReviewDate), MONTH(ReviewDate)
             ORDER BY YEAR(ReviewDate), MONTH(ReviewDate)
         """, (profile_id,)),
@@ -635,12 +656,13 @@ def chart_data():
                     ELSE 0
                 END as CompletionRate
             FROM Categories c
-            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID
+            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID AND f.CreatedBy = ?
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
+            WHERE c.CreatedBy = ?
             GROUP BY c.CategoryName
             HAVING COUNT(f.FactID) > 0
             ORDER BY CompletionRate DESC
-        """, (profile_id,)),
+        """, (profile_id, profile_id, profile_id)),
 
         # Learning Velocity - Time from fact creation to first marked as known
         'learningVelocity': fetch_query("""
@@ -654,10 +676,12 @@ def chart_data():
             JOIN Facts f ON pf.FactID = f.FactID
             JOIN Categories c ON f.CategoryID = c.CategoryID
             WHERE pf.ProfileID = ? AND pf.IsEasy = 1 AND pf.KnownSince IS NOT NULL
+              AND f.CreatedBy = ?
+              AND c.CreatedBy = ?
             GROUP BY c.CategoryName
             HAVING COUNT(*) > 0
             ORDER BY AVG(DATEDIFF(day, f.DateAdded, pf.KnownSince)) ASC
-        """, (profile_id,)),
+        """, (profile_id, profile_id, profile_id)),
 
         # Peak Productivity Times - Session efficiency by hour of day
         'peakProductivityTimes': fetch_query("""
@@ -692,8 +716,8 @@ def chart_data():
                 COALESCE(rl.Action, 'view') as ActionType,
                 COUNT(*) as ActionCount
             FROM ReviewLogs rl
-            LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
-            WHERE rs.ProfileID = ? OR rl.SessionID IS NULL
+            JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+            WHERE rs.ProfileID = ?
             GROUP BY COALESCE(rl.Action, 'view')
             ORDER BY COUNT(*) DESC
         """, (profile_id,)),
@@ -947,7 +971,7 @@ def chart_data():
     if return_all:
         # Get ALL facts sorted by review count (including 0 reviews)
         formatted_data['all_most_reviewed_facts'] = format_table_data(fetch_query("""
-            SELECT 
+            SELECT
                 f.Content,
                 COALESCE(pf.PersonalReviewCount, 0) AS ReviewCount,
                 c.CategoryName,
@@ -956,12 +980,14 @@ def chart_data():
             FROM Facts f
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
             JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE f.CreatedBy = ?
+              AND c.CreatedBy = ?
             ORDER BY COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) DESC, f.TotalViews DESC, f.Content
-        """, (profile_id,)))
+        """, (profile_id, profile_id, profile_id)))
         
         # Get ALL facts sorted by least reviewed (including 0 reviews)
         formatted_data['all_least_reviewed_facts'] = format_table_data(fetch_query("""
-            SELECT 
+            SELECT
                 f.Content,
                 COALESCE(pf.PersonalReviewCount, 0) AS ReviewCount,
                 c.CategoryName,
@@ -974,11 +1000,13 @@ def chart_data():
             FROM Facts f
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
             JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE f.CreatedBy = ?
+              AND c.CreatedBy = ?
             ORDER BY 
                 COALESCE(pf.PersonalReviewCount, 0) ASC,
                 CASE WHEN pf.LastViewedByUser IS NULL THEN 0 ELSE 1 END ASC,
                 pf.LastViewedByUser ASC
-        """, (profile_id,)))
+        """, (profile_id, profile_id, profile_id)))
 
     # removed avg per-view duration series
 
@@ -1008,12 +1036,12 @@ def chart_data():
             COALESCE(c.CategoryName, c2.CategoryName) AS CategoryName,
             COALESCE(f.Content, rl.FactContentSnapshot) AS Content
         FROM ReviewLogs rl
-        LEFT JOIN ReviewSessions s ON s.SessionID = rl.SessionID
+        JOIN ReviewSessions s ON s.SessionID = rl.SessionID
         LEFT JOIN Facts f ON f.FactID = rl.FactID
         LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
         LEFT JOIN Categories c2 ON rl.CategoryIDSnapshot = c2.CategoryID
         WHERE (rl.Action IS NULL OR rl.Action = 'view')
-          AND (s.ProfileID = ? OR rl.SessionID IS NULL)
+          AND s.ProfileID = ?
         ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.ReviewLogID DESC
     """, (profile_id,))
     formatted_data['recent_card_reviews'] = format_table_data(recent_card_reviews)
@@ -1028,12 +1056,12 @@ def chart_data():
                 COALESCE(c.CategoryName, c2.CategoryName) AS CategoryName,
                 COALESCE(f.Content, rl.FactContentSnapshot) AS Content
             FROM ReviewLogs rl
-            LEFT JOIN ReviewSessions s ON s.SessionID = rl.SessionID
+            JOIN ReviewSessions s ON s.SessionID = rl.SessionID
             LEFT JOIN Facts f ON f.FactID = rl.FactID
             LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
             LEFT JOIN Categories c2 ON rl.CategoryIDSnapshot = c2.CategoryID
             WHERE (rl.Action IS NULL OR rl.Action = 'view')
-              AND (s.ProfileID = ? OR rl.SessionID IS NULL)
+              AND s.ProfileID = ?
             ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.ReviewLogID DESC
         """, (profile_id,))
         formatted_data['all_recent_card_reviews'] = format_table_data(all_recent_card_reviews)
@@ -1109,9 +1137,8 @@ def calculate_review_streak(profile_id: int):
     query = """
     SELECT DISTINCT CONVERT(date, rl.ReviewDate) as ReviewDate
     FROM ReviewLogs rl
-    LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
-    WHERE (rl.Action IS NULL OR rl.Action = 'view')
-      AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+    JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+    WHERE (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
     ORDER BY CONVERT(date, rl.ReviewDate) DESC
     """
 
@@ -1540,4 +1567,3 @@ if __name__ == '__main__':
     import os
     debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
     app.run(debug=debug_mode)
-
