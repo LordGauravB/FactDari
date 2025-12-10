@@ -689,6 +689,19 @@ body {
   border: 1px solid var(--border);
   box-shadow: var(--shadow-xs);
   transition: var(--transition);
+  position: relative;
+}
+
+.lifetime-stat-card .metric-info-btn {
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+}
+
+.lifetime-stat-card .metric-info-btn svg {
+  width: 12px;
+  height: 12px;
 }
 
 .lifetime-stat-card:hover {
@@ -2465,5 +2478,176 @@ article[title="AI success rate"] .metric-icon::before {
   .filter-btn {
     padding: 4px 8px;
     font-size: 11px;
+  }
+}
+
+/* Metric Info Button Styles */
+.metric-info-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  z-index: 5;
+  opacity: 0.6;
+}
+
+.metric-info-btn:hover {
+  background: var(--primary);
+  color: white;
+  opacity: 1;
+  transform: scale(1.1);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+}
+
+.metric-info-btn:active {
+  transform: scale(0.95);
+}
+
+.metric-info-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.metric-card:hover .metric-info-btn {
+  opacity: 1;
+}
+
+/* Metric Info Modal Styles */
+.metric-info-modal .modal-content.metric-info-content {
+  width: min(90vw, 480px);
+  max-height: 80vh;
+  padding: 0;
+  overflow: hidden;
+}
+
+.metric-info-modal .modal-content.metric-info-content::before {
+  height: 5px;
+  background: var(--primary-gradient);
+}
+
+.metric-info-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 28px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.05));
+  border-bottom: 1px solid var(--border-light);
+}
+
+.metric-info-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+}
+
+.metric-info-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.metric-info-body {
+  padding: 24px 28px;
+}
+
+.metric-info-description {
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.metric-info-calculation {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  border: 1px solid var(--border-light);
+}
+
+.metric-info-calculation h4 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 10px 0;
+}
+
+.metric-info-formula {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  background: var(--card);
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+
+.metric-info-formula code {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* Responsive Metric Info Modal */
+@media (max-width: 480px) {
+  .metric-info-modal .modal-content.metric-info-content {
+    width: 95vw;
+  }
+
+  .metric-info-header {
+    padding: 18px 20px;
+    gap: 12px;
+  }
+
+  .metric-info-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+
+  .metric-info-title {
+    font-size: 17px;
+  }
+
+  .metric-info-body {
+    padding: 18px 20px;
+  }
+
+  .metric-info-description {
+    font-size: 14px;
+  }
+
+  .metric-info-calculation {
+    padding: 14px 16px;
+  }
+
+  .metric-info-formula {
+    font-size: 13px;
+    padding: 10px 12px;
   }
 }

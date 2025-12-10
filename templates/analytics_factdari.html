@@ -109,47 +109,83 @@
             <!-- Key Metrics Section -->
             <section class="metrics-section" aria-label="Key metrics">
                 <div class="metrics-grid">
-                    <article class="metric-card" title="Total number of facts in your collection">
+                    <article class="metric-card" title="Total number of facts in your collection" data-metric="total-facts">
+                        <button class="metric-info-btn" aria-label="Info about Total Facts" data-metric="total-facts">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                        </button>
                         <div class="metric-icon">📚</div>
                         <div class="metric-content">
                             <div class="metric-value" id="total-cards">0</div>
                             <div class="metric-label">Total Facts</div>
                         </div>
                     </article>
-                    
-                    <article class="metric-card" title="Number of facts viewed today">
+
+                    <article class="metric-card" title="Number of facts viewed today" data-metric="viewed-today">
+                        <button class="metric-info-btn" aria-label="Info about Viewed Today" data-metric="viewed-today">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                        </button>
                         <div class="metric-icon">👁️</div>
                         <div class="metric-content">
                             <div class="metric-value" id="due-today">0</div>
                             <div class="metric-label">Viewed Today</div>
                         </div>
                     </article>
-                    
-                    <article class="metric-card" title="Current consecutive days of reviewing facts">
+
+                    <article class="metric-card" title="Current consecutive days of reviewing facts" data-metric="review-streak">
+                        <button class="metric-info-btn" aria-label="Info about Review Streak" data-metric="review-streak">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                        </button>
                         <div class="metric-icon">🔥</div>
                         <div class="metric-content">
                             <div class="metric-value" id="mastered-cards">0</div>
                             <div class="metric-label">Review Streak</div>
                         </div>
                     </article>
-                    
-                    <article class="metric-card" title="Number of active fact categories">
+
+                    <article class="metric-card" title="Number of active fact categories" data-metric="categories">
+                        <button class="metric-info-btn" aria-label="Info about Active Categories" data-metric="categories">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                        </button>
                         <div class="metric-icon">📊</div>
                         <div class="metric-content">
                             <div class="metric-value" id="active-categories">0</div>
-                            <div class="metric-label">Categories</div>
+                            <div class="metric-label">Active Categories</div>
                         </div>
                     </article>
-                    
-                    <article class="metric-card" title="Number of facts added to favorites">
+
+                    <article class="metric-card" title="Number of facts added to favorites" data-metric="favorites">
+                        <button class="metric-info-btn" aria-label="Info about Favorites" data-metric="favorites">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                        </button>
                         <div class="metric-icon">⭐</div>
                         <div class="metric-content">
                             <div class="metric-value" id="favorites-count">0</div>
                             <div class="metric-label">Favorites</div>
                         </div>
                     </article>
-                    
-                    <article class="metric-card" title="Number of facts marked as known">
+
+                    <article class="metric-card" title="Number of facts marked as known" data-metric="known-facts">
+                        <button class="metric-info-btn" aria-label="Info about Known Facts" data-metric="known-facts">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                        </button>
                         <div class="metric-icon">✅</div>
                         <div class="metric-content">
                             <div class="metric-value" id="known-facts-count">0</div>
@@ -162,35 +198,65 @@
             <!-- Lifetime Stats Section -->
             <section class="lifetime-stats-section" aria-label="Lifetime statistics">
                 <div class="lifetime-stats-grid">
-                    <article class="lifetime-stat-card" title="Total facts added">
+                    <article class="lifetime-stat-card" title="Total facts added" data-metric="lifetime-adds">
+                        <button class="metric-info-btn" aria-label="Info about Facts Added" data-metric="lifetime-adds">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                        </button>
                         <div class="lifetime-stat-icon">➕</div>
                         <div class="lifetime-stat-content">
                             <div class="lifetime-stat-value" id="lifetime-adds">0</div>
                             <div class="lifetime-stat-label">Facts Added</div>
                         </div>
                     </article>
-                    <article class="lifetime-stat-card" title="Total facts edited">
+                    <article class="lifetime-stat-card" title="Total facts edited" data-metric="lifetime-edits">
+                        <button class="metric-info-btn" aria-label="Info about Facts Edited" data-metric="lifetime-edits">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                        </button>
                         <div class="lifetime-stat-icon">✏️</div>
                         <div class="lifetime-stat-content">
                             <div class="lifetime-stat-value" id="lifetime-edits">0</div>
                             <div class="lifetime-stat-label">Facts Edited</div>
                         </div>
                     </article>
-                    <article class="lifetime-stat-card" title="Total facts deleted">
+                    <article class="lifetime-stat-card" title="Total facts deleted" data-metric="lifetime-deletes">
+                        <button class="metric-info-btn" aria-label="Info about Facts Deleted" data-metric="lifetime-deletes">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                        </button>
                         <div class="lifetime-stat-icon">🗑️</div>
                         <div class="lifetime-stat-content">
                             <div class="lifetime-stat-value" id="lifetime-deletes">0</div>
                             <div class="lifetime-stat-label">Facts Deleted</div>
                         </div>
                     </article>
-                    <article class="lifetime-stat-card" title="Total reviews completed">
+                    <article class="lifetime-stat-card" title="Total reviews completed" data-metric="lifetime-reviews">
+                        <button class="metric-info-btn" aria-label="Info about Total Reviews" data-metric="lifetime-reviews">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                        </button>
                         <div class="lifetime-stat-icon">📖</div>
                         <div class="lifetime-stat-content">
                             <div class="lifetime-stat-value" id="lifetime-reviews">0</div>
                             <div class="lifetime-stat-label">Total Reviews</div>
                         </div>
                     </article>
-                    <article class="lifetime-stat-card streak-card" title="Current vs Longest streak">
+                    <article class="lifetime-stat-card streak-card" title="Current vs Longest streak" data-metric="lifetime-streak">
+                        <button class="metric-info-btn" aria-label="Info about Day Streak" data-metric="lifetime-streak">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                        </button>
                         <div class="lifetime-stat-icon">🔥</div>
                         <div class="lifetime-stat-content">
                             <div class="streak-comparison">
@@ -741,47 +807,83 @@
                     <!-- Session Metrics Section -->
                     <section class="metrics-section" aria-label="Session metrics">
                         <div class="metrics-grid">
-                            <article class="metric-card" title="Average duration of review sessions">
+                            <article class="metric-card" title="Average duration of review sessions" data-metric="avg-session">
+                                <button class="metric-info-btn" aria-label="Info about Average Session" data-metric="avg-session">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">⏱️</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="avg-session-duration">--</div>
                                     <div class="metric-label">Average Session</div>
                                 </div>
                             </article>
-                            
-                            <article class="metric-card" title="Total time spent reviewing">
+
+                            <article class="metric-card" title="Total time spent reviewing" data-metric="total-time">
+                                <button class="metric-info-btn" aria-label="Info about Total Time" data-metric="total-time">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">⏳</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="total-session-time">--</div>
                                     <div class="metric-label">Total Time</div>
                                 </div>
                             </article>
-                            
-                            <article class="metric-card" title="Longest review session">
+
+                            <article class="metric-card" title="Longest review session" data-metric="longest-session">
+                                <button class="metric-info-btn" aria-label="Info about Longest Session" data-metric="longest-session">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">🏁</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="max-session-duration">--</div>
                                     <div class="metric-label">Longest Session</div>
                                 </div>
                             </article>
-                            
-                            <article class="metric-card" title="Total number of review sessions">
+
+                            <article class="metric-card" title="Total number of review sessions" data-metric="total-sessions">
+                                <button class="metric-info-btn" aria-label="Info about Total Sessions" data-metric="total-sessions">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">📈</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="total-sessions">--</div>
                                     <div class="metric-label">Total Sessions</div>
                                 </div>
                             </article>
-                            
-                            <article class="metric-card" title="Average facts reviewed per session">
+
+                            <article class="metric-card" title="Average facts reviewed per session" data-metric="avg-facts-session">
+                                <button class="metric-info-btn" aria-label="Info about Avg Facts/Session" data-metric="avg-facts-session">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">📊</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="avg-facts-per-session">--</div>
                                     <div class="metric-label">Avg Facts/Session</div>
                                 </div>
                             </article>
-                            
-                            <article class="metric-card" title="Best review efficiency (facts per minute)">
+
+                            <article class="metric-card" title="Best review efficiency (facts per minute)" data-metric="best-efficiency">
+                                <button class="metric-info-btn" aria-label="Info about Best Efficiency" data-metric="best-efficiency">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">⚡</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="best-efficiency">--</div>
@@ -1111,7 +1213,13 @@
                     <!-- AI Usage Metrics Section -->
                     <section class="metrics-section" aria-label="AI usage metrics">
                         <div class="metrics-grid">
-                            <article class="metric-card" title="Total AI API calls made">
+                            <article class="metric-card" title="Total AI API calls made" data-metric="total-ai-calls">
+                                <button class="metric-info-btn" aria-label="Info about Total AI Calls" data-metric="total-ai-calls">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">🤖</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="total-ai-calls">0</div>
@@ -1119,7 +1227,13 @@
                                 </div>
                             </article>
 
-                            <article class="metric-card" title="Total tokens consumed">
+                            <article class="metric-card" title="Total tokens consumed" data-metric="total-ai-tokens">
+                                <button class="metric-info-btn" aria-label="Info about Total Tokens" data-metric="total-ai-tokens">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">🔢</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="total-ai-tokens">0</div>
@@ -1127,7 +1241,13 @@
                                 </div>
                             </article>
 
-                            <article class="metric-card" title="Total cost of AI usage">
+                            <article class="metric-card" title="Total cost of AI usage" data-metric="total-ai-cost">
+                                <button class="metric-info-btn" aria-label="Info about Total Cost" data-metric="total-ai-cost">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">💰</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="total-ai-cost">$0.00</div>
@@ -1135,7 +1255,13 @@
                                 </div>
                             </article>
 
-                            <article class="metric-card" title="Average cost per AI call">
+                            <article class="metric-card" title="Average cost per AI call" data-metric="avg-ai-cost">
+                                <button class="metric-info-btn" aria-label="Info about Avg Cost/Call" data-metric="avg-ai-cost">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">📊</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="avg-ai-cost">$0.00</div>
@@ -1143,7 +1269,13 @@
                                 </div>
                             </article>
 
-                            <article class="metric-card" title="Average API response time">
+                            <article class="metric-card" title="Average API response time" data-metric="avg-ai-latency">
+                                <button class="metric-info-btn" aria-label="Info about Avg Latency" data-metric="avg-ai-latency">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">⚡</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="avg-ai-latency">--</div>
@@ -1151,7 +1283,13 @@
                                 </div>
                             </article>
 
-                            <article class="metric-card" title="AI success rate">
+                            <article class="metric-card" title="AI success rate" data-metric="ai-success-rate">
+                                <button class="metric-info-btn" aria-label="Info about Success Rate" data-metric="ai-success-rate">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                </button>
                                 <div class="metric-icon">✅</div>
                                 <div class="metric-content">
                                     <div class="metric-value" id="ai-success-rate">--%</div>
@@ -1400,6 +1538,24 @@
             <button class="modal-close" aria-label="Close modal">&times;</button>
             <div class="modal-chart-container">
                 <canvas id="modal-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for metric info popups -->
+    <div id="metric-info-modal" class="modal metric-info-modal" role="dialog" aria-modal="true" aria-label="Metric information">
+        <div class="modal-content metric-info-content">
+            <button class="modal-close" aria-label="Close modal">&times;</button>
+            <div class="metric-info-header">
+                <span class="metric-info-icon"></span>
+                <h3 class="metric-info-title"></h3>
+            </div>
+            <div class="metric-info-body">
+                <div class="metric-info-description"></div>
+                <div class="metric-info-calculation">
+                    <h4>How it's calculated:</h4>
+                    <p class="metric-info-formula"></p>
+                </div>
             </div>
         </div>
     </div>
