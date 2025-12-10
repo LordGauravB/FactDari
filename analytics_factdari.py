@@ -79,6 +79,7 @@ def chart_data():
             FROM ReviewLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.ReviewDate >= ? AND (rl.Action IS NULL OR rl.Action = 'view')
+              AND COALESCE(rl.TimedOut, 0) = 0
               AND rs.ProfileID = ?
             GROUP BY CONVERT(varchar, rl.ReviewDate, 23)
             ORDER BY CONVERT(varchar, rl.ReviewDate, 23)
@@ -149,6 +150,7 @@ def chart_data():
             FROM ReviewLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.ReviewDate >= ? AND (rl.Action IS NULL OR rl.Action = 'view')
+              AND COALESCE(rl.TimedOut, 0) = 0
               AND rs.ProfileID = ?
             GROUP BY DATEPART(hour, rl.ReviewDate), DATEPART(weekday, rl.ReviewDate)
             ORDER BY DATEPART(weekday, rl.ReviewDate), DATEPART(hour, rl.ReviewDate)
@@ -265,6 +267,7 @@ def chart_data():
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE())
               AND (rl.Action IS NULL OR rl.Action = 'view')
+              AND COALESCE(rl.TimedOut, 0) = 0
               AND rs.ProfileID = ?
               AND c.CreatedBy = ?
               AND f.CreatedBy = ?
@@ -310,6 +313,7 @@ def chart_data():
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE())
               AND (rl.Action IS NULL OR rl.Action = 'view')
+              AND COALESCE(rl.TimedOut, 0) = 0
               AND rs.ProfileID = ?
         """, (profile_id,)),
 
@@ -335,7 +339,7 @@ def chart_data():
                     s.SessionID,
                     COUNT(DISTINCT rl.FactID) as FactCount
                 FROM ReviewSessions s
-                LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view')
+                LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
                 WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
                   AND s.ProfileID = ?
                 GROUP BY s.SessionID
@@ -350,7 +354,7 @@ def chart_data():
                     ELSE 0 
                 END as BestFactsPerMinute
             FROM ReviewSessions s
-            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view')
+            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
             WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
               AND s.ProfileID = ?
             GROUP BY s.SessionID, s.DurationSeconds
@@ -394,6 +398,7 @@ def chart_data():
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.SessionDuration IS NOT NULL AND rl.SessionDuration > 0
               AND (rl.Action IS NULL OR rl.Action = 'view')
+              AND COALESCE(rl.TimedOut, 0) = 0
               AND rs.ProfileID = ?
         """, (profile_id,)),
         
@@ -409,6 +414,7 @@ def chart_data():
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.SessionDuration IS NOT NULL AND rl.SessionDuration > 0
               AND (rl.Action IS NULL OR rl.Action = 'view')
+              AND COALESCE(rl.TimedOut, 0) = 0
               AND rs.ProfileID = ?
               AND c.CreatedBy = ?
             GROUP BY c.CategoryName
@@ -447,7 +453,7 @@ def chart_data():
                     ELSE 0 
                 END as ReviewsPerMinute
             FROM ReviewSessions s
-            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view')
+            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
             WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
               AND s.ProfileID = ?
             GROUP BY s.SessionID, s.StartTime, s.DurationSeconds
@@ -497,6 +503,7 @@ def chart_data():
             FROM ReviewLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
+              AND COALESCE(rl.TimedOut, 0) = 0
             GROUP BY DATEPART(weekday, ReviewDate)
             ORDER BY DATEPART(weekday, ReviewDate)
         """, (profile_id,)),
@@ -508,6 +515,7 @@ def chart_data():
             FROM ReviewLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
+              AND COALESCE(rl.TimedOut, 0) = 0
             GROUP BY DATEPART(hour, ReviewDate)
             ORDER BY COUNT(*) DESC
         """, (profile_id,)),
@@ -536,6 +544,7 @@ def chart_data():
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.ReviewDate >= DATEADD(month, -6, GETDATE())
               AND (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
+              AND COALESCE(rl.TimedOut, 0) = 0
             GROUP BY YEAR(ReviewDate), MONTH(ReviewDate)
             ORDER BY YEAR(ReviewDate), MONTH(ReviewDate)
         """, (profile_id,)),
@@ -701,7 +710,8 @@ def chart_data():
                     rl.SessionID,
                     COUNT(DISTINCT rl.FactID) as UniqueFactsReviewed
                 FROM ReviewLogs rl
-                WHERE rl.Action IS NULL OR rl.Action = 'view'
+                WHERE (rl.Action IS NULL OR rl.Action = 'view')
+                  AND COALESCE(rl.TimedOut, 0) = 0
                 GROUP BY rl.SessionID
             ) sub ON s.SessionID = sub.SessionID
             WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
@@ -1020,7 +1030,7 @@ def chart_data():
             COUNT(rl.ReviewLogID) AS Views,
             COUNT(DISTINCT rl.FactID) AS DistinctFacts
         FROM ReviewSessions s
-        LEFT JOIN ReviewLogs rl ON rl.SessionID = s.SessionID AND (rl.Action IS NULL OR rl.Action = 'view')
+        LEFT JOIN ReviewLogs rl ON rl.SessionID = s.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
         WHERE s.ProfileID = ?
         GROUP BY s.SessionID, s.StartTime, s.EndTime, s.DurationSeconds
         ORDER BY s.SessionID DESC
@@ -1041,6 +1051,7 @@ def chart_data():
         LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
         LEFT JOIN Categories c2 ON rl.CategoryIDSnapshot = c2.CategoryID
         WHERE (rl.Action IS NULL OR rl.Action = 'view')
+          AND COALESCE(rl.TimedOut, 0) = 0
           AND s.ProfileID = ?
         ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.ReviewLogID DESC
     """, (profile_id,))
@@ -1061,6 +1072,7 @@ def chart_data():
             LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
             LEFT JOIN Categories c2 ON rl.CategoryIDSnapshot = c2.CategoryID
             WHERE (rl.Action IS NULL OR rl.Action = 'view')
+              AND COALESCE(rl.TimedOut, 0) = 0
               AND s.ProfileID = ?
             ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.ReviewLogID DESC
         """, (profile_id,))
@@ -1138,7 +1150,9 @@ def calculate_review_streak(profile_id: int):
     SELECT DISTINCT CONVERT(date, rl.ReviewDate) as ReviewDate
     FROM ReviewLogs rl
     JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
-    WHERE (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
+    WHERE (rl.Action IS NULL OR rl.Action = 'view')
+      AND COALESCE(rl.TimedOut, 0) = 0
+      AND rs.ProfileID = ?
     ORDER BY CONVERT(date, rl.ReviewDate) DESC
     """
 

@@ -1712,7 +1712,16 @@ class FactDariApp:
         """
         try:
             if self.current_review_log_id and self.current_fact_start_time:
-                elapsed = int((datetime.now() - self.current_fact_start_time).total_seconds())
+                # If timing out, cap elapsed at last activity to avoid counting idle time
+                end_ts = None
+                try:
+                    if timed_out and getattr(self, "last_activity_time", None):
+                        end_ts = self.last_activity_time
+                except Exception:
+                    end_ts = None
+                if end_ts is None:
+                    end_ts = datetime.now()
+                elapsed = int((end_ts - self.current_fact_start_time).total_seconds())
                 if elapsed < 0:
                     elapsed = 0
                 # Try to update with TimedOut flag if column exists
@@ -1802,26 +1811,60 @@ class FactDariApp:
             self.finalize_current_fact_view(timed_out=False)
 
             if self.current_session_id:
+                # Compute duration ignoring idle time after last activity when timed out
+                duration_seconds = None
+                try:
+                    end_marker = None
+                    if timed_out and getattr(self, "last_activity_time", None):
+                        end_marker = self.last_activity_time
+                    if end_marker is None:
+                        end_marker = datetime.now()
+                    if self.session_start_time:
+                        duration_seconds = int((end_marker - self.session_start_time).total_seconds())
+                        if duration_seconds < 0:
+                            duration_seconds = 0
+                except Exception:
+                    duration_seconds = None
+                if duration_seconds is None:
+                    try:
+                        if self.session_start_time:
+                            duration_seconds = int((datetime.now() - self.session_start_time).total_seconds())
+                            if duration_seconds < 0:
+                                duration_seconds = 0
+                    except Exception:
+                        duration_seconds = 0
+                if duration_seconds is None:
+                    duration_seconds = 0
+
                 updated = self.execute_update(
                     """
                     UPDATE ReviewSessions
-                    SET EndTime = GETDATE(),
-                        DurationSeconds = DATEDIFF(second, StartTime, GETDATE()),
+                    SET EndTime = DATEADD(second, ?, StartTime),
+                        DurationSeconds = ?,
                         TimedOut = ?
                     WHERE SessionID = ?
                     """,
-                    (1 if timed_out else 0, self.current_session_id)
+                    (
+                        duration_seconds,
+                        duration_seconds,
+                        1 if timed_out else 0,
+                        self.current_session_id
+                    )
                 )
                 if not updated:
                     # Fallback without TimedOut if migration hasn't applied yet
                     self.execute_update(
                         """
                         UPDATE ReviewSessions
-                        SET EndTime = GETDATE(),
-                            DurationSeconds = DATEDIFF(second, StartTime, GETDATE())
+                        SET EndTime = DATEADD(second, ?, StartTime),
+                            DurationSeconds = ?
                         WHERE SessionID = ?
                         """,
-                        (self.current_session_id,)
+                        (
+                            duration_seconds,
+                            duration_seconds,
+                            self.current_session_id
+                        )
                     )
         except Exception as e:
             print(f"Error ending session: {e}")
