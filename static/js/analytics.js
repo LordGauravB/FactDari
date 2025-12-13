@@ -1782,22 +1782,37 @@
     });
   }
   
+  // Helper function to format duration with appropriate unit
+  function formatDuration(seconds) {
+    if (!seconds || seconds <= 0) return '0 sec';
+    const totalHours = seconds / 3600;
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.round(seconds % 60);
+
+    if (totalHours >= 1) {
+      // Show decimal hours (e.g., 1.5 hrs for 1 hour 30 mins)
+      const displayHours = Math.round(totalHours * 10) / 10; // Round to 1 decimal
+      return `${displayHours} hr${displayHours !== 1 ? 's' : ''}`;
+    } else if (minutes > 0) {
+      return `${minutes} min`;
+    } else {
+      return `${secs} sec`;
+    }
+  }
+
   // Render duration statistics
   function renderDurationStats(sessionStats, reviewTimeStats, avgFactsPerSession, bestEfficiency) {
     if (sessionStats) {
-      const avgSession = sessionStats.AvgDuration ? Math.round(sessionStats.AvgDuration / 60) : 0;
-      const totalTime = sessionStats.TotalDuration ? Math.round(sessionStats.TotalDuration / 3600) : 0;
-      const maxSession = sessionStats.MaxDuration ? Math.round(sessionStats.MaxDuration / 60) : 0;
       const totalSessions = sessionStats.SessionCount || 0;
-      
+
       const avgEl = qs('#avg-session-duration');
       const totalEl = qs('#total-session-time');
       const maxEl = qs('#max-session-duration');
       const sessionsEl = qs('#total-sessions');
-      
-      if (avgEl) avgEl.textContent = `${avgSession} min`;
-      if (totalEl) totalEl.textContent = `${totalTime} hrs`;
-      if (maxEl) maxEl.textContent = `${maxSession} min`;
+
+      if (avgEl) avgEl.textContent = formatDuration(sessionStats.AvgDuration);
+      if (totalEl) totalEl.textContent = formatDuration(sessionStats.TotalDuration);
+      if (maxEl) maxEl.textContent = formatDuration(sessionStats.MaxDuration);
       if (sessionsEl) sessionsEl.textContent = totalSessions;
     }
     
