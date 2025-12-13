@@ -146,6 +146,8 @@ class FactDariApp:
         # Timer pause state (exclude non-review time like add/edit/delete dialogs)
         self.timer_paused = False
         self.pause_started_at = None
+        self.category_dropdown_open = False
+        self._dropdown_seen_open = False
         # Inactivity tracking
         self.idle_timeout_seconds = getattr(config, 'IDLE_TIMEOUT_SECONDS', 300)
         self.idle_end_session = getattr(config, 'IDLE_END_SESSION', True)
@@ -485,7 +487,6 @@ class FactDariApp:
         self.root.bind("<s>", self.set_static_position)
         self.category_dropdown.bind("<Button-1>", self.on_category_dropdown_open, add="+")
         self.category_dropdown.bind("<<ComboboxSelected>>", self.on_category_dropdown_selected)
-        self.category_dropdown.bind("<FocusOut>", lambda e: self.resume_review_timer(), add="+")
         # Global input to detect activity
         self.root.bind_all('<Any-KeyPress>', lambda e: self.record_activity())
         self.root.bind_all('<Button>', lambda e: self.record_activity())
@@ -1630,7 +1631,14 @@ class FactDariApp:
         # 1) Finalize previous view's duration if any
         try:
             if self.current_review_log_id and self.current_fact_start_time:
-                elapsed = int((now - self.current_fact_start_time).total_seconds())
+                end_point = now
+                # If currently paused, cap at pause start so paused time isn't counted
+                try:
+                    if getattr(self, "timer_paused", False) and self.pause_started_at:
+                        end_point = self.pause_started_at
+                except Exception:
+                    pass
+                elapsed = int((end_point - self.current_fact_start_time).total_seconds())
                 if elapsed < 0:
                     elapsed = 0
                 self.execute_update(
@@ -1743,6 +1751,7 @@ class FactDariApp:
                     self.current_fact_start_time = self.current_fact_start_time + delta
                 self.pause_started_at = None
                 self.timer_paused = False
+                self.category_dropdown_open = False
         except Exception:
             pass
 
@@ -1761,6 +1770,12 @@ class FactDariApp:
                     end_ts = None
                 if end_ts is None:
                     end_ts = datetime.now()
+                # If paused, cap at pause start so paused time is excluded even if not resumed yet
+                try:
+                    if getattr(self, "timer_paused", False) and self.pause_started_at:
+                        end_ts = min(end_ts, self.pause_started_at)
+                except Exception:
+                    pass
                 elapsed = int((end_ts - self.current_fact_start_time).total_seconds())
                 if elapsed < 0:
                     elapsed = 0
@@ -2855,16 +2870,57 @@ class FactDariApp:
         """Pause timing while the category dropdown is open."""
         try:
             self.pause_review_timer()
+            self.category_dropdown_open = True
+            self._dropdown_seen_open = False
+            # Start polling after a tiny delay to let the popdown map
+            self.root.after(100, self._poll_category_dropdown_close)
         except Exception:
             pass
 
     def on_category_dropdown_selected(self, event=None):
         """Resume timing once a category is chosen, then handle the change."""
         try:
+            self.category_dropdown_open = False
             self.resume_review_timer()
         except Exception:
             pass
         self.on_category_change(event)
+
+    def _poll_category_dropdown_close(self):
+        """Detect when the dropdown popdown window closes to resume timing."""
+        try:
+            if not getattr(self, "category_dropdown_open", False):
+                return
+            popdown = self.category_dropdown.tk.call("ttk::combobox::PopdownWindow", self.category_dropdown)
+            is_open = bool(int(self.category_dropdown.tk.call("winfo", "ismapped", popdown)))
+            if is_open:
+                self._dropdown_seen_open = True
+                # Keep polling until it closes
+                self.root.after(120, self._poll_category_dropdown_close)
+                return
+            # Not open right now
+            if self._dropdown_seen_open:
+                # Was open and now closed -> resume
+                self.category_dropdown_open = False
+                try:
+                    self.resume_review_timer()
+                except Exception:
+                    pass
+                return
+            # Haven't seen it open yet; keep polling briefly
+            self.root.after(120, self._poll_category_dropdown_close)
+        except Exception:
+            # If detection fails, keep polling a bit instead of resuming immediately
+            try:
+                if getattr(self, "category_dropdown_open", False):
+                    self.root.after(150, self._poll_category_dropdown_close)
+            except Exception:
+                pass
+        # Still open; poll again shortly
+        try:
+            self.root.after(150, self._poll_category_dropdown_close)
+        except Exception:
+            pass
 
     def on_category_change(self, event=None):
         """Handle category dropdown change"""
