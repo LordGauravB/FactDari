@@ -148,6 +148,8 @@ class FactDariApp:
         self.pause_started_at = None
         self.category_dropdown_open = False
         self._dropdown_seen_open = False
+        # Prevent overlapping AI requests
+        self.ai_request_inflight = False
         # Inactivity tracking
         self.idle_timeout_seconds = getattr(config, 'IDLE_TIMEOUT_SECONDS', 300)
         self.idle_end_session = getattr(config, 'IDLE_END_SESSION', True)
@@ -1030,6 +1032,13 @@ class FactDariApp:
         """Open a popup and ask Together AI to explain the current fact in simple words."""
         if self.is_home_page or not self.current_fact_id:
             return
+        if getattr(self, "ai_request_inflight", False):
+            try:
+                self.status_label.config(text="AI request already in progress…", fg=self.STATUS_COLOR)
+                self.clear_status_after_delay(2500)
+            except Exception:
+                pass
+            return
 
         fact_text = (self.fact_label.cget("text") or "").strip()
         if not fact_text:
@@ -1046,6 +1055,7 @@ class FactDariApp:
 
         # Pause session timer while popup is open
         self.pause_review_timer()
+        self.ai_request_inflight = True
 
         win = tk.Toplevel(self.root)
         win.title("AI Fact Explanation")
@@ -1090,6 +1100,10 @@ class FactDariApp:
                 self.ai_button.config(state="normal")
             except Exception:
                 pass
+            try:
+                self.ai_request_inflight = False
+            except Exception:
+                pass
             win.destroy()
 
         win.protocol("WM_DELETE_WINDOW", on_close)
@@ -1113,6 +1127,11 @@ class FactDariApp:
         explain_box.pack(fill="both", expand=True, pady=4)
 
         def update_text(text, use_markdown=False):
+            try:
+                if not explain_box.winfo_exists():
+                    return
+            except Exception:
+                return
             if use_markdown:
                 self._render_markdown_to_text(explain_box, text)
             else:
@@ -1155,6 +1174,13 @@ class FactDariApp:
             "provider": getattr(self, 'ai_provider', "together"),
             "status": "SUCCESS",
         }
+
+        def _record_latency():
+            try:
+                usage_info["latency_ms"] = int((time.perf_counter() - started) * 1000)
+            except Exception:
+                pass
+
         try:
             payload = {
                 "model": usage_info["model"],
@@ -1181,8 +1207,7 @@ class FactDariApp:
                 headers=headers,
                 timeout=30
             )
-            latency_ms = int((time.perf_counter() - started) * 1000)
-            usage_info["latency_ms"] = latency_ms
+            _record_latency()
             if resp.status_code != 200:
                 usage_info["status"] = "FAILED"
                 return f"Error from AI ({resp.status_code}): {resp.text}", usage_info
@@ -1207,11 +1232,16 @@ class FactDariApp:
                 "total_tokens": total_tokens,
             })
             return message.strip() or "No explanation returned.", usage_info
+        except requests.exceptions.Timeout:
+            _record_latency()
+            usage_info["status"] = "FAILED"
+            return "Timed out contacting AI. Please try again.", usage_info
+        except requests.exceptions.ConnectionError:
+            _record_latency()
+            usage_info["status"] = "FAILED"
+            return "Network error reaching AI service. Check your connection or VPN and retry.", usage_info
         except Exception as exc:
-            try:
-                usage_info["latency_ms"] = int((time.perf_counter() - started) * 1000)
-            except Exception:
-                pass
+            _record_latency()
             usage_info["status"] = "FAILED"
             return f"Failed to fetch explanation: {exc}", usage_info
 
