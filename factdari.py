@@ -483,7 +483,9 @@ class FactDariApp:
         self.root.bind("<FocusIn>", lambda event: self.root.attributes('-alpha', 1.0))
         self.root.bind("<FocusOut>", lambda event: self.root.attributes('-alpha', 0.7))
         self.root.bind("<s>", self.set_static_position)
-        self.category_dropdown.bind("<<ComboboxSelected>>", self.on_category_change)
+        self.category_dropdown.bind("<Button-1>", self.on_category_dropdown_open, add="+")
+        self.category_dropdown.bind("<<ComboboxSelected>>", self.on_category_dropdown_selected)
+        self.category_dropdown.bind("<FocusOut>", lambda e: self.resume_review_timer(), add="+")
         # Global input to detect activity
         self.root.bind_all('<Any-KeyPress>', lambda e: self.record_activity())
         self.root.bind_all('<Button>', lambda e: self.record_activity())
@@ -524,12 +526,12 @@ class FactDariApp:
         """Attach tooltips to interactive widgets for discoverability."""
         try:
             ToolTip(self.home_button, "Home (h)")
-            ToolTip(self.speaker_button, "Speak text")
+            ToolTip(self.speaker_button, "Speak text (v)")
             ToolTip(self.star_button, "Toggle favorite (f)")
             ToolTip(self.easy_button, "Mark as known (k)")
-            ToolTip(self.ai_button, "AI explain fact")
+            ToolTip(self.ai_button, "AI explain fact (x)")
             ToolTip(self.graph_button, "Analytics (g)")
-            ToolTip(self.info_button, "Show shortcuts")
+            ToolTip(self.info_button, "Show shortcuts (i)")
             ToolTip(self.add_icon_button, "Add fact (a)")
             ToolTip(self.edit_icon_button, "Edit fact (e)")
             ToolTip(self.delete_icon_button, "Delete fact (d)")
@@ -541,6 +543,11 @@ class FactDariApp:
 
     def show_shortcuts_window(self):
         """Show a window listing available keyboard shortcuts."""
+        # Pause timing while shortcuts popup is open
+        try:
+            self.pause_review_timer()
+        except Exception:
+            pass
         win = tk.Toplevel(self.root)
         win.title("Keyboard Shortcuts")
         # Size and position per UI config
@@ -549,6 +556,15 @@ class FactDariApp:
         except Exception:
             win.geometry(self.POPUP_INFO_SIZE)
         win.configure(bg=self.BG_COLOR)
+
+        def on_close():
+            try:
+                self.resume_review_timer()
+            except Exception:
+                pass
+            win.destroy()
+
+        win.protocol("WM_DELETE_WINDOW", on_close)
 
         header = tk.Label(win, text="Keyboard Shortcuts", fg=self.TEXT_COLOR, bg=self.BG_COLOR, font=self.TITLE_FONT)
         header.pack(pady=10)
@@ -577,9 +593,10 @@ class FactDariApp:
         row("Achievements", "l")
         row("Show Shortcuts", "i")
         row("Toggle Favorite", "f")
+        row("Mark as Known", "k")
         row("Static Position", "s")
 
-        tk.Button(win, text="Close", command=win.destroy, bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5).pack(pady=10)
+        tk.Button(win, text="Close", command=on_close, bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5).pack(pady=10)
 
     def show_achievements_window(self):
         """Display achievements, status, and progress."""
@@ -590,6 +607,10 @@ class FactDariApp:
             except Exception:
                 pass
             return
+        try:
+            self.pause_review_timer()
+        except Exception:
+            pass
         win = tk.Toplevel(self.root)
         win.title("Achievements")
         try:
@@ -598,9 +619,18 @@ class FactDariApp:
             win.geometry(self.POPUP_ACHIEVEMENTS_SIZE)
         win.configure(bg=self.BG_COLOR)
 
+        def on_close():
+            try:
+                self.resume_review_timer()
+            except Exception:
+                pass
+            win.destroy()
+
+        win.protocol("WM_DELETE_WINDOW", on_close)
+
         header = tk.Label(win, text="Achievements", fg=self.TEXT_COLOR, bg=self.BG_COLOR, font=self.TITLE_FONT)
         header.pack(pady=(10, 4))
-        sub = tk.Label(win, text="Click a column to resize. New (unseen) unlocks show green.", fg=self.STATUS_COLOR, bg=self.BG_COLOR, font=self.SMALL_FONT)
+        sub = tk.Label(win, text="Click a column to resize. Unlocked achievements show in green.", fg=self.STATUS_COLOR, bg=self.BG_COLOR, font=self.SMALL_FONT)
         sub.pack()
 
         # Treeview for achievements (with scrollbars so all columns are accessible even on small widths)
@@ -637,9 +667,30 @@ class FactDariApp:
             data = self.gamify.get_achievements_with_status()
         except Exception:
             data = []
+        # Sort unlocked (most recent first) above locked
+        def _ach_sort(row):
+            unlocked_flag = 0 if row.get('Unlocked') else 1
+            ts = 0
+            try:
+                dt = row.get('UnlockDate')
+                if dt:
+                    ts = float(dt.timestamp()) if hasattr(dt, "timestamp") else 0
+            except Exception:
+                ts = 0
+            category = str(row.get('Category') or "")
+            threshold_val = 0
+            try:
+                threshold_val = int(row.get('Threshold') or 0)
+            except Exception:
+                threshold_val = 0
+            return (unlocked_flag, -ts, category, threshold_val)
+
+        try:
+            data = sorted(data, key=_ach_sort)
+        except Exception:
+            pass
         for row in data:
             unlocked = row.get('Unlocked')
-            notified = bool(row.get('Notified'))
             name = row.get('Name')
             category = row.get('Category')
             threshold = int(row.get('Threshold', 0))
@@ -649,32 +700,21 @@ class FactDariApp:
             prog_text = f"{min(progress, threshold)}/{threshold}"
             vals = (status_text, name, category, prog_text, f"{reward} XP")
             iid = tree.insert('', 'end', values=vals)
-            # Color only new (unseen) unlocks
+            # Color unlocked achievements
             try:
-                if unlocked and not notified:
-                    tree.item(iid, tags=('new_unlock',))
+                if unlocked:
+                    tree.item(iid, tags=('unlocked',))
             except Exception:
                 pass
         try:
-            tree.tag_configure('new_unlock', foreground=self.GREEN_COLOR)
+            tree.tag_configure('unlocked', foreground=self.GREEN_COLOR)
         except Exception:
             pass
 
-        # Buttons
+        # Close button
         btns = tk.Frame(win, bg=self.BG_COLOR)
         btns.pack(pady=(0, 10))
-
-        def mark_seen():
-            try:
-                self.gamify.mark_all_unnotified_as_notified()
-                self.status_label.config(text="Marked new unlocks as seen", fg=self.STATUS_COLOR)
-                self.clear_status_after_delay(2000)
-            except Exception:
-                pass
-
-        tk.Button(btns, text="Mark New Unlocks Seen", command=mark_seen,
-                  bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5).pack(side='left', padx=6)
-        tk.Button(btns, text="Close", command=win.destroy,
+        tk.Button(btns, text="Close", command=on_close,
                   bg=self.GRAY_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5).pack(side='left', padx=6)
 
     def confirm_dialog(self, title, message, ok_text="OK", cancel_text="Cancel"):
@@ -1874,7 +1914,7 @@ class FactDariApp:
     
     def toggle_favorite(self):
         """Toggle the favorite status of the current fact"""
-        if not self.current_fact_id:
+        if self.is_home_page or not self.current_fact_id:
             return
         profile_id = self.get_active_profile_id()
 
@@ -1947,7 +1987,7 @@ class FactDariApp:
 
     def toggle_easy(self):
         """Toggle the 'known/easy' status of the current fact"""
-        if not self.current_fact_id:
+        if self.is_home_page or not self.current_fact_id:
             return
         profile_id = self.get_active_profile_id()
         new_status = not self.current_fact_is_easy
@@ -2541,8 +2581,21 @@ class FactDariApp:
     
     def manage_categories(self):
         """Open a window to manage categories"""
+        try:
+            self.pause_review_timer()
+        except Exception:
+            pass
         # Create the category management window
         cat_window = self._create_category_window()
+
+        def on_close():
+            try:
+                self.resume_review_timer()
+            except Exception:
+                pass
+            cat_window.destroy()
+
+        cat_window.protocol("WM_DELETE_WINDOW", on_close)
         
         # Create the UI components
         self._create_add_category_ui(cat_window)
@@ -2670,13 +2723,6 @@ class FactDariApp:
                                     command=lambda: self._delete_category(cat_listbox, refresh_callback), 
                                     cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5)
         delete_button_cat.pack(side="left", padx=5)
-        
-        # Close button
-        close_button = tk.Button(parent, text="Close", bg=self.GRAY_COLOR, fg=self.TEXT_COLOR, 
-                              command=parent.destroy, cursor="hand2", borderwidth=0, 
-                              highlightthickness=0, padx=20, pady=5,
-                              font=(self.NORMAL_FONT[0], self.NORMAL_FONT[1], 'bold'))
-        close_button.pack(pady=15)
     
     def _rename_category(self, cat_listbox, refresh_callback):
         """Handle renaming a category"""
@@ -2805,6 +2851,21 @@ class FactDariApp:
         label.pack(side=side)
         return label
     
+    def on_category_dropdown_open(self, event=None):
+        """Pause timing while the category dropdown is open."""
+        try:
+            self.pause_review_timer()
+        except Exception:
+            pass
+
+    def on_category_dropdown_selected(self, event=None):
+        """Resume timing once a category is chosen, then handle the change."""
+        try:
+            self.resume_review_timer()
+        except Exception:
+            pass
+        self.on_category_change(event)
+
     def on_category_change(self, event=None):
         """Handle category dropdown change"""
         self.load_all_facts()

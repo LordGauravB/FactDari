@@ -158,6 +158,23 @@ Available on:
 | `i` | Show Shortcuts |
 | `s` | Set static position |
 
+### Review Timer Pausing
+
+The app tracks how long you spend reviewing each card. To ensure accurate timing, the review timer automatically pauses when you open any dialog or popup:
+
+| Trigger | Description |
+|---------|-------------|
+| Keyboard Shortcuts (`i`) | Viewing the shortcuts help window |
+| Achievements (`l`) | Viewing achievements and progress |
+| AI Explanation (`x`) | Getting an AI-generated explanation |
+| Add Fact (`a`) | Adding a new fact |
+| Edit Fact (`e`) | Editing an existing fact |
+| Delete Fact (`d`) | Confirming fact deletion |
+| Manage Categories (`c`) | Managing categories window |
+| Category Dropdown | Opening the category filter dropdown |
+
+The timer resumes automatically when the dialog closes.
+
 ### Analytics
 - Run the analytics server:
   ```
