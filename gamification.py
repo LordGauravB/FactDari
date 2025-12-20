@@ -91,6 +91,35 @@ class Gamification:
                 conn.commit()
         return self.get_profile()
 
+    def add_question_usage(self, total_tokens: int = 0, cost: float = 0.0) -> dict:
+        """Accumulate question generation token/cost totals on the profile."""
+        try:
+            tokens_val = int(total_tokens or 0)
+        except Exception:
+            tokens_val = 0
+        try:
+            cost_val = float(cost or 0.0)
+        except Exception:
+            cost_val = 0.0
+
+        if tokens_val <= 0 and cost_val <= 0.0:
+            return self.get_profile()
+
+        with pyodbc.connect(self.conn_str) as conn:
+            with conn.cursor() as cur:
+                pid = self._get_or_create_profile_id(cur, conn)
+                cur.execute(
+                    """
+                    UPDATE GamificationProfile
+                    SET TotalQuestionTokens = ISNULL(TotalQuestionTokens,0) + ?,
+                        TotalQuestionCost = ISNULL(TotalQuestionCost,0) + ?
+                    WHERE ProfileID = ?
+                    """,
+                    (tokens_val, cost_val, pid)
+                )
+                conn.commit()
+        return self.get_profile()
+
     def award_xp(self, amount: int) -> dict:
         if amount <= 0:
             return self.get_profile()

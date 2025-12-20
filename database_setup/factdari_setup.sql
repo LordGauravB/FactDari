@@ -19,6 +19,8 @@ GO
 
 -- Step 3: Drop tables if they exist (order matters due to FKs)
 IF OBJECT_ID('AchievementUnlocks', 'U') IS NOT NULL DROP TABLE AchievementUnlocks;
+IF OBJECT_ID('QuestionLogs', 'U') IS NOT NULL DROP TABLE QuestionLogs;
+IF OBJECT_ID('Questions', 'U') IS NOT NULL DROP TABLE Questions;
 IF OBJECT_ID('AIUsageLogs', 'U') IS NOT NULL DROP TABLE AIUsageLogs;
 IF OBJECT_ID('ReviewLogs', 'U') IS NOT NULL DROP TABLE ReviewLogs;
 IF OBJECT_ID('ReviewSessions', 'U') IS NOT NULL DROP TABLE ReviewSessions;
@@ -42,6 +44,8 @@ CREATE TABLE GamificationProfile (
     TotalDeletes INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalDeletes DEFAULT 0,
     TotalAITokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAITokens DEFAULT 0,
     TotalAICost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalAICost DEFAULT 0,
+    TotalQuestionTokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalQuestionTokens DEFAULT 0,
+    TotalQuestionCost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalQuestionCost DEFAULT 0,
     CurrentStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_CurrentStreak DEFAULT 0,
     LongestStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_LongestStreak DEFAULT 0,
     LastCheckinDate DATE NULL
@@ -67,6 +71,7 @@ CREATE TABLE Facts (
     Content NVARCHAR(MAX) NOT NULL,
     DateAdded DATE NOT NULL CONSTRAINT DF_Facts_DateAdded DEFAULT GETDATE(),
     TotalViews INT NOT NULL CONSTRAINT DF_Facts_TotalViews DEFAULT 0,
+    QuestionsRefreshCountdown INT NOT NULL CONSTRAINT DF_Facts_QuestionsRefreshCountdown DEFAULT 50,
     CreatedBy INT NOT NULL CONSTRAINT DF_Facts_CreatedBy DEFAULT 1
         CONSTRAINT FK_Facts_CreatedBy REFERENCES GamificationProfile(ProfileID)
 );
@@ -152,7 +157,56 @@ CREATE TABLE AIUsageLogs (
         REFERENCES ReviewSessions(SessionID) ON DELETE SET NULL
 );
 
--- Step 11: Create Achievements table (catalog of all possible achievements)
+-- Step 11: Create Questions table (cache of pre-generated questions, up to 3 per fact)
+CREATE TABLE Questions (
+    QuestionID INT IDENTITY(1,1) PRIMARY KEY,
+
+    -- Link to fact
+    FactID INT NOT NULL
+        CONSTRAINT FK_Questions_Facts REFERENCES Facts(FactID) ON DELETE CASCADE,
+
+    -- The generated question content
+    QuestionText NVARCHAR(MAX) NOT NULL,
+
+    -- LLM generation cost (one-time when question is created)
+    ModelName NVARCHAR(200) NULL,
+    Provider NVARCHAR(100) NULL,
+    InputTokens INT NULL,
+    OutputTokens INT NULL,
+    TotalTokens AS (ISNULL(InputTokens, 0) + ISNULL(OutputTokens, 0)) PERSISTED,
+    Cost DECIMAL(19,9) NULL,
+    CurrencyCode CHAR(3) NOT NULL CONSTRAINT DF_Questions_CurrencyCode DEFAULT 'USD',
+    LatencyMs INT NULL,
+    Status NVARCHAR(16) NOT NULL CONSTRAINT DF_Questions_Status DEFAULT 'SUCCESS',
+
+    -- Usage stats
+    TimesShown INT NOT NULL CONSTRAINT DF_Questions_TimesShown DEFAULT 0,
+    LastShownAt DATETIME NULL,
+
+    GeneratedAt DATETIME NOT NULL CONSTRAINT DF_Questions_GeneratedAt DEFAULT GETDATE()
+);
+
+-- Step 12: Create QuestionLogs table (tracks when cached questions are shown to users)
+CREATE TABLE QuestionLogs (
+    QuestionLogID INT IDENTITY(1,1) PRIMARY KEY,
+
+    -- Link to the cached question (not directly to fact)
+    QuestionID INT NOT NULL
+        CONSTRAINT FK_QuestionLogs_Questions REFERENCES Questions(QuestionID) ON DELETE CASCADE,
+    SessionID INT NULL
+        CONSTRAINT FK_QuestionLogs_Session REFERENCES ReviewSessions(SessionID) ON DELETE SET NULL,
+    ProfileID INT NOT NULL CONSTRAINT DF_QuestionLogs_ProfileID DEFAULT 1
+        CONSTRAINT FK_QuestionLogs_Profile REFERENCES GamificationProfile(ProfileID),
+
+    -- Timing metrics
+    QuestionShownAt DATETIME NOT NULL CONSTRAINT DF_QuestionLogs_QuestionShownAt DEFAULT GETDATE(),
+    AnswerRevealedAt DATETIME NULL,
+    QuestionReadingDurationSec INT NULL,    -- Calculated when answer is revealed
+
+    CreatedAt DATETIME NOT NULL CONSTRAINT DF_QuestionLogs_CreatedAt DEFAULT GETDATE()
+);
+
+-- Step 13: Create Achievements table (catalog of all possible achievements)
 CREATE TABLE Achievements (
     AchievementID INT IDENTITY(1,1) PRIMARY KEY,
     Code NVARCHAR(64) NOT NULL UNIQUE,
@@ -163,7 +217,7 @@ CREATE TABLE Achievements (
     CreatedDate DATETIME NOT NULL CONSTRAINT DF_Achievements_CreatedDate DEFAULT GETDATE()
 );
 
--- Step 12: Create AchievementUnlocks table (tracks which achievements have been earned)
+-- Step 14: Create AchievementUnlocks table (tracks which achievements have been earned)
 CREATE TABLE AchievementUnlocks (
     UnlockID INT IDENTITY(1,1) PRIMARY KEY,
     AchievementID INT NOT NULL
@@ -189,6 +243,11 @@ CREATE INDEX IX_AIUsageLogs_FactID ON AIUsageLogs(FactID);
 CREATE INDEX IX_AIUsageLogs_SessionID ON AIUsageLogs(SessionID);
 CREATE INDEX IX_AIUsageLogs_ProfileID ON AIUsageLogs(ProfileID);
 CREATE INDEX IX_AIUsageLogs_CreatedAt ON AIUsageLogs(CreatedAt);
+CREATE INDEX IX_Questions_FactID ON Questions(FactID);
+CREATE INDEX IX_QuestionLogs_QuestionID ON QuestionLogs(QuestionID);
+CREATE INDEX IX_QuestionLogs_SessionID ON QuestionLogs(SessionID);
+CREATE INDEX IX_QuestionLogs_ProfileID ON QuestionLogs(ProfileID);
+CREATE INDEX IX_QuestionLogs_CreatedAt ON QuestionLogs(CreatedAt);
 GO
 
 -- Seed default profile (ProfileID = 1) before inserting categories/facts
@@ -225,7 +284,7 @@ BEGIN
 END
 GO
 
--- Step 12: Insert expanded categories
+-- Step 15: Insert expanded categories
 INSERT INTO Categories (CategoryName, Description)
 VALUES
 ('General Knowledge', 'Broad facts and trivia across domains'),
@@ -246,7 +305,7 @@ VALUES
 ('DIY', 'Everyday home hacks: cleaning, organizing, minor fixes');
 GO
 
--- Step 13: Cache category IDs for readable inserts
+-- Step 16: Cache category IDs for readable inserts
 DECLARE
   @Cat_General INT = (SELECT CategoryID FROM Categories WHERE CategoryName='General Knowledge'),
   @Cat_Science INT = (SELECT CategoryID FROM Categories WHERE CategoryName='Science'),
@@ -266,7 +325,7 @@ DECLARE
   @Cat_DIY INT = (SELECT CategoryID FROM dbo.Categories WHERE CategoryName = 'DIY');
 
 
--- Step 14:  Insert Facts
+-- Step 17: Insert Facts
 INSERT INTO Facts (CategoryID, Content, DateAdded, TotalViews, CreatedBy)
 VALUES
 (@Cat_General, N'Ada Lovelace''s 1843 notes described a general-purpose algorithm for Babbage''s engine — she''s often called the first computer programmer.', GETDATE(), 0, 1),

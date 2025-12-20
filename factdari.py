@@ -150,6 +150,13 @@ class FactDariApp:
         self._dropdown_seen_open = False
         # Prevent overlapping AI requests
         self.ai_request_inflight = False
+        # Question Mode state (always enabled - questions shown before facts)
+        self.question_mode_enabled = True
+        self.current_question_id = None
+        self.current_question_log_id = None
+        self.question_shown_at = None
+        self.answer_revealed = False
+        self.question_request_inflight = False
         # Inactivity tracking
         self.idle_timeout_seconds = getattr(config, 'IDLE_TIMEOUT_SECONDS', 300)
         self.idle_end_session = getattr(config, 'IDLE_END_SESSION', True)
@@ -326,18 +333,18 @@ class FactDariApp:
         # Navigation buttons frame
         self.nav_frame = tk.Frame(self.content_frame, bg=self.BG_COLOR)
         
-        nav_buttons = tk.Frame(self.nav_frame, bg=self.BG_COLOR)
-        nav_buttons.pack(side="top")
-        
+        self.nav_buttons = tk.Frame(self.nav_frame, bg=self.BG_COLOR)
+        self.nav_buttons.pack(side="top")
+
         # Previous button
-        self.prev_button = tk.Button(nav_buttons, text="Previous", command=self.show_previous_fact, 
+        self.prev_button = tk.Button(self.nav_buttons, text="Previous", command=self.show_previous_fact,
                            bg=self.BLUE_COLOR, fg=self.TEXT_COLOR,
                            cursor="hand2", borderwidth=0, highlightthickness=0, padx=10, pady=5, width=10)
         self.prev_button.pack(side="left", padx=5)
-        
+
         # Next button
-        self.next_button = tk.Button(nav_buttons, text="Next", command=self.show_next_fact,
-                                bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0, 
+        self.next_button = tk.Button(self.nav_buttons, text="Next", command=self.show_next_fact,
+                                bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, cursor="hand2", borderwidth=0,
                                 highlightthickness=0, padx=10, pady=5, width=10)
         self.next_button.pack(side="left", padx=5)
         
@@ -402,6 +409,22 @@ class FactDariApp:
             highlightthickness=0
         )
         self.ai_button.place(relx=1.0, rely=0, anchor="ne", x=-105, y=5)
+
+        # Reveal Answer button (same style and position as nav buttons, shown in question mode)
+        self.reveal_button = tk.Button(
+            self.nav_buttons,
+            text="Reveal Answer",
+            command=self.reveal_answer,
+            bg=self.GREEN_COLOR,
+            fg=self.TEXT_COLOR,
+            cursor="hand2",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=5,
+            width=21  # Width to span roughly same as Previous + Next combined
+        )
+        # Not packed initially; shown only in question mode when question is displayed
 
         # Add easy/known button (left of the star)
         self.easy_button = tk.Button(self.fact_frame, image=self.easy_icon, bg=self.BG_COLOR, command=self.toggle_easy,
@@ -512,6 +535,7 @@ class FactDariApp:
         self.root.bind("k", lambda e: self.toggle_easy())  # Shortcut for known/easy
         self.root.bind("x", lambda e: self.explain_fact_with_ai())  # Shortcut for AI explain
         self.root.bind("v", lambda e: self.speak_text())  # Shortcut for speak/voice
+        self.root.bind("<Return>", lambda e: self._handle_reveal_shortcut())  # Reveal answer in question mode
 
     def apply_rounded_corners(self, radius=None):
         """Apply rounded corners to the window"""
@@ -1259,6 +1283,372 @@ class FactDariApp:
         completion_cost = (completion_val / 1000.0) * float(getattr(self, 'ai_completion_cost_per_1k', 0) or 0)
         return round(prompt_cost + completion_cost, 9)
 
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Question Mode: LLM-generated questions before showing facts
+    # ─────────────────────────────────────────────────────────────────────────────
+
+    def _call_together_ai_for_questions(self, fact_text: str, api_key: str):
+        """Call Together AI to generate 3 questions for a fact; returns (list_of_questions, usage_info)."""
+        started = time.perf_counter()
+        usage_info = {
+            "operation_type": "QUESTION_GENERATION",
+            "model": getattr(self, 'ai_model', "deepseek-ai/DeepSeek-V3.1"),
+            "provider": getattr(self, 'ai_provider', "together"),
+            "status": "SUCCESS",
+        }
+
+        def _record_latency():
+            try:
+                usage_info["latency_ms"] = int((time.perf_counter() - started) * 1000)
+            except Exception:
+                pass
+
+        try:
+            payload = {
+                "model": usage_info["model"],
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Generate exactly 3 short, distinct questions that test knowledge of the following fact. "
+                            "Each question should be answerable by the fact provided. "
+                            "Output ONLY a valid JSON array with exactly 3 strings, no other text. "
+                            "Example format: [\"Question 1?\", \"Question 2?\", \"Question 3?\"]"
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Fact: {fact_text}"
+                    }
+                ],
+                "max_tokens": 300,
+                "temperature": 0.7,
+            }
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            resp = requests.post(
+                "https://api.together.xyz/v1/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=30
+            )
+            _record_latency()
+            if resp.status_code != 200:
+                usage_info["status"] = "FAILED"
+                return [], usage_info
+            data = resp.json()
+            choices = data.get("choices") or []
+            if not choices:
+                usage_info["status"] = "FAILED"
+                return [], usage_info
+            message = choices[0].get("message", {}).get("content", "")
+            raw_usage = data.get("usage") or {}
+            input_tokens = raw_usage.get("prompt_tokens")
+            output_tokens = raw_usage.get("completion_tokens")
+            total_tokens = raw_usage.get("total_tokens")
+            if total_tokens is None and (input_tokens is not None or output_tokens is not None):
+                total_tokens = int(input_tokens or 0) + int(output_tokens or 0)
+            usage_info.update({
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": total_tokens,
+            })
+            # Parse JSON array from response
+            import json as json_module
+            try:
+                # Clean up the response - sometimes LLMs add extra text
+                text = message.strip()
+                # Find the JSON array in the response
+                start_idx = text.find('[')
+                end_idx = text.rfind(']')
+                if start_idx != -1 and end_idx != -1:
+                    text = text[start_idx:end_idx + 1]
+                questions = json_module.loads(text)
+                if isinstance(questions, list) and len(questions) >= 1:
+                    # Ensure all items are strings
+                    questions = [str(q).strip() for q in questions if q][:3]
+                    return questions, usage_info
+            except Exception:
+                pass
+            usage_info["status"] = "FAILED"
+            return [], usage_info
+        except requests.exceptions.Timeout:
+            _record_latency()
+            usage_info["status"] = "FAILED"
+            return [], usage_info
+        except requests.exceptions.ConnectionError:
+            _record_latency()
+            usage_info["status"] = "FAILED"
+            return [], usage_info
+        except Exception:
+            _record_latency()
+            usage_info["status"] = "FAILED"
+            return [], usage_info
+
+    def _generate_questions_for_fact(self, fact_id: int, fact_content: str, count: int = 3):
+        """Generate questions for a fact via LLM and cache them in Questions table.
+
+        Note: Always stores ALL questions returned by LLM to avoid wasting tokens.
+        The count parameter is kept for API compatibility but all questions are stored.
+        """
+        api_key = config.get_together_api_key()
+        if not api_key:
+            return []
+
+        questions, usage_info = self._call_together_ai_for_questions(fact_content, api_key)
+        if not questions:
+            return []
+
+        # Calculate cost
+        input_tokens = usage_info.get("input_tokens") or 0
+        output_tokens = usage_info.get("output_tokens") or 0
+        total_tokens = usage_info.get("total_tokens") or 0
+        cost = self._estimate_ai_cost(input_tokens, output_tokens)
+        latency_ms = usage_info.get("latency_ms")
+        model = usage_info.get("model", "")
+        provider = usage_info.get("provider", "")
+        status = usage_info.get("status", "SUCCESS")
+
+        # Cost per question (divide evenly among ALL questions generated)
+        cost_per_q = cost / len(questions) if questions else 0
+        tokens_per_q = total_tokens // len(questions) if questions else 0
+        input_per_q = input_tokens // len(questions) if questions else 0
+        output_per_q = output_tokens // len(questions) if questions else 0
+
+        # Store ALL questions to avoid wasting tokens (LLM already generated them)
+        inserted_ids = []
+        for q_text in questions:
+            try:
+                q_id = self.execute_insert_return_id(
+                    """
+                    INSERT INTO Questions
+                        (FactID, QuestionText, ModelName, Provider, InputTokens, OutputTokens,
+                         Cost, CurrencyCode, LatencyMs, Status, GeneratedAt)
+                    OUTPUT INSERTED.QuestionID
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())
+                    """,
+                    (fact_id, q_text, model, provider, input_per_q, output_per_q,
+                     cost_per_q, self.ai_currency, latency_ms, status)
+                )
+                if q_id:
+                    inserted_ids.append(q_id)
+            except Exception:
+                pass
+
+        # Update profile aggregates
+        try:
+            self.gamify.add_question_usage(total_tokens, cost)
+        except Exception:
+            pass
+
+        return inserted_ids
+
+    def _get_or_generate_question(self, fact_id: int, fact_content: str):
+        """
+        Get a cached question or trigger generation.
+        Returns (question_text, question_id) or (None, None) if unavailable.
+        """
+        try:
+            # Check how many questions exist for this fact
+            rows = self.fetch_query(
+                """
+                SELECT QuestionID, QuestionText, TimesShown
+                FROM Questions
+                WHERE FactID = ? AND Status = 'SUCCESS'
+                ORDER BY TimesShown ASC, NEWID()
+                """,
+                (fact_id,)
+            )
+        except Exception:
+            rows = []
+
+        if len(rows) > 0:
+            # Questions exist, pick the least-shown one
+            # (No partial regeneration - wait for countdown to hit 0 for full refresh)
+            q_id, q_text, _ = rows[0]
+            return q_text, q_id
+        else:
+            # No questions exist, generate all 3
+            if not self.question_request_inflight:
+                self.question_request_inflight = True
+                def gen_worker():
+                    try:
+                        self._generate_questions_for_fact(fact_id, fact_content, count=3)
+                    finally:
+                        self.question_request_inflight = False
+                    # Refresh display after generation
+                    self.root.after(0, self.display_current_fact)
+                threading.Thread(target=gen_worker, daemon=True).start()
+            return None, None  # Signal that we're generating
+
+    def _update_question_shown(self, question_id: int):
+        """Update TimesShown and LastShownAt for a question."""
+        try:
+            self.execute_update(
+                """
+                UPDATE Questions
+                SET TimesShown = TimesShown + 1, LastShownAt = GETDATE()
+                WHERE QuestionID = ?
+                """,
+                (question_id,)
+            )
+        except Exception:
+            pass
+
+    def _log_question_view(self, question_id: int) -> int:
+        """Insert into QuestionLogs when a question is shown. Returns QuestionLogID."""
+        try:
+            log_id = self.execute_insert_return_id(
+                """
+                INSERT INTO QuestionLogs
+                    (QuestionID, SessionID, ProfileID, QuestionShownAt, CreatedAt)
+                OUTPUT INSERTED.QuestionLogID
+                VALUES (?, ?, ?, GETDATE(), GETDATE())
+                """,
+                (question_id, self.current_session_id, self.get_active_profile_id())
+            )
+            return log_id
+        except Exception:
+            return None
+
+    def _finalize_question_view(self):
+        """Update QuestionLogs with AnswerRevealedAt and duration when answer is revealed or navigating away."""
+        if not self.current_question_log_id or not self.question_shown_at:
+            return
+        try:
+            elapsed = (datetime.now() - self.question_shown_at).total_seconds()
+            elapsed_int = int(max(0, elapsed))
+            self.execute_update(
+                """
+                UPDATE QuestionLogs
+                SET AnswerRevealedAt = GETDATE(), QuestionReadingDurationSec = ?
+                WHERE QuestionLogID = ?
+                """,
+                (elapsed_int, self.current_question_log_id)
+            )
+        except Exception:
+            pass
+        finally:
+            self.current_question_log_id = None
+            self.question_shown_at = None
+
+    def _decrement_question_countdown(self, fact_id: int):
+        """Decrement QuestionsRefreshCountdown. If it hits 0, delete old questions and reset."""
+        try:
+            # Decrement
+            self.execute_update(
+                """
+                UPDATE Facts
+                SET QuestionsRefreshCountdown = QuestionsRefreshCountdown - 1
+                WHERE FactID = ? AND QuestionsRefreshCountdown > 0
+                """,
+                (fact_id,)
+            )
+            # Check if it hit 0
+            rows = self.fetch_query(
+                "SELECT QuestionsRefreshCountdown FROM Facts WHERE FactID = ?",
+                (fact_id,)
+            )
+            if rows and rows[0][0] <= 0:
+                # Delete old questions and reset countdown
+                self.execute_update("DELETE FROM Questions WHERE FactID = ?", (fact_id,))
+                self.execute_update(
+                    "UPDATE Facts SET QuestionsRefreshCountdown = 50 WHERE FactID = ?",
+                    (fact_id,)
+                )
+        except Exception:
+            pass
+
+    def _handle_reveal_shortcut(self):
+        """Handle Enter key - reveal answer if in question mode, otherwise do nothing."""
+        if self.question_mode_enabled and not self.answer_revealed and not self.is_home_page:
+            self.reveal_answer()
+
+    def reveal_answer(self):
+        """Show the fact content when in Question Mode."""
+        if not self.question_mode_enabled:
+            return
+
+        # Finalize question timing
+        self._finalize_question_view()
+
+        # Mark answer as revealed
+        self.answer_revealed = True
+
+        # Hide reveal button
+        try:
+            self.reveal_button.pack_forget()
+        except Exception:
+            pass
+
+        # Show navigation buttons after answer is revealed
+        try:
+            self.prev_button.pack(side="left", padx=5)
+            self.next_button.pack(side="left", padx=5)
+        except Exception:
+            pass
+
+        # Display the fact content
+        if self.all_facts and 0 <= self.current_fact_index < len(self.all_facts):
+            fact_data = self.all_facts[self.current_fact_index]
+            fact_id = fact_data[0]
+            content = fact_data[1]
+
+            # Show fact in the label with dynamic font sizing
+            self.fact_label.config(text=content, font=(self.NORMAL_FONT[0], self.adjust_font_size(content)))
+
+            # Now track the fact view (starts the fact reading timer)
+            self.track_fact_view(fact_id)
+
+    def _display_question_for_current_fact(self):
+        """Display the question for the current fact (Question Mode)."""
+        if not self.all_facts or self.current_fact_index >= len(self.all_facts):
+            return
+
+        fact_data = self.all_facts[self.current_fact_index]
+        fact_id = fact_data[0]
+        content = fact_data[1]
+
+        # Get or generate a question
+        question_text, question_id = self._get_or_generate_question(fact_id, content)
+
+        # Hide navigation buttons while question is displayed (only show Reveal Answer)
+        try:
+            self.prev_button.pack_forget()
+            self.next_button.pack_forget()
+        except Exception:
+            pass
+
+        if question_text and question_id:
+            # Show the question with dynamic font sizing
+            display_text = question_text
+            self.fact_label.config(text=display_text, font=(self.NORMAL_FONT[0], self.adjust_font_size(display_text)))
+
+            # Update question tracking
+            self._update_question_shown(question_id)
+            self.current_question_id = question_id
+            self.question_shown_at = datetime.now()
+            self.current_question_log_id = self._log_question_view(question_id)
+
+            # Show reveal button
+            try:
+                self.reveal_button.pack_forget()
+            except Exception:
+                pass
+            self.reveal_button.pack(side="left", padx=5)
+
+        else:
+            # Questions are being generated
+            generating_text = "⏳ Generating question..."
+            self.fact_label.config(text=generating_text, font=(self.NORMAL_FONT[0], self.adjust_font_size(generating_text)))
+            # Hide reveal button while generating
+            try:
+                self.reveal_button.pack_forget()
+            except Exception:
+                pass
+
     def _render_markdown_to_text(self, text_widget, markdown_text):
         """Render markdown text with formatting tags in a tkinter Text widget.
 
@@ -1563,9 +1953,23 @@ class FactDariApp:
             return
         # Stop any ongoing speech when changing facts
         self.stop_speaking()
+
+        # Finalize question view if in question mode
+        self._finalize_question_view()
+        # Reset question state for next fact
+        self.answer_revealed = False
+        self.current_question_id = None
+
+        # Decrement question countdown for current fact (if in question mode)
+        if self.question_mode_enabled and self.current_fact_id:
+            try:
+                self._decrement_question_countdown(self.current_fact_id)
+            except Exception:
+                pass
+
         if not self.all_facts:
             self.load_all_facts()
-        
+
         # Only navigate if there's more than one fact
         if self.all_facts and len(self.all_facts) > 1:
             if self.current_fact_index >= len(self.all_facts) - 1:
@@ -1586,9 +1990,23 @@ class FactDariApp:
             return
         # Stop any ongoing speech when changing facts
         self.stop_speaking()
+
+        # Finalize question view if in question mode
+        self._finalize_question_view()
+        # Reset question state for next fact
+        self.answer_revealed = False
+        self.current_question_id = None
+
+        # Decrement question countdown for current fact (if in question mode)
+        if self.question_mode_enabled and self.current_fact_id:
+            try:
+                self._decrement_question_countdown(self.current_fact_id)
+            except Exception:
+                pass
+
         if not self.all_facts:
             self.load_all_facts()
-        
+
         # Only navigate if there's more than one fact
         if self.all_facts and len(self.all_facts) > 1:
             self.current_fact_index = (self.current_fact_index - 1) % len(self.all_facts)
@@ -1639,10 +2057,22 @@ class FactDariApp:
             self.easy_button.config(image=self.easy_gold_icon)
         else:
             self.easy_button.config(image=self.easy_icon)
-        
+
+        # Check if Question Mode is enabled
+        if self.question_mode_enabled and not self.answer_revealed:
+            # Display question instead of fact
+            self._display_question_for_current_fact()
+            return
+
+        # Hide reveal button in normal mode
+        try:
+            self.reveal_button.pack_forget()
+        except Exception:
+            pass
+
         # Display the fact
         self.fact_label.config(text=content, font=(self.NORMAL_FONT[0], self.adjust_font_size(content)))
-        
+
         # Update tracking in database only if we have more than one fact
         # (to avoid inflating view counts when there's only one fact)
         if len(self.all_facts) > 1 or not hasattr(self, '_last_tracked_fact') or self._last_tracked_fact != self.current_fact_id:
@@ -2989,6 +3419,11 @@ class FactDariApp:
                 self.ai_button.place_forget()
             except Exception:
                 pass
+            # Hide reveal button on home page
+            try:
+                self.reveal_button.pack_forget()
+            except Exception:
+                pass
             # Hide level label on home page
             try:
                 self.level_label.place_forget()
@@ -3077,7 +3512,7 @@ class FactDariApp:
         # Swap back: hide info, show star icon
         try:
             self.info_button.place_forget()
-            # Show easy button before star
+            # Show buttons for reviewing
             self.ai_button.place(relx=1.0, rely=0, anchor="ne", x=-105, y=5)
             self.easy_button.place(relx=1.0, rely=0, anchor="ne", x=-80, y=5)
             self.star_button.place(relx=1.0, rely=0, anchor="ne", x=-55, y=5)
@@ -3095,7 +3530,12 @@ class FactDariApp:
                     pass
         except Exception:
             pass
-        
+
+        # Reset question state when starting review
+        self.answer_revealed = False
+        self.current_question_id = None
+        self._finalize_question_view()
+
         # Load facts and display the first one
         self.load_all_facts()
         # Re-pack the fact label for reviewing view
