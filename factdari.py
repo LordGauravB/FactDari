@@ -1,4 +1,4 @@
-#FactDari.py - Simple Fact Viewer Application
+﻿#FactDari.py - Simple Fact Viewer Application
 import os
 import sys
 import signal
@@ -156,6 +156,10 @@ class FactDariApp:
         self.question_shown_at = None
         self.answer_revealed = False
         self.question_request_inflight = False
+        self.question_generation_fact_id = None
+        # Question generation throttling to avoid rapid retries on failures
+        self.question_generation_cooldown_seconds = 60
+        self.question_generation_last_attempt = {}
         # Inactivity tracking
         self.idle_timeout_seconds = getattr(config, 'IDLE_TIMEOUT_SECONDS', 300)
         self.idle_end_session = getattr(config, 'IDLE_END_SESSION', True)
@@ -518,7 +522,7 @@ class FactDariApp:
         # Keyboard shortcuts for navigation and actions
         self.root.bind("<Left>", lambda e: self.show_previous_fact())
         self.root.bind("<Right>", lambda e: self.show_next_fact())
-        self.root.bind("<space>", lambda e: self.show_next_fact())
+        self.root.bind("<space>", lambda e: self._handle_space_key())
         self.root.bind("n", lambda e: self.show_next_fact())
         self.root.bind("p", lambda e: self.show_previous_fact())
         self.root.bind("a", lambda e: self.add_new_fact())
@@ -607,7 +611,8 @@ class FactDariApp:
         # List of shortcuts
         row("Home", "h")
         row("Previous", "Left Arrow, p")
-        row("Next", "Right Arrow, n, Space")
+        row("Next", "Right Arrow, n (Space after reveal)")
+        row("Reveal Answer", "Space, Enter")
         row("Add Fact", "a")
         row("Edit Fact", "e")
         row("Delete Fact", "d")
@@ -629,7 +634,7 @@ class FactDariApp:
         if not getattr(self, 'gamify', None):
             try:
                 self.status_label.config(text="Gamification unavailable", fg=self.STATUS_COLOR)
-                self.clear_status_after_delay(2000)
+                self.clear_status_after_delay(3000)
             except Exception:
                 pass
             return
@@ -1058,7 +1063,7 @@ class FactDariApp:
         if getattr(self, "ai_request_inflight", False):
             try:
                 self.status_label.config(text="AI request already in progress…", fg=self.STATUS_COLOR)
-                self.clear_status_after_delay(2500)
+                self.clear_status_after_delay(3000)
             except Exception:
                 pass
             return
@@ -1454,6 +1459,7 @@ class FactDariApp:
         Get a cached question or trigger generation.
         Returns (question_text, question_id) or (None, None) if unavailable.
         """
+        fallback_question = "What does this fact say?"
         try:
             # Check how many questions exist for this fact
             rows = self.fetch_query(
@@ -1472,21 +1478,47 @@ class FactDariApp:
             # Questions exist, pick the least-shown one
             # (No partial regeneration - wait for countdown to hit 0 for full refresh)
             q_id, q_text, _ = rows[0]
-            return q_text, q_id
-        else:
-            # No questions exist, generate all 3
-            if not self.question_request_inflight:
-                self.question_request_inflight = True
-                def gen_worker():
-                    try:
-                        self._generate_questions_for_fact(fact_id, fact_content, count=3)
-                    finally:
-                        self.question_request_inflight = False
-                    # Re-enable UI and refresh display after generation (on main thread)
-                    self.root.after(0, self._enable_ui_after_generation)
-                    self.root.after(0, self.display_current_fact)
-                threading.Thread(target=gen_worker, daemon=True).start()
-            return None, None  # Signal that we're generating
+            if q_text:
+                return q_text, q_id
+
+        # No cached questions; attempt background generation if API key exists
+        api_key = config.get_together_api_key()
+        if not api_key:
+            return fallback_question, None
+
+        if self.question_request_inflight:
+            if self.question_generation_fact_id == fact_id:
+                return None, None
+            return fallback_question, None
+
+        now = time.time()
+        last_attempt = self.question_generation_last_attempt.get(fact_id)
+        if last_attempt and (now - last_attempt) < self.question_generation_cooldown_seconds:
+            return fallback_question, None
+
+        self.question_request_inflight = True
+        self.question_generation_fact_id = fact_id
+        self.question_generation_last_attempt[fact_id] = now
+
+        def gen_worker():
+            try:
+                self._generate_questions_for_fact(fact_id, fact_content, count=3)
+            finally:
+                self.question_request_inflight = False
+                self.question_generation_fact_id = None
+            # Re-enable UI and refresh display after generation (on main thread)
+            self.root.after(0, self._enable_ui_after_generation)
+            def _refresh_if_still_current():
+                if self.is_home_page:
+                    return
+                if self.current_fact_id != fact_id:
+                    return
+                self.display_current_fact()
+            self.root.after(0, _refresh_if_still_current)
+
+        threading.Thread(target=gen_worker, daemon=True).start()
+
+        return None, None
 
     def _update_question_shown(self, question_id: int):
         """Update TimesShown and LastShownAt for a question."""
@@ -1568,13 +1600,12 @@ class FactDariApp:
 
     def _disable_fact_action_buttons(self):
         """Disable action buttons while question is displayed (before answer is revealed).
-        Note: Speaker button stays enabled so users can hear the question read aloud.
+        Note: Speaker and Add buttons stay enabled.
         """
         try:
             self.ai_button.config(state="disabled")
             self.easy_button.config(state="disabled")
             self.star_button.config(state="disabled")
-            self.add_icon_button.config(state="disabled")
             self.edit_icon_button.config(state="disabled")
             self.delete_icon_button.config(state="disabled")
             self.category_dropdown.config(state="disabled")
@@ -1587,7 +1618,6 @@ class FactDariApp:
             self.ai_button.config(state="normal")
             self.easy_button.config(state="normal")
             self.star_button.config(state="normal")
-            self.add_icon_button.config(state="normal")
             self.edit_icon_button.config(state="normal")
             self.delete_icon_button.config(state="normal")
             self.category_dropdown.config(state="readonly")
@@ -1627,6 +1657,15 @@ class FactDariApp:
         """Handle Enter key - reveal answer."""
         if not self.answer_revealed and not self.is_home_page:
             self.reveal_answer()
+
+    def _handle_space_key(self):
+        """Handle Space key - reveal answer or advance when already revealed."""
+        if self.is_home_page:
+            return
+        if not self.answer_revealed:
+            self.reveal_answer()
+        else:
+            self.show_next_fact()
 
     def reveal_answer(self):
         """Show the fact/answer content."""
@@ -1670,6 +1709,10 @@ class FactDariApp:
             # Now track the fact view (starts the fact reading timer)
             self.track_fact_view(fact_id)
 
+            # Show contextual hint for answer state
+            self.status_label.config(text="<- Previous, -> Next", fg=self.STATUS_COLOR)
+            self.clear_status_after_delay(3000)
+
     def _display_question_for_current_fact(self):
         """Display the question for the current fact (Question Mode)."""
         if not self.all_facts or self.current_fact_index >= len(self.all_facts):
@@ -1692,34 +1735,52 @@ class FactDariApp:
         # Disable action buttons until answer is revealed
         self._disable_fact_action_buttons()
 
-        if question_text and question_id:
-            # Show the question with dynamic font sizing
-            display_text = question_text
-            self.fact_label.config(text=display_text, font=(self.NORMAL_FONT[0], self.adjust_font_size(display_text)))
-
-            # Update question tracking
-            self._update_question_shown(question_id)
-            self.current_question_id = question_id
-            self.question_shown_at = datetime.now()
-            self.current_question_log_id = self._log_question_view(question_id)
-
-            # Show reveal button
-            try:
-                self.reveal_button.pack_forget()
-            except Exception:
-                pass
-            self.reveal_button.pack(side="left", padx=5)
-
-        else:
+        if question_text is None:
             # Questions are being generated - disable ALL navigation
             self._disable_ui_during_generation()
-            generating_text = "⏳ Generating question..."
-            self.fact_label.config(text=generating_text, font=(self.NORMAL_FONT[0], self.adjust_font_size(generating_text)))
+            generating_text = "Generating question..."
+            self.fact_label.config(
+                text=generating_text,
+                font=(self.NORMAL_FONT[0], self.adjust_font_size(generating_text))
+            )
             # Hide reveal button while generating
             try:
                 self.reveal_button.pack_forget()
             except Exception:
                 pass
+            return
+
+        if not question_text:
+            question_text = "What does this fact say?"
+
+        # Show the question with dynamic font sizing
+        display_text = question_text
+        self.fact_label.config(
+            text=display_text,
+            font=(self.NORMAL_FONT[0], self.adjust_font_size(display_text))
+        )
+
+        # Update question tracking (only when we have a cached question id)
+        if question_id:
+            self._update_question_shown(question_id)
+            self.current_question_id = question_id
+            self.question_shown_at = datetime.now()
+            self.current_question_log_id = self._log_question_view(question_id)
+        else:
+            self.current_question_id = None
+            self.question_shown_at = None
+            self.current_question_log_id = None
+
+        # Show reveal button
+        try:
+            self.reveal_button.pack_forget()
+        except Exception:
+            pass
+        self.reveal_button.pack(side="left", padx=5)
+
+        # Show contextual hint for question state
+        self.status_label.config(text="Press Space or Enter to reveal answer", fg=self.STATUS_COLOR)
+        self.clear_status_after_delay(3000)
 
     def _render_markdown_to_text(self, text_widget, markdown_text):
         """Render markdown text with formatting tags in a tkinter Text widget.
@@ -1809,6 +1870,10 @@ class FactDariApp:
 
         if total_tokens is None and (input_tokens is not None or output_tokens is not None):
             total_tokens = (input_tokens or 0) + (output_tokens or 0)
+        # If the API only returned total tokens, preserve them in InputTokens for analytics
+        if total_tokens is not None and input_tokens is None and output_tokens is None:
+            input_tokens = total_tokens
+            output_tokens = 0
 
         cost = usage_info.get("cost")
         if cost is None and (input_tokens is not None or output_tokens is not None):
@@ -1861,6 +1926,10 @@ class FactDariApp:
         it = input_tokens if input_tokens is None else int(input_tokens)
         ot = output_tokens if output_tokens is None else int(output_tokens)
         total_for_profile = total_tokens
+        # If only total tokens were available, map them to input tokens so analytics still reflect usage
+        if total_for_profile is not None and it is None and ot is None:
+            it = int(total_for_profile)
+            ot = 0
         if total_for_profile is None:
             total_for_profile = (0 if it is None else it) + (0 if ot is None else ot)
             if total_for_profile == 0:
@@ -2143,8 +2212,9 @@ class FactDariApp:
             self._last_tracked_fact = self.current_fact_id
         
         # Update status with fact position
-        self.status_label.config(text=f"Fact {self.current_fact_index + 1} of {len(self.all_facts)}", 
+        self.status_label.config(text=f"Fact {self.current_fact_index + 1} of {len(self.all_facts)}",
                                fg=self.STATUS_COLOR)
+        self.clear_status_after_delay(3000)
     
     def track_fact_view(self, fact_id):
         """Track that a fact has been viewed"""
@@ -2174,7 +2244,7 @@ class FactDariApp:
                 )
                 # Award XP for the just-finished view
                 try:
-                    self._award_for_elapsed(elapsed)
+                    self._award_for_elapsed(elapsed, timed_out=False)
                 except Exception:
                     pass
         except Exception as _:
@@ -2233,6 +2303,12 @@ class FactDariApp:
             )
             self.current_fact_log_id = None
             self.current_fact_start_time = now
+        # Ensure streak/analytics can still see a session even if the insert fell back
+        if self.current_session_id is None:
+            try:
+                self.start_new_session()
+            except Exception:
+                pass
 
         # Force a streak check-in now that a log exists for today
         try:
@@ -2321,9 +2397,9 @@ class FactDariApp:
                         """,
                         (elapsed, self.current_fact_log_id)
                     )
-                # Award XP
+                # Award XP (skip if timed out)
                 try:
-                    self._award_for_elapsed(elapsed)
+                    self._award_for_elapsed(elapsed, timed_out=timed_out)
                 except Exception:
                     pass
         except Exception:
@@ -2363,7 +2439,7 @@ class FactDariApp:
                     if streak:
                         try:
                             self.status_label.config(text=f"Daily streak: {int(streak)} day(s)", fg=self.STATUS_COLOR)
-                            self.clear_status_after_delay(2500)
+                            self.clear_status_after_delay(3000)
                         except Exception:
                             pass
                 if unlocked:
@@ -2374,7 +2450,7 @@ class FactDariApp:
                         pass
                     try:
                         self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                        self.clear_status_after_delay(2500)
+                        self.clear_status_after_delay(3000)
                     except Exception:
                         pass
                 # Refresh level display
@@ -2382,11 +2458,15 @@ class FactDariApp:
         except Exception:
             pass
 
-    def end_active_session(self, timed_out=False):
-        """End the active reviewing session, if any. If timed_out=True, marks session TimedOut."""
+    def end_active_session(self, timed_out=False, skip_finalize=False):
+        """End the active reviewing session, if any.
+        timed_out=True marks the session as timed out.
+        skip_finalize=True avoids re-finalizing a view the caller already finalized.
+        """
         try:
             # Finalize any ongoing fact view first
-            self.finalize_current_fact_view(timed_out=False)
+            if not skip_finalize:
+                self.finalize_current_fact_view(timed_out=False)
 
             if self.current_session_id:
                 # Compute duration ignoring idle time after last activity when timed out
@@ -2495,7 +2575,7 @@ class FactDariApp:
                     fact.append(new_status)
                 self.all_facts[self.current_fact_index] = tuple(fact)
             
-            self.clear_status_after_delay(2000)
+            self.clear_status_after_delay(3000)
             # Gamification: award on favorite and unlock using current favorites count
             try:
                 if new_status and getattr(self, 'gamify', None):
@@ -2514,7 +2594,7 @@ class FactDariApp:
                         self.gamify.award_xp(fav_xp)
                     if unlocked:
                         self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                        self.clear_status_after_delay(2500)
+                        self.clear_status_after_delay(3000)
                         try:
                             self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
                         except Exception:
@@ -2576,7 +2656,7 @@ class FactDariApp:
                     fact.append(False)
                 fact[3] = new_status
                 self.all_facts[self.current_fact_index] = tuple(fact)
-            self.clear_status_after_delay(2000)
+            self.clear_status_after_delay(3000)
             # Gamification: award when marking known, unlock using current known count
             try:
                 if new_status and getattr(self, 'gamify', None):
@@ -2594,7 +2674,7 @@ class FactDariApp:
                         self.gamify.award_xp(known_xp)
                     if unlocked:
                         self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                        self.clear_status_after_delay(2500)
+                        self.clear_status_after_delay(3000)
                         try:
                             self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
                         except Exception:
@@ -2605,7 +2685,7 @@ class FactDariApp:
     
     def add_new_fact(self):
         """Add a new fact to the database"""
-        if not self._is_action_allowed():
+        if self.is_home_page:
             return
         # Pause review timer while user is adding a card
         self.pause_review_timer()
@@ -2767,7 +2847,7 @@ class FactDariApp:
                             self.gamify.award_xp(add_xp)
                         if unlocked:
                             self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                            self.clear_status_after_delay(2500)
+                            self.clear_status_after_delay(3000)
                             try:
                                 self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
                             except Exception:
@@ -2913,6 +2993,7 @@ class FactDariApp:
                 return
                 
             category_id = cat_result[0][0]
+            category_changed = (category != current_category)
             
             # Prevent duplicates: check against computed ContentKey, ignoring this FactID
             try:
@@ -2978,7 +3059,7 @@ class FactDariApp:
                             self.gamify.award_xp(edit_xp)
                         if unlocked:
                             self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                            self.clear_status_after_delay(2500)
+                            self.clear_status_after_delay(3000)
                             try:
                                 self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
                             except Exception:
@@ -2989,9 +3070,24 @@ class FactDariApp:
                 
                 # Update the current display
                 self.fact_label.config(text=content, font=(self.NORMAL_FONT[0], self.adjust_font_size(content)))
-                # Update the fact in our list
+
+                # If the category changed and no longer matches the active filter, reload the list
+                selected_filter = self.category_var.get()
+                header_filters = {"All Categories", "Favorites", "Known", "Not Known", "Not Favorite"}
+                if category_changed and selected_filter not in header_filters and selected_filter != category:
+                    self.load_all_facts()
+                    self.answer_revealed = False
+                    self.current_question_id = None
+                    self.display_current_fact()
+                    return
+
+                # Update the fact in our list while preserving favorite/known flags
                 if self.all_facts and self.current_fact_index < len(self.all_facts):
-                    self.all_facts[self.current_fact_index] = (self.current_fact_id, content)
+                    fact = list(self.all_facts[self.current_fact_index])
+                    while len(fact) < 4:
+                        fact.append(False)
+                    fact[1] = content
+                    self.all_facts[self.current_fact_index] = tuple(fact)
             else:
                 self.status_label.config(text="Error updating fact!", fg=self.RED_COLOR)
                 self.clear_status_after_delay(3000)
@@ -3008,7 +3104,10 @@ class FactDariApp:
         if not self._is_action_allowed() or not self.current_fact_id:
             return
         profile_id = self.get_active_profile_id()
-        
+
+        # Finalize any active question view before deleting
+        self._finalize_question_view()
+
         # Pause during confirmation and deletion flow
         self.pause_review_timer()
         try:
@@ -3063,7 +3162,7 @@ class FactDariApp:
                                 self.gamify.award_xp(del_xp)
                             if unlocked:
                                 self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                                self.clear_status_after_delay(2500)
+                                self.clear_status_after_delay(3000)
                                 try:
                                     self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
                                 except Exception:
@@ -3077,19 +3176,34 @@ class FactDariApp:
                         self.all_facts.pop(self.current_fact_index)
                         if self.all_facts:
                             self.current_fact_index = self.current_fact_index % len(self.all_facts)
+                            # Reset question state so next fact starts with question
+                            self.answer_revealed = False
+                            self.current_question_id = None
                             self.display_current_fact()
                         else:
                             self.fact_label.config(text="No facts found. Add some facts first!")
                             self.current_fact_id = None
+                            # Clear all tracking state
+                            self.current_fact_log_id = None
+                            self.current_fact_start_time = None
+                            self.current_question_id = None
+                            self.question_shown_at = None
+                            self.answer_revealed = False
+                            self.status_label.config(text="Press 'a' to add a new fact", fg=self.STATUS_COLOR)
+                            self.clear_status_after_delay(3000)
                 else:
                     self.status_label.config(text="Error deleting fact!", fg=self.RED_COLOR)
                     self.clear_status_after_delay(3000)
         finally:
             # Always resume after delete flow
             self.resume_review_timer()
-    def _award_for_elapsed(self, elapsed_seconds: int):
-        """Award XP and review counters for a completed view."""
+    def _award_for_elapsed(self, elapsed_seconds: int, timed_out: bool = False):
+        """Award XP and review counters for a completed view.
+        Skips awards for timed-out views to prevent idle XP farming.
+        """
         if not getattr(self, 'gamify', None):
+            return
+        if timed_out:
             return
         # Only count reviews after grace period
         try:
@@ -3110,7 +3224,7 @@ class FactDariApp:
         if unlocked:
             try:
                 self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                self.clear_status_after_delay(2500)
+                self.clear_status_after_delay(3000)
             except Exception:
                 pass
             try:
@@ -3346,25 +3460,70 @@ class FactDariApp:
             ):
                 return
         
-        # Delete the category and its facts
-        success = self.execute_update("""
-            BEGIN TRANSACTION;
+        # Delete the category and its facts, logging deletes if a session is active
+        success = self.execute_update(
+            """
+            BEGIN TRY
+                BEGIN TRANSACTION;
 
-            DELETE FROM Facts WHERE CategoryID = ? AND CreatedBy = ?;
-            DELETE FROM Categories WHERE CategoryID = ? AND CreatedBy = ?;
+                DECLARE @SessionID INT = ?;
+                DECLARE @FactCount INT = ?;
 
-            COMMIT TRANSACTION;
-        """, (cat_id, profile_id, cat_id, profile_id))
+                IF @SessionID IS NOT NULL
+                BEGIN
+                    INSERT INTO FactLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactDeleted, FactContentSnapshot, CategoryIDSnapshot)
+                    SELECT FactID, GETDATE(), @SessionID, 0, 'delete', 1, Content, CategoryID
+                    FROM Facts
+                    WHERE CategoryID = ? AND CreatedBy = ?;
+
+                    UPDATE ReviewSessions
+                    SET FactsDeleted = ISNULL(FactsDeleted,0) + @FactCount
+                    WHERE SessionID = @SessionID;
+                END
+
+                DELETE FROM Facts WHERE CategoryID = ? AND CreatedBy = ?;
+                DELETE FROM Categories WHERE CategoryID = ? AND CreatedBy = ?;
+
+                COMMIT TRANSACTION;
+            END TRY
+            BEGIN CATCH
+                IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+                THROW;
+            END CATCH
+            """,
+            (self.current_session_id, fact_count, cat_id, profile_id, cat_id, profile_id, cat_id, profile_id)
+        )
         
         if success:
             refresh_callback()
             self.update_category_dropdown()
             self.update_fact_count()
+            # Gamification: count deletes for removed facts
+            if fact_count and fact_count > 0:
+                try:
+                    if getattr(self, 'gamify', None):
+                        total = self.gamify.increment_counter('TotalDeletes', int(fact_count))
+                        unlocked = self.gamify.unlock_achievements_if_needed('deletes', total)
+                        del_xp = int(config.XP_CONFIG.get('xp_delete', 0))
+                        if del_xp:
+                            self.gamify.award_xp(del_xp * int(fact_count))
+                        if unlocked:
+                            self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
+                            self.clear_status_after_delay(3000)
+                            try:
+                                self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
+                            except Exception:
+                                pass
+                        self.update_level_progress()
+                except Exception:
+                    pass
             # Reload facts if we're viewing
             if not self.is_home_page:
                 self.load_all_facts()
-                if self.all_facts:
-                    self.display_current_fact()
+                self.answer_revealed = False
+                self.current_question_id = None
+                self._finalize_question_view()
+                self.display_current_fact()
         else:
             tk.messagebox.showinfo("Error", "Failed to delete category!")
     
@@ -3449,8 +3608,18 @@ class FactDariApp:
 
     def on_category_change(self, event=None):
         """Handle category dropdown change"""
+        # Finalize any active fact view before switching categories to prevent time leakage
+        try:
+            self.finalize_current_fact_view(timed_out=False)
+        except Exception:
+            pass
+        # Finalize any active question view before switching
+        self._finalize_question_view()
         self.load_all_facts()
         if self.all_facts and not self.is_home_page:
+            # Reset question state so new category starts with question
+            self.answer_revealed = False
+            self.current_question_id = None
             self.display_current_fact()
     
     def clear_status_after_delay(self, delay_ms=3000):
@@ -3536,7 +3705,8 @@ class FactDariApp:
             self.start_button.pack(pady=20)
         
         # Update status to shortcut hint
-        self.status_label.config(text="Shortcuts: Prev = Left/p, Next = Right/n/Space", fg=self.STATUS_COLOR)
+        self.status_label.config(text="Press 'r' to start reviewing", fg=self.STATUS_COLOR)
+        self.clear_status_after_delay(3000)
 
         # Apply rounded corners again after UI changes
         self.root.update_idletasks()
@@ -3544,12 +3714,15 @@ class FactDariApp:
     
     def start_reviewing(self):
         """Switch from home page to fact viewing interface"""
+        if not self.is_home_page and self.current_session_id:
+            return
         self.is_home_page = False
         self.record_activity()
 
         # Start a new reviewing session
         try:
-            self.start_new_session()
+            if self.current_session_id is None:
+                self.start_new_session()
         except Exception as _:
             pass
 
@@ -3616,11 +3789,11 @@ class FactDariApp:
             pass
         if self.all_facts:
             self.display_current_fact()
+            # Status message is set contextually by display_current_fact()
         else:
             self.fact_label.config(text="No facts found. Add some facts first!")
-        
-        # Show shortcut hints
-        self.status_label.config(text="Shortcuts: <- Previous, -> Next, Space Next", fg=self.STATUS_COLOR)
+            self.status_label.config(text="Press 'a' to add a new fact", fg=self.STATUS_COLOR)
+            self.clear_status_after_delay(3000)
 
         # Apply rounded corners again after UI changes
         self.root.update_idletasks()
@@ -3644,7 +3817,7 @@ class FactDariApp:
             self.finalize_current_fact_view(timed_out=True)
             if self.idle_end_session:
                 # End the session as timed out
-                self.end_active_session(timed_out=True)
+                self.end_active_session(timed_out=True, skip_finalize=True)
                 # Optionally navigate to Home after ending session
                 if self.idle_navigate_home:
                     try:
@@ -3657,7 +3830,7 @@ class FactDariApp:
                 if self.idle_navigate_home and self.idle_end_session:
                     msg += "; returned to Home"
                 self.status_label.config(text=msg, fg=self.STATUS_COLOR)
-                self.clear_status_after_delay(4000)
+                self.clear_status_after_delay(3000)
             except Exception:
                 pass
         except Exception:
@@ -3668,3 +3841,4 @@ class FactDariApp:
 if __name__ == "__main__":
     app = FactDariApp()
     app.run()
+

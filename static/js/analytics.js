@@ -127,7 +127,7 @@
             html = `
               <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
               <td>${escapeHtml(row.CategoryName || '')}</td>
-              <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
+              <td style="text-align: center;" class="${escapeHtml(medalClass)}">${escapeHtml(String(row.ReviewCount || 0))}</td>
             `;
           } else {
             let medalClass = '';
@@ -136,11 +136,12 @@
               else if (index === 1) medalClass = 'medal-silver';
               else if (index === 2) medalClass = 'medal-bronze';
             }
+            const daysSince = row.DaysSinceReview ?? 'N/A';
             html = `
               <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
               <td>${escapeHtml(row.CategoryName || '')}</td>
-              <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
-              <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
+              <td style="text-align: center;" class="${escapeHtml(medalClass)}">${escapeHtml(String(row.ReviewCount || 0))}</td>
+              <td style="text-align: center;">${escapeHtml(String(daysSince))}</td>
             `;
           }
           tr.innerHTML = html;
@@ -551,8 +552,9 @@
     const mostToShow = (data || []).slice(0, 10);
     const showMedals = mostSortState.index === 2 && mostSortState.dir === 'desc';
     mostToShow.forEach((row, index) => {
+      if (!row) return;  // Null check for row
       const tr = document.createElement('tr');
-      const factContent = row.Content || '';
+      const factContent = (row && row.Content) || '';
       const escapedContent = escapeHtml(factContent);
       const displayText = factContent.length > 150 ?
         `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 150))}...</span>` :
@@ -565,8 +567,8 @@
       }
       tr.innerHTML = `
         <td>${displayText}</td>
-        <td>${escapeHtml(row.CategoryName || '')}</td>
-        <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
+        <td>${escapeHtml((row && row.CategoryName) || '')}</td>
+        <td style="text-align: center;" class="${escapeHtml(medalClass)}">${escapeHtml(String((row && row.ReviewCount) || 0))}</td>
       `;
       mostTbody.appendChild(tr);
     });
@@ -579,8 +581,9 @@
     const leastToShow = (data || []).slice(0, 10);
     const showMedals = leastSortState.index === 2 && leastSortState.dir === 'asc';
     leastToShow.forEach((row, index) => {
+      if (!row) return;  // Null check for row
       const tr = document.createElement('tr');
-      const factContent = row.Content || '';
+      const factContent = (row && row.Content) || '';
       const escapedContent = escapeHtml(factContent);
       const displayText = factContent.length > 150 ?
         `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 150))}...</span>` :
@@ -591,11 +594,12 @@
         else if (index === 1) medalClass = 'medal-silver';
         else if (index === 2) medalClass = 'medal-bronze';
       }
+      const daysSince = (row && row.DaysSinceReview) ?? 'N/A';
       tr.innerHTML = `
         <td>${displayText}</td>
-        <td>${escapeHtml(row.CategoryName || '')}</td>
-        <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
-        <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
+        <td>${escapeHtml((row && row.CategoryName) || '')}</td>
+        <td style="text-align: center;" class="${escapeHtml(medalClass)}">${escapeHtml(String((row && row.ReviewCount) || 0))}</td>
+        <td style="text-align: center;">${escapeHtml(String(daysSince))}</td>
       `;
       leastTbody.appendChild(tr);
     });
@@ -605,21 +609,23 @@
     const favTbody = qs('#favorite-facts-table tbody');
     if (!favTbody) return;
     favTbody.innerHTML = '';
-    data.forEach((row, index) => {
+    (data || []).forEach((row, index) => {
+      if (!row) return;  // Null check for row
       const tr = document.createElement('tr');
       // Show full fact content and allow wrapping
-      const factContent = row.Content || '';
+      const factContent = (row && row.Content) || '';
       let medalClass = '';
       if (favoriteSortState.index === 2 && favoriteSortState.dir === 'desc') {
         if (index === 0) medalClass = 'medal-gold';
         else if (index === 1) medalClass = 'medal-silver';
         else if (index === 2) medalClass = 'medal-bronze';
       }
+      const daysSince = (row && row.DaysSinceReview) ?? 'N/A';
       tr.innerHTML = `
         <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
-        <td>${escapeHtml(row.CategoryName || '')}</td>
-        <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
-        <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
+        <td>${escapeHtml((row && row.CategoryName) || '')}</td>
+        <td style="text-align: center;" class="${escapeHtml(medalClass)}">${escapeHtml(String((row && row.ReviewCount) || 0))}</td>
+        <td style="text-align: center;">${escapeHtml(String(daysSince))}</td>
       `;
       favTbody.appendChild(tr);
     });
@@ -630,16 +636,17 @@
     if (!tbody) return;
     tbody.innerHTML = '';
     (rows || []).forEach(row => {
+      if (!row) return;  // Null check for row
       const tr = document.createElement('tr');
-      const start = row.StartTime ? new Date(row.StartTime).toLocaleString() : '';
-      const duration = row.DurationSeconds ?? '';
-      const views = row.Views ?? 0;
-      const distinct = row.DistinctFacts ?? 0;
+      const start = (row && row.StartTime) ? new Date(row.StartTime).toLocaleString() : '';
+      const duration = (row && row.DurationSeconds) ?? '';
+      const views = (row && row.Views) ?? 0;
+      const distinct = (row && row.DistinctFacts) ?? 0;
       tr.innerHTML = `
-        <td>${start}</td>
-        <td style="text-align:center;">${duration}</td>
-        <td style="text-align:center;">${views}</td>
-        <td style="text-align:center;">${distinct}</td>
+        <td>${escapeHtml(start)}</td>
+        <td style="text-align:center;">${escapeHtml(String(duration))}</td>
+        <td style="text-align:center;">${escapeHtml(String(views))}</td>
+        <td style="text-align:center;">${escapeHtml(String(distinct))}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -650,12 +657,13 @@
     if (!tbody) return;
     tbody.innerHTML = '';
     (rows || []).forEach(row => {
+      if (!row) return;  // Null check for row
       const tr = document.createElement('tr');
-      const when = row.UnlockDate ? new Date(row.UnlockDate).toLocaleString() : '';
+      const when = (row && row.UnlockDate) ? new Date(row.UnlockDate).toLocaleString() : '';
       tr.innerHTML = `
         <td>${escapeHtml(when)}</td>
-        <td>${escapeHtml(row.Name || '')}</td>
-        <td style="text-align:center;">${row.RewardXP || 0} XP</td>
+        <td>${escapeHtml((row && row.Name) || '')}</td>
+        <td style="text-align:center;">${escapeHtml(String((row && row.RewardXP) || 0))} XP</td>
       `;
       tbody.appendChild(tr);
     });
@@ -666,13 +674,14 @@
     if (!tbody) return;
     tbody.innerHTML = '';
     (rows || []).forEach(r => {
+      if (!r) return;  // Null check for row
       const tr = document.createElement('tr');
-      const start = r.StartTime ? new Date(r.StartTime).toLocaleString() : '';
+      const start = (r && r.StartTime) ? new Date(r.StartTime).toLocaleString() : '';
       tr.innerHTML = `
-        <td>${start}</td>
-        <td style="text-align:center;">${r.FactsAdded ?? 0}</td>
-        <td style="text-align:center;">${r.FactsEdited ?? 0}</td>
-        <td style="text-align:center;">${r.FactsDeleted ?? 0}</td>
+        <td>${escapeHtml(start)}</td>
+        <td style="text-align:center;">${escapeHtml(String((r && r.FactsAdded) ?? 0))}</td>
+        <td style="text-align:center;">${escapeHtml(String((r && r.FactsEdited) ?? 0))}</td>
+        <td style="text-align:center;">${escapeHtml(String((r && r.FactsDeleted) ?? 0))}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -683,17 +692,18 @@
     if (!tbody) return;
     tbody.innerHTML = '';
     (rows || []).forEach(row => {
+      if (!row) return;  // Null check for row
       const tr = document.createElement('tr');
-      const sessionStart = row.StartTime ? new Date(row.StartTime).toLocaleString() : '';
-      const reviewTime = row.ReviewDate ? new Date(row.ReviewDate).toLocaleString() : '';
-      const factContent = row.Content || '';
+      const sessionStart = (row && row.StartTime) ? new Date(row.StartTime).toLocaleString() : '';
+      const reviewTime = (row && row.ReviewDate) ? new Date(row.ReviewDate).toLocaleString() : '';
+      const factContent = (row && row.Content) || '';
       const displayText = factContent.length > 150 ?
         `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 150))}...</span>` :
         `<span class="fact-text">${escapeHtml(factContent)}</span>`;
       tr.innerHTML = `
         <td>${escapeHtml(sessionStart)}</td>
         <td>${escapeHtml(reviewTime)}</td>
-        <td>${escapeHtml(row.CategoryName || '')}</td>
+        <td>${escapeHtml((row && row.CategoryName) || '')}</td>
         <td>${displayText}</td>
       `;
       tbody.appendChild(tr);
@@ -784,45 +794,50 @@
     }
 
     filteredData.forEach(r => {
+      if (!r) return;  // Null check for row
       const badge = document.createElement('div');
       badge.className = `achievement-badge ${r.Unlocked ? 'unlocked' : 'locked'}`;
 
-      const icon = getAchievementIcon(r.Category, r.Name);
-      const progressCurrent = Math.min(r.ProgressCurrent || 0, r.Threshold || 0);
-      const threshold = r.Threshold || 0;
+      const icon = getAchievementIcon((r && r.Category) || '', (r && r.Name) || '');
+      const progressCurrent = Math.min((r && r.ProgressCurrent) || 0, (r && r.Threshold) || 0);
+      const threshold = (r && r.Threshold) || 0;
       const progressPercent = threshold > 0 ? Math.round((progressCurrent / threshold) * 100) : 0;
-      const unlockDate = r.UnlockDate ? new Date(r.UnlockDate).toLocaleDateString() : '';
+      const unlockDate = (r && r.UnlockDate) ? new Date(r.UnlockDate).toLocaleDateString() : '';
+      const rewardXP = (r && r.RewardXP) || 0;
+      const name = escapeHtml((r && r.Name) || 'Achievement');
+      const category = escapeHtml((r && r.Category) || '');
+      const description = escapeHtml((r && r.Description) || 'Complete this achievement to earn XP!');
 
       let progressBar = '';
       if (!r.Unlocked && threshold > 0) {
         progressBar = `
           <div class="badge-progress">
-            <div class="badge-progress-fill" style="width: ${progressPercent}%"></div>
+            <div class="badge-progress-fill" style="width: ${escapeHtml(String(progressPercent))}%"></div>
           </div>
         `;
       }
 
       let dateDisplay = '';
       if (r.Unlocked && unlockDate) {
-        dateDisplay = `<div class="badge-date">${unlockDate}</div>`;
+        dateDisplay = `<div class="badge-date">${escapeHtml(unlockDate)}</div>`;
       }
 
       badge.innerHTML = `
-        <span class="badge-xp">${r.RewardXP || 0} XP</span>
+        <span class="badge-xp">${escapeHtml(String(rewardXP))} XP</span>
         <div class="badge-icon">${icon}</div>
-        <div class="badge-name">${r.Name || 'Achievement'}</div>
-        <div class="badge-category">${r.Category || ''}</div>
+        <div class="badge-name">${name}</div>
+        <div class="badge-category">${category}</div>
         ${progressBar}
         ${dateDisplay}
         <div class="badge-tooltip">
-          <div class="badge-tooltip-title">${r.Name || 'Achievement'}</div>
-          <div class="badge-tooltip-desc">${r.Description || 'Complete this achievement to earn XP!'}</div>
+          <div class="badge-tooltip-title">${name}</div>
+          <div class="badge-tooltip-desc">${description}</div>
           <div class="badge-tooltip-meta">
-            <span>${r.Category || 'General'}</span>
-            <span>${r.RewardXP || 0} XP</span>
+            <span>${category || escapeHtml('General')}</span>
+            <span>${escapeHtml(String(rewardXP))} XP</span>
           </div>
-          ${!r.Unlocked ? `<div class="badge-tooltip-progress">Progress: ${progressCurrent}/${threshold} (${progressPercent}%)</div>` : ''}
-          ${r.Unlocked ? `<div class="badge-tooltip-progress" style="color: var(--success);">Unlocked: ${unlockDate}</div>` : ''}
+          ${!r.Unlocked ? `<div class="badge-tooltip-progress">Progress: ${escapeHtml(String(progressCurrent))}/${escapeHtml(String(threshold))} (${escapeHtml(String(progressPercent))}%)</div>` : ''}
+          ${r.Unlocked ? `<div class="badge-tooltip-progress" style="color: var(--success);">Unlocked: ${escapeHtml(unlockDate)}</div>` : ''}
         </div>
       `;
 
@@ -862,21 +877,23 @@
     const knownTbody = qs('#known-facts-table tbody');
     if (!knownTbody) return;
     knownTbody.innerHTML = '';
-    data.forEach((row, index) => {
+    (data || []).forEach((row, index) => {
+      if (!row) return;  // Null check for row
       const tr = document.createElement('tr');
       // Show full fact content and allow wrapping
-      const factContent = row.Content || '';
+      const factContent = (row && row.Content) || '';
       let medalClass = '';
       if (knownSortState.index === 2 && knownSortState.dir === 'desc') {
         if (index === 0) medalClass = 'medal-gold';
         else if (index === 1) medalClass = 'medal-silver';
         else if (index === 2) medalClass = 'medal-bronze';
       }
+      const daysSince = (row && row.DaysSinceReview) ?? 'N/A';
       tr.innerHTML = `
         <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
-        <td>${escapeHtml(row.CategoryName || '')}</td>
-        <td style="text-align: center;" class="${medalClass}">${row.ReviewCount || 0}</td>
-        <td style="text-align: center;">${row.DaysSinceReview ?? 'N/A'}</td>
+        <td>${escapeHtml((row && row.CategoryName) || '')}</td>
+        <td style="text-align: center;" class="${escapeHtml(medalClass)}">${escapeHtml(String((row && row.ReviewCount) || 0))}</td>
+        <td style="text-align: center;">${escapeHtml(String(daysSince))}</td>
       `;
       knownTbody.appendChild(tr);
     });

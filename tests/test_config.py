@@ -307,3 +307,95 @@ class TestFloatEnvHelper:
         import config
         result = config._get_float_env('TEST_FLOAT_INVALID', '3.0')
         assert result == 3.0
+
+
+class TestAnalyticsConfig:
+    """Tests for analytics configuration."""
+
+    def test_analytics_config_exists(self):
+        """Test that analytics config is defined."""
+        import config
+        assert hasattr(config, 'ANALYTICS_CONFIG')
+        assert isinstance(config.ANALYTICS_CONFIG, dict)
+
+    def test_time_windows_positive(self):
+        """Test time windows are positive integers."""
+        import config
+        assert config.ANALYTICS_CONFIG['recent_days_window'] > 0
+        assert config.ANALYTICS_CONFIG['history_days_window'] > 0
+
+    def test_pagination_limits_positive(self):
+        """Test pagination limits are positive integers."""
+        import config
+        assert config.ANALYTICS_CONFIG['top_n_default'] > 0
+        assert config.ANALYTICS_CONFIG['top_n_sessions'] > 0
+        assert config.ANALYTICS_CONFIG['top_n_reviews'] > 0
+        assert config.ANALYTICS_CONFIG['top_n_reviews_expanded'] > 0
+
+    def test_rate_limits_positive(self):
+        """Test rate limits are positive integers."""
+        import config
+        assert config.ANALYTICS_CONFIG['rate_limit_per_minute'] > 0
+        assert config.ANALYTICS_CONFIG['rate_limit_per_second'] > 0
+
+
+class TestLoggingConfig:
+    """Tests for logging configuration."""
+
+    def test_logging_config_exists(self):
+        """Test that logging config is defined."""
+        import config
+        assert hasattr(config, 'LOGGING_CONFIG')
+        assert isinstance(config.LOGGING_CONFIG, dict)
+
+    def test_log_level_valid(self):
+        """Test log level is a valid level."""
+        import config
+        valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+        assert config.LOGGING_CONFIG['log_level'].upper() in valid_levels
+
+    def test_log_file_is_string(self):
+        """Test log file path is a string."""
+        import config
+        assert isinstance(config.LOGGING_CONFIG['log_file'], str)
+        assert len(config.LOGGING_CONFIG['log_file']) > 0
+
+    def test_log_max_bytes_positive(self):
+        """Test max log file size is positive."""
+        import config
+        assert config.LOGGING_CONFIG['log_max_bytes'] > 0
+
+    def test_log_backup_count_non_negative(self):
+        """Test backup count is non-negative."""
+        import config
+        assert config.LOGGING_CONFIG['log_backup_count'] >= 0
+
+
+class TestSetupLogging:
+    """Tests for setup_logging function."""
+
+    def test_setup_logging_returns_logger(self):
+        """Test setup_logging returns a logger instance."""
+        import config
+        import logging
+        logger = config.setup_logging('test_logger')
+        assert isinstance(logger, logging.Logger)
+
+    def test_setup_logging_with_name(self):
+        """Test setup_logging uses provided name."""
+        import config
+        logger = config.setup_logging('custom_test_name')
+        assert logger.name == 'custom_test_name'
+
+    def test_setup_logging_default_name(self):
+        """Test setup_logging uses default name."""
+        import config
+        logger = config.setup_logging()
+        assert logger.name == 'factdari'
+
+    def test_setup_logging_has_handlers(self):
+        """Test setup_logging adds handlers."""
+        import config
+        logger = config.setup_logging('test_with_handlers')
+        # Should have at least one handler (console)
+        assert len(logger.handlers) >= 1

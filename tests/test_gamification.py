@@ -67,22 +67,23 @@ class TestLevelCalculation:
 class TestIncrementCounterValidation:
     """Tests for increment_counter field validation."""
 
+    def test_allowed_fields_constant_exists(self):
+        """Test that ALLOWED_COUNTER_FIELDS constant is defined."""
+        from gamification import ALLOWED_COUNTER_FIELDS
+        assert isinstance(ALLOWED_COUNTER_FIELDS, frozenset)
+        assert len(ALLOWED_COUNTER_FIELDS) == 6
+
     def test_valid_fields(self):
         """Test that valid fields are accepted."""
+        from gamification import ALLOWED_COUNTER_FIELDS
         valid_fields = [
             'TotalReviews', 'TotalKnown', 'TotalFavorites',
             'TotalAdds', 'TotalEdits', 'TotalDeletes'
         ]
-        from gamification import Gamification
-        gamify = Gamification("dummy_conn_str")
 
         for field in valid_fields:
-            # The field validation happens before DB call
-            # Since we can't connect to DB, we just verify the whitelist exists
-            assert field in (
-                'TotalReviews', 'TotalKnown', 'TotalFavorites',
-                'TotalAdds', 'TotalEdits', 'TotalDeletes'
-            )
+            # Verify field is in the whitelist
+            assert field in ALLOWED_COUNTER_FIELDS
 
     def test_invalid_field_returns_zero(self):
         """Test that invalid field returns 0 without DB call."""

@@ -1,9 +1,35 @@
 from flask import Flask, render_template, jsonify, Response, request
+from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import pyodbc
 from datetime import datetime, timedelta, date
+import os
 import config  # Import the config module
 
-app = Flask(__name__) 
+# Set up logging
+logger = config.setup_logging('factdari.analytics')
+
+app = Flask(__name__)
+
+# Secret key for CSRF protection (use environment variable in production)
+app.config['SECRET_KEY'] = os.environ.get('FACTDARI_SECRET_KEY', os.urandom(32).hex())
+
+# CSRF Protection
+csrf = CSRFProtect(app)
+
+# Rate limiting configuration
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=[f"{config.ANALYTICS_CONFIG['rate_limit_per_minute']}/minute"],
+    storage_uri="memory://"
+)
+
+# Exempt the API endpoint from CSRF (it's read-only and rate-limited)
+@csrf.exempt
+def csrf_exempt_api():
+    pass
 
 # Get database connection string from config
 CONN_STR = config.get_connection_string()
@@ -20,15 +46,28 @@ def fetch_query(query, params=None):
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 def get_default_profile_id():
-    """Fetch the first profile id, defaulting to 1 if not found."""
+    """Fetch the first profile id, defaulting to 1 if not found.
+
+    Note: In a multi-user system, this should use session-based authentication
+    to determine the correct profile. The hardcoded default of 1 is a fallback
+    for single-user deployments.
+    """
     try:
         rows = fetch_query("SELECT TOP 1 ProfileID FROM GamificationProfile ORDER BY ProfileID")
         if rows:
             pid = rows[0].get('ProfileID') if isinstance(rows[0], dict) else rows[0][0]
-            return int(pid) if pid is not None else 1
-    except Exception:
-        pass
-    return 1
+            if pid is not None:
+                return int(pid)
+            logger.warning("ProfileID was None in GamificationProfile, using default 1")
+            return 1
+        logger.info("No profiles found in GamificationProfile, using default 1")
+        return 1
+    except pyodbc.Error as e:
+        logger.error(f"Database error fetching profile ID: {e}")
+        return 1
+    except (ValueError, TypeError) as e:
+        logger.error(f"Error parsing profile ID: {e}")
+        return 1
 
 @app.route('/')
 def index():
@@ -40,14 +79,19 @@ def index():
 # No favicon route; allow browser default or static hosting if desired
 
 @app.route('/api/chart-data')
+@csrf.exempt  # Exempt from CSRF (read-only endpoint)
+@limiter.limit(f"{config.ANALYTICS_CONFIG['rate_limit_per_second']}/second")
 def chart_data():
     """Get all chart data for FactDari analytics"""
-    seven_days_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-    thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    # Use config constants instead of hardcoded values
+    recent_days = config.ANALYTICS_CONFIG['recent_days_window']
+    history_days = config.ANALYTICS_CONFIG['history_days_window']
+    seven_days_ago = (datetime.now() - timedelta(days=recent_days)).strftime('%Y-%m-%d')
+    thirty_days_ago = (datetime.now() - timedelta(days=history_days)).strftime('%Y-%m-%d')
     profile_id = get_default_profile_id()
-    
-    # Check if we need to return all facts
-    return_all = request.args.get('all', 'false').lower() == 'true'
+
+    # Check if we need to return all facts (explicit whitelist validation)
+    return_all = request.args.get('all', '') == 'true'
     
     data = {
         # Category distribution (active categories only)
@@ -755,7 +799,11 @@ def chart_data():
         try:
             rows = fetch_query(q, params)
             return rows[0] if rows else (default or {})
-        except Exception:
+        except pyodbc.Error as e:
+            logger.error(f"Database error in safe_fetch_one: {e}")
+            return default or {}
+        except (IndexError, KeyError) as e:
+            logger.warning(f"Data access error in safe_fetch_one: {e}")
             return default or {}
 
     # Profile snapshot
@@ -771,11 +819,11 @@ def chart_data():
     def level_progress(xp_val: int, stored_level: int):
         try:
             xp_val = int(xp_val or 0)
-        except Exception:
+        except (ValueError, TypeError):
             xp_val = 0
         try:
             stored_level = int(stored_level or 1)
-        except Exception:
+        except (ValueError, TypeError):
             stored_level = 1
 
         cfg = getattr(config, 'LEVELING_CONFIG', {})
@@ -857,7 +905,8 @@ def chart_data():
             WHERE u.ProfileID = ?
             ORDER BY u.UnlockDate DESC, u.UnlockID DESC
         """, (profile_id,))
-    except Exception:
+    except pyodbc.Error as e:
+        logger.error(f"Database error fetching recent achievements: {e}")
         recent_achievements = []
 
     # Full achievements with status and progress
@@ -865,12 +914,20 @@ def chart_data():
     try:
         known_count_row = fetch_query("SELECT COUNT(*) AS C FROM ProfileFacts WHERE ProfileID = ? AND IsEasy = 1", (profile_id,))
         known_count = int(known_count_row[0]['C']) if known_count_row else 0
-    except Exception:
+    except pyodbc.Error as e:
+        logger.error(f"Database error fetching known count: {e}")
+        known_count = 0
+    except (ValueError, TypeError, IndexError, KeyError) as e:
+        logger.warning(f"Data error parsing known count: {e}")
         known_count = 0
     try:
         fav_count_row = fetch_query("SELECT COUNT(*) AS C FROM ProfileFacts WHERE ProfileID = ? AND IsFavorite = 1", (profile_id,))
         favorites_count_val = int(fav_count_row[0]['C']) if fav_count_row else 0
-    except Exception:
+    except pyodbc.Error as e:
+        logger.error(f"Database error fetching favorites count: {e}")
+        favorites_count_val = 0
+    except (ValueError, TypeError, IndexError, KeyError) as e:
+        logger.warning(f"Data error parsing favorites count: {e}")
         favorites_count_val = 0
 
     counters = {
@@ -893,7 +950,8 @@ def chart_data():
             ORDER BY a.Category, a.Threshold
             """
         , (profile_id,))
-    except Exception:
+    except pyodbc.Error as e:
+        logger.error(f"Database error fetching achievements: {e}")
         ach_rows = []
     achievements_full = []
     for r in ach_rows:
@@ -1101,7 +1159,7 @@ def chart_data():
         st = r.get('StartTime')
         try:
             lbl = st.strftime('%m-%d %H:%M') if isinstance(st, datetime) else str(st)
-        except Exception:
+        except (AttributeError, ValueError, TypeError):
             lbl = f"#{r.get('SessionID')}"
         labels.append(lbl)
         added.append(int(r.get('FactsAdded') or 0))
@@ -1143,8 +1201,10 @@ def calculate_review_streak(profile_id: int):
         )
         if profile_row:
             profile_longest = int(profile_row[0].get('LongestStreak', 0) or 0)
-    except Exception:
-        pass
+    except pyodbc.Error as e:
+        logger.error(f"Database error fetching longest streak: {e}")
+    except (ValueError, TypeError, IndexError, KeyError) as e:
+        logger.warning(f"Data error parsing longest streak: {e}")
 
     query = """
     SELECT DISTINCT CONVERT(date, rl.ReviewDate) as ReviewDate
@@ -1310,7 +1370,7 @@ def format_single_line_chart(data, label='Series', value_field='Value'):
         val = row.get(value_field)
         try:
             series.append(0 if val is None else float(val))
-        except Exception:
+        except (ValueError, TypeError):
             series.append(0)
     return {
         'labels': labels,

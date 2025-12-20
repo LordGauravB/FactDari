@@ -9,12 +9,16 @@ requests==2.32.3       # HTTP calls for Together AI explanations
 
 # Web framework for analytics
 Flask==3.0.3
+Flask-WTF==1.2.1        # CSRF protection
+Flask-Limiter==3.5.0    # Rate limiting
 Werkzeug==3.0.3
 Jinja2==3.1.4
 MarkupSafe==2.1.5
 itsdangerous==2.2.0
 click==8.1.7
 blinker==1.8.2
+WTForms==3.1.2          # Required by Flask-WTF
+limits==3.7.0           # Required by Flask-Limiter
 
 # Windows-specific
 pywin32==306           # Windows system integration (optional, for Windows users)

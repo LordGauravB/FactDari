@@ -231,6 +231,7 @@ CREATE INDEX IX_ReviewSessions_ProfileID ON ReviewSessions(ProfileID);
 CREATE INDEX IX_FactLogs_FactID ON FactLogs(FactID);
 CREATE INDEX IX_FactLogs_ReviewDate ON FactLogs(ReviewDate);
 CREATE INDEX IX_FactLogs_SessionID ON FactLogs(SessionID);
+CREATE INDEX IX_FactLogs_Action ON FactLogs(Action);  -- For filtering by action type
 CREATE INDEX IX_AIUsageLogs_FactID ON AIUsageLogs(FactID);
 CREATE INDEX IX_AIUsageLogs_SessionID ON AIUsageLogs(SessionID);
 CREATE INDEX IX_AIUsageLogs_ProfileID ON AIUsageLogs(ProfileID);

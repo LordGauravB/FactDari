@@ -77,11 +77,11 @@ class TestChartDataRoute:
 
         # Check for key data sections
         expected_keys = [
-            'categoryDistribution',
-            'factsViewedPerDay',
-            'mostReviewedFacts',
-            'leastReviewedFacts',
-            'reviewStreak',
+            'category_distribution',
+            'reviews_per_day',
+            'most_reviewed_facts',
+            'least_reviewed_facts',
+            'review_streak',
         ]
         for key in expected_keys:
             assert key in data, f"Missing key: {key}"
@@ -312,13 +312,13 @@ class TestAIUsageData:
         data = json.loads(response.data)
 
         ai_keys = [
-            'aiUsageSummary',
-            'aiCostTimeline',
-            'aiTokenDistribution',
-            'aiUsageByCategory',
-            'aiLatencyDistribution',
-            'aiMostExplainedFacts',
-            'aiRecentUsage',
+            'ai_usage_summary',
+            'ai_cost_timeline',
+            'ai_token_distribution',
+            'ai_usage_by_category',
+            'ai_latency_distribution',
+            'ai_most_explained_facts',
+            'ai_recent_usage',
         ]
         for key in ai_keys:
             assert key in data, f"Missing AI key: {key}"
@@ -342,10 +342,10 @@ class TestGamificationData:
         data = json.loads(response.data)
 
         gamification_keys = [
-            'gamificationProfile',
-            'achievementsSummary',
-            'recentAchievements',
-            'achievementsFull',
+            'gamification',
+            'achievements_summary',
+            'recent_achievements',
+            'achievements',
         ]
         for key in gamification_keys:
             assert key in data, f"Missing gamification key: {key}"
@@ -369,10 +369,10 @@ class TestSessionAnalytics:
         data = json.loads(response.data)
 
         session_keys = [
-            'sessionDurationStats',
-            'avgFactsPerSession',
-            'sessionDurationDistribution',
-            'sessionEfficiency',
+            'session_duration_stats',
+            'avg_facts_per_session',
+            'session_duration_distribution',
+            'session_efficiency',
         ]
         for key in session_keys:
             assert key in data, f"Missing session key: {key}"
@@ -396,10 +396,10 @@ class TestProgressAnalytics:
         data = json.loads(response.data)
 
         progress_keys = [
-            'monthlyProgress',
-            'categoryCompletionRate',
-            'learningVelocity',
-            'categoryGrowthTrend',
+            'monthly_progress',
+            'category_completion_rate',
+            'learning_velocity',
+            'category_growth_trend',
         ]
         for key in progress_keys:
             assert key in data, f"Missing progress key: {key}"

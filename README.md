@@ -143,8 +143,9 @@ Available on:
 |-----|--------|
 | `h` | Go to Home page |
 | `r` | Start Reviewing |
-| `←` / `p` | Previous fact |
-| `→` / `n` / `Space` | Next fact |
+| `Left Arrow` / `p` | Previous fact |
+| `Right Arrow` / `n` | Next fact |
+| `Space` / `Enter` | Reveal answer (Space also advances after reveal) |
 | `a` | Add new fact |
 | `e` | Edit current fact |
 | `d` | Delete current fact |
@@ -205,7 +206,7 @@ Below are sample screenshots of the desktop widget and the analytics dashboard. 
   
   ![Keyboard Shortcuts](Resources/application_images/Keyboard_Shortcuts_Window.png)
   
-  A quick reference to keyboard controls (e.g., ←/→ for navigation, Space for next, A/E/D for add/edit/delete, F for favorite, K for known).
+  A quick reference to keyboard controls (e.g., Left/Right arrows for navigation, Space/Enter to reveal, Space to advance after reveal, A/E/D for add/edit/delete, F for favorite, K for known).
 
 - Add New Fact
   

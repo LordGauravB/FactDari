@@ -1,5 +1,7 @@
 # config.py
 import os
+import logging
+from logging.handlers import RotatingFileHandler
 
 # Base directory where the application is installed
 # Use environment variable if provided, otherwise use relative path
@@ -100,10 +102,13 @@ def _get_float_env(var_name: str, default: str = "0") -> float:
     """Safely parse a float from environment variables."""
     try:
         return float(os.environ.get(var_name, default))
-    except Exception:
+    except (ValueError, TypeError) as e:
+        # Log at debug level since this is expected for invalid env vars
+        logger = logging.getLogger('factdari.config')
+        logger.debug(f"Could not parse {var_name} as float, using default: {e}")
         try:
             return float(default)
-        except Exception:
+        except (ValueError, TypeError):
             return 0.0
 
 
@@ -164,6 +169,79 @@ def get_together_api_key():
     )
 
 # (no chart config helpers are needed; Chart.js is configured in the template)
+
+# Analytics configuration constants (extracted magic numbers)
+ANALYTICS_CONFIG = {
+    # Time windows for analytics queries (in days)
+    'recent_days_window': int(os.environ.get('FACTDARI_ANALYTICS_RECENT_DAYS', '7')),
+    'history_days_window': int(os.environ.get('FACTDARI_ANALYTICS_HISTORY_DAYS', '30')),
+
+    # Pagination limits
+    'top_n_default': int(os.environ.get('FACTDARI_ANALYTICS_TOP_N', '10')),
+    'top_n_sessions': int(os.environ.get('FACTDARI_ANALYTICS_TOP_SESSIONS', '100')),
+    'top_n_reviews': int(os.environ.get('FACTDARI_ANALYTICS_TOP_REVIEWS', '50')),
+    'top_n_reviews_expanded': int(os.environ.get('FACTDARI_ANALYTICS_TOP_REVIEWS_EXPANDED', '500')),
+
+    # Rate limiting
+    'rate_limit_per_minute': int(os.environ.get('FACTDARI_RATE_LIMIT_PER_MINUTE', '60')),
+    'rate_limit_per_second': int(os.environ.get('FACTDARI_RATE_LIMIT_PER_SECOND', '5')),
+}
+
+# Logging configuration
+LOGGING_CONFIG = {
+    'log_level': os.environ.get('FACTDARI_LOG_LEVEL', 'INFO'),
+    'log_file': os.environ.get('FACTDARI_LOG_FILE', os.path.join(BASE_DIR, 'logs', 'factdari.log')),
+    'log_max_bytes': int(os.environ.get('FACTDARI_LOG_MAX_BYTES', '10485760')),  # 10MB
+    'log_backup_count': int(os.environ.get('FACTDARI_LOG_BACKUP_COUNT', '5')),
+    'log_format': os.environ.get('FACTDARI_LOG_FORMAT',
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
+}
+
+
+def setup_logging(name: str = 'factdari') -> logging.Logger:
+    """Configure and return a logger instance with file and console handlers."""
+    logger = logging.getLogger(name)
+
+    # Avoid adding handlers multiple times
+    if logger.handlers:
+        return logger
+
+    log_level = getattr(logging, LOGGING_CONFIG['log_level'].upper(), logging.INFO)
+    logger.setLevel(log_level)
+
+    formatter = logging.Formatter(LOGGING_CONFIG['log_format'])
+
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    # File handler with rotation (create logs directory if needed)
+    log_file = LOGGING_CONFIG['log_file']
+    log_dir = os.path.dirname(log_file)
+    if log_dir and not os.path.exists(log_dir):
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+        except OSError:
+            # Fall back to current directory if can't create logs dir
+            log_file = os.path.join(BASE_DIR, 'factdari.log')
+
+    try:
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=LOGGING_CONFIG['log_max_bytes'],
+            backupCount=LOGGING_CONFIG['log_backup_count']
+        )
+        file_handler.setLevel(log_level)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    except (OSError, IOError) as e:
+        # If file logging fails, just use console
+        logger.warning(f"Could not set up file logging: {e}")
+
+    return logger
+
 
 # Leveling configuration (makes Level 100 total XP adjustable and early band sizes tunable)
 LEVELING_CONFIG = {

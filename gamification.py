@@ -2,6 +2,15 @@ import pyodbc
 from datetime import datetime, date, timedelta
 import config
 
+# Set up logging
+logger = config.setup_logging('factdari.gamification')
+
+# Allowed counter fields for increment_counter (whitelist for safety)
+ALLOWED_COUNTER_FIELDS = frozenset({
+    'TotalReviews', 'TotalKnown', 'TotalFavorites',
+    'TotalAdds', 'TotalEdits', 'TotalDeletes'
+})
+
 
 class Gamification:
     """Lightweight gamification service backed by SQL Server.
@@ -50,45 +59,76 @@ class Gamification:
 
     # --- Counters and XP ---
     def increment_counter(self, field: str, amount: int = 1) -> int:
-        if field not in (
-            'TotalReviews', 'TotalKnown', 'TotalFavorites', 'TotalAdds', 'TotalEdits', 'TotalDeletes'
-        ):
+        """Increment a counter field in the gamification profile.
+
+        Uses parameterized queries with explicit field mapping to prevent SQL injection.
+        """
+        if field not in ALLOWED_COUNTER_FIELDS:
+            logger.warning(f"Attempted to increment invalid field: {field}")
             return 0
-        with pyodbc.connect(self.conn_str) as conn:
-            with conn.cursor() as cur:
-                pid = self._get_or_create_profile_id(cur, conn)
-                cur.execute(f"UPDATE GamificationProfile SET {field} = {field} + ? WHERE ProfileID = ?", (amount, pid))
-                conn.commit()
-                cur.execute(f"SELECT {field} FROM GamificationProfile WHERE ProfileID = ?", (pid,))
-                return int(cur.fetchone()[0])
+
+        # Use explicit conditional SQL to avoid f-string interpolation of field names
+        # This is more secure than dynamic field names even with whitelisting
+        field_sql_map = {
+            'TotalReviews': ("UPDATE GamificationProfile SET TotalReviews = TotalReviews + ? WHERE ProfileID = ?",
+                           "SELECT TotalReviews FROM GamificationProfile WHERE ProfileID = ?"),
+            'TotalKnown': ("UPDATE GamificationProfile SET TotalKnown = TotalKnown + ? WHERE ProfileID = ?",
+                         "SELECT TotalKnown FROM GamificationProfile WHERE ProfileID = ?"),
+            'TotalFavorites': ("UPDATE GamificationProfile SET TotalFavorites = TotalFavorites + ? WHERE ProfileID = ?",
+                              "SELECT TotalFavorites FROM GamificationProfile WHERE ProfileID = ?"),
+            'TotalAdds': ("UPDATE GamificationProfile SET TotalAdds = TotalAdds + ? WHERE ProfileID = ?",
+                         "SELECT TotalAdds FROM GamificationProfile WHERE ProfileID = ?"),
+            'TotalEdits': ("UPDATE GamificationProfile SET TotalEdits = TotalEdits + ? WHERE ProfileID = ?",
+                          "SELECT TotalEdits FROM GamificationProfile WHERE ProfileID = ?"),
+            'TotalDeletes': ("UPDATE GamificationProfile SET TotalDeletes = TotalDeletes + ? WHERE ProfileID = ?",
+                            "SELECT TotalDeletes FROM GamificationProfile WHERE ProfileID = ?"),
+        }
+
+        update_sql, select_sql = field_sql_map[field]
+
+        try:
+            with pyodbc.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    pid = self._get_or_create_profile_id(cur, conn)
+                    cur.execute(update_sql, (amount, pid))
+                    conn.commit()
+                    cur.execute(select_sql, (pid,))
+                    result = cur.fetchone()
+                    return int(result[0]) if result else 0
+        except pyodbc.Error as e:
+            logger.error(f"Database error incrementing counter {field}: {e}")
+            return 0
 
     def add_ai_usage(self, total_tokens: int = 0, cost: float = 0.0) -> dict:
         """Accumulate AI token/cost totals on the profile."""
         try:
             tokens_val = int(total_tokens or 0)
-        except Exception:
+        except (ValueError, TypeError):
             tokens_val = 0
         try:
             cost_val = float(cost or 0.0)
-        except Exception:
+        except (ValueError, TypeError):
             cost_val = 0.0
 
         if tokens_val <= 0 and cost_val <= 0.0:
             return self.get_profile()
 
-        with pyodbc.connect(self.conn_str) as conn:
-            with conn.cursor() as cur:
-                pid = self._get_or_create_profile_id(cur, conn)
-                cur.execute(
-                    """
-                    UPDATE GamificationProfile
-                    SET TotalAITokens = ISNULL(TotalAITokens,0) + ?,
-                        TotalAICost = ISNULL(TotalAICost,0) + ?
-                    WHERE ProfileID = ?
-                    """,
-                    (tokens_val, cost_val, pid)
-                )
-                conn.commit()
+        try:
+            with pyodbc.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    pid = self._get_or_create_profile_id(cur, conn)
+                    cur.execute(
+                        """
+                        UPDATE GamificationProfile
+                        SET TotalAITokens = ISNULL(TotalAITokens,0) + ?,
+                            TotalAICost = ISNULL(TotalAICost,0) + ?
+                        WHERE ProfileID = ?
+                        """,
+                        (tokens_val, cost_val, pid)
+                    )
+                    conn.commit()
+        except pyodbc.Error as e:
+            logger.error(f"Database error adding AI usage: {e}")
         return self.get_profile()
 
     def award_xp(self, amount: int) -> dict:
@@ -126,33 +166,41 @@ class Gamification:
         Returns list of dicts for unlocked achievements.
         """
         unlocked = []
-        with pyodbc.connect(self.conn_str) as conn:
-            with conn.cursor() as cur:
-                pid = self._get_or_create_profile_id(cur, conn)
-                cur.execute(
-                    """
-                    SELECT a.AchievementID, a.Code, a.Name, a.RewardXP
-                    FROM Achievements a
-                    LEFT JOIN AchievementUnlocks u ON u.AchievementID = a.AchievementID AND u.ProfileID = ?
-                    WHERE a.Category = ? AND a.Threshold <= ? AND u.UnlockID IS NULL
-                    ORDER BY a.Threshold
-                    """,
-                    (pid, category, int(current_value))
-                )
-                rows = cur.fetchall()
-                for r in rows:
-                    ach_id, code, name, reward = r
-                    try:
-                        cur.execute(
-                            "INSERT INTO AchievementUnlocks (AchievementID, ProfileID) VALUES (?, ?)",
-                            (ach_id, pid)
-                        )
-                        unlocked.append({'Code': code, 'Name': name, 'RewardXP': int(reward)})
-                    except Exception:
-                        # Likely a concurrent unlock; ignore
-                        pass
-                if rows:
-                    conn.commit()
+        try:
+            with pyodbc.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    pid = self._get_or_create_profile_id(cur, conn)
+                    cur.execute(
+                        """
+                        SELECT a.AchievementID, a.Code, a.Name, a.RewardXP
+                        FROM Achievements a
+                        LEFT JOIN AchievementUnlocks u ON u.AchievementID = a.AchievementID AND u.ProfileID = ?
+                        WHERE a.Category = ? AND a.Threshold <= ? AND u.UnlockID IS NULL
+                        ORDER BY a.Threshold
+                        """,
+                        (pid, category, int(current_value))
+                    )
+                    rows = cur.fetchall()
+                    for r in rows:
+                        ach_id, code, name, reward = r
+                        try:
+                            cur.execute(
+                                "INSERT INTO AchievementUnlocks (AchievementID, ProfileID) VALUES (?, ?)",
+                                (ach_id, pid)
+                            )
+                            unlocked.append({'Code': code, 'Name': name, 'RewardXP': int(reward)})
+                        except pyodbc.IntegrityError:
+                            # Concurrent unlock - unique constraint violation, safe to ignore
+                            logger.debug(f"Achievement {code} already unlocked (concurrent insert)")
+                        except pyodbc.Error as e:
+                            # Other database error - log but continue with other achievements
+                            logger.warning(f"Error unlocking achievement {code}: {e}")
+                    if unlocked:
+                        conn.commit()
+        except pyodbc.Error as e:
+            logger.error(f"Database error in unlock_achievements_if_needed: {e}")
+            return []
+
         # Grant cumulative XP for all unlocked
         total_reward = sum(x['RewardXP'] for x in unlocked)
         if total_reward:
@@ -191,7 +239,7 @@ class Gamification:
                 elif last is not None and not isinstance(last, date):
                     try:
                         last = datetime.strptime(str(last), '%Y-%m-%d').date()
-                    except Exception:
+                    except (ValueError, TypeError):
                         last = None
 
                 # Derive streak from actual review activity (authoritative)
@@ -238,15 +286,17 @@ class Gamification:
                 """
                 SELECT DISTINCT CONVERT(date, rl.ReviewDate) as ReviewDay
                 FROM FactLogs rl
-                LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+                INNER JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
                 WHERE (rl.Action IS NULL OR rl.Action = 'view')
-                  AND (rs.ProfileID = ? OR rl.SessionID IS NULL)
+                  AND COALESCE(rl.TimedOut, 0) = 0
+                  AND rs.ProfileID = ?
                 ORDER BY ReviewDay DESC
                 """,
                 (profile_id,)
             )
             rows = cur.fetchall()
-        except Exception:
+        except pyodbc.Error as e:
+            logger.error(f"Database error calculating streak: {e}")
             return 0, 0, None
 
         dates = []
@@ -257,7 +307,7 @@ class Gamification:
             elif not isinstance(d, date):
                 try:
                     d = datetime.strptime(str(d), '%Y-%m-%d').date()
-                except Exception:
+                except (ValueError, TypeError):
                     continue
             dates.append(d)
 
@@ -381,12 +431,20 @@ class Gamification:
                 try:
                     cur.execute("SELECT COUNT(*) FROM ProfileFacts WHERE ProfileID = ? AND IsEasy = 1", (pid,))
                     counters['known'] = int(cur.fetchone()[0] or 0)
-                except Exception:
+                except pyodbc.Error as e:
+                    logger.error(f"Database error fetching known count: {e}")
+                    counters['known'] = 0
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Error parsing known count: {e}")
                     counters['known'] = 0
                 try:
                     cur.execute("SELECT COUNT(*) FROM ProfileFacts WHERE ProfileID = ? AND IsFavorite = 1", (pid,))
                     counters['favorites'] = int(cur.fetchone()[0] or 0)
-                except Exception:
+                except pyodbc.Error as e:
+                    logger.error(f"Database error fetching favorites count: {e}")
+                    counters['favorites'] = 0
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Error parsing favorites count: {e}")
                     counters['favorites'] = 0
 
                 cur.execute(
