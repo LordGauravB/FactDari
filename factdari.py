@@ -142,7 +142,7 @@ class FactDariApp:
         self.current_session_id = None
         self.session_start_time = None
         self.current_fact_start_time = None
-        self.current_review_log_id = None
+        self.current_fact_log_id = None
         # Timer pause state (exclude non-review time like add/edit/delete dialogs)
         self.timer_paused = False
         self.pause_started_at = None
@@ -150,8 +150,7 @@ class FactDariApp:
         self._dropdown_seen_open = False
         # Prevent overlapping AI requests
         self.ai_request_inflight = False
-        # Question Mode state (always enabled - questions shown before facts)
-        self.question_mode_enabled = True
+        # Question state (questions shown before facts/answers)
         self.current_question_id = None
         self.current_question_log_id = None
         self.question_shown_at = None
@@ -935,7 +934,7 @@ class FactDariApp:
         # Count only actual view actions (exclude add/edit/delete logs)
         query = """
         SELECT COUNT(DISTINCT rl.FactID)
-        FROM ReviewLogs rl
+        FROM FactLogs rl
         LEFT JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
         WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, ?)
           AND (rl.Action IS NULL OR rl.Action = 'view')
@@ -1016,7 +1015,7 @@ class FactDariApp:
         self.update_coordinates()
     
     def speak_text(self):
-        """Speak the current fact text (non-blocking)."""
+        """Speak the current fact or question text (non-blocking)."""
         if self.is_home_page:
             return
         text = self.fact_label.cget("text")
@@ -1054,7 +1053,7 @@ class FactDariApp:
 
     def explain_fact_with_ai(self):
         """Open a popup and ask Together AI to explain the current fact in simple words."""
-        if self.is_home_page or not self.current_fact_id:
+        if not self._is_action_allowed() or not self.current_fact_id:
             return
         if getattr(self, "ai_request_inflight", False):
             try:
@@ -1392,6 +1391,7 @@ class FactDariApp:
 
         Note: Always stores ALL questions returned by LLM to avoid wasting tokens.
         The count parameter is kept for API compatibility but all questions are stored.
+        LLM costs are logged to AIUsageLogs with OperationType='QUESTION_GENERATION'.
         """
         api_key = config.get_together_api_key()
         if not api_key:
@@ -1401,7 +1401,7 @@ class FactDariApp:
         if not questions:
             return []
 
-        # Calculate cost
+        # Extract usage info
         input_tokens = usage_info.get("input_tokens") or 0
         output_tokens = usage_info.get("output_tokens") or 0
         total_tokens = usage_info.get("total_tokens") or 0
@@ -1411,37 +1411,41 @@ class FactDariApp:
         provider = usage_info.get("provider", "")
         status = usage_info.get("status", "SUCCESS")
 
-        # Cost per question (divide evenly among ALL questions generated)
-        cost_per_q = cost / len(questions) if questions else 0
-        tokens_per_q = total_tokens // len(questions) if questions else 0
-        input_per_q = input_tokens // len(questions) if questions else 0
-        output_per_q = output_tokens // len(questions) if questions else 0
+        # Log to AIUsageLogs (also updates profile aggregates)
+        try:
+            self._log_ai_usage(
+                fact_id=fact_id,
+                session_id=getattr(self, 'current_session_id', None),
+                operation_type='QUESTION_GENERATION',
+                status=status,
+                model_name=model,
+                provider=provider,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
+                cost=cost,
+                latency_ms=latency_ms,
+                reading_duration_sec=0
+            )
+        except Exception:
+            pass
 
-        # Store ALL questions to avoid wasting tokens (LLM already generated them)
+        # Store ALL questions in cache (simplified - no cost columns)
         inserted_ids = []
         for q_text in questions:
             try:
                 q_id = self.execute_insert_return_id(
                     """
-                    INSERT INTO Questions
-                        (FactID, QuestionText, ModelName, Provider, InputTokens, OutputTokens,
-                         Cost, CurrencyCode, LatencyMs, Status, GeneratedAt)
+                    INSERT INTO Questions (FactID, QuestionText, Status, GeneratedAt)
                     OUTPUT INSERTED.QuestionID
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())
+                    VALUES (?, ?, ?, GETDATE())
                     """,
-                    (fact_id, q_text, model, provider, input_per_q, output_per_q,
-                     cost_per_q, self.ai_currency, latency_ms, status)
+                    (fact_id, q_text, status)
                 )
                 if q_id:
                     inserted_ids.append(q_id)
             except Exception:
                 pass
-
-        # Update profile aggregates
-        try:
-            self.gamify.add_question_usage(total_tokens, cost)
-        except Exception:
-            pass
 
         return inserted_ids
 
@@ -1478,7 +1482,8 @@ class FactDariApp:
                         self._generate_questions_for_fact(fact_id, fact_content, count=3)
                     finally:
                         self.question_request_inflight = False
-                    # Refresh display after generation
+                    # Re-enable UI and refresh display after generation (on main thread)
+                    self.root.after(0, self._enable_ui_after_generation)
                     self.root.after(0, self.display_current_fact)
                 threading.Thread(target=gen_worker, daemon=True).start()
             return None, None  # Signal that we're generating
@@ -1514,7 +1519,7 @@ class FactDariApp:
             return None
 
     def _finalize_question_view(self):
-        """Update QuestionLogs with AnswerRevealedAt and duration when answer is revealed or navigating away."""
+        """Update QuestionLogs with QuestionViewEndedAt and duration when navigating away or revealing answer."""
         if not self.current_question_log_id or not self.question_shown_at:
             return
         try:
@@ -1523,7 +1528,7 @@ class FactDariApp:
             self.execute_update(
                 """
                 UPDATE QuestionLogs
-                SET AnswerRevealedAt = GETDATE(), QuestionReadingDurationSec = ?
+                SET QuestionViewEndedAt = GETDATE(), QuestionReadingDurationSec = ?
                 WHERE QuestionLogID = ?
                 """,
                 (elapsed_int, self.current_question_log_id)
@@ -1561,16 +1566,70 @@ class FactDariApp:
         except Exception:
             pass
 
+    def _disable_fact_action_buttons(self):
+        """Disable action buttons while question is displayed (before answer is revealed).
+        Note: Speaker button stays enabled so users can hear the question read aloud.
+        """
+        try:
+            self.ai_button.config(state="disabled")
+            self.easy_button.config(state="disabled")
+            self.star_button.config(state="disabled")
+            self.add_icon_button.config(state="disabled")
+            self.edit_icon_button.config(state="disabled")
+            self.delete_icon_button.config(state="disabled")
+            self.category_dropdown.config(state="disabled")
+        except Exception:
+            pass
+
+    def _enable_fact_action_buttons(self):
+        """Enable action buttons after answer is revealed."""
+        try:
+            self.ai_button.config(state="normal")
+            self.easy_button.config(state="normal")
+            self.star_button.config(state="normal")
+            self.add_icon_button.config(state="normal")
+            self.edit_icon_button.config(state="normal")
+            self.delete_icon_button.config(state="normal")
+            self.category_dropdown.config(state="readonly")
+        except Exception:
+            pass
+
+    def _is_action_allowed(self):
+        """Check if fact actions are allowed (answer must be revealed)."""
+        if self.is_home_page:
+            return False
+        if not self.answer_revealed:
+            return False
+        return True
+
+    def _disable_ui_during_generation(self):
+        """Disable Home, navigation, and other buttons while questions are being generated."""
+        try:
+            self.home_button.config(state="disabled")
+            self.prev_button.config(state="disabled")
+            self.next_button.config(state="disabled")
+            # Also disable fact action buttons
+            self._disable_fact_action_buttons()
+        except Exception:
+            pass
+
+    def _enable_ui_after_generation(self):
+        """Re-enable UI after question generation completes."""
+        try:
+            self.home_button.config(state="normal")
+            self.prev_button.config(state="normal")
+            self.next_button.config(state="normal")
+            # Note: fact action buttons stay disabled until answer is revealed
+        except Exception:
+            pass
+
     def _handle_reveal_shortcut(self):
-        """Handle Enter key - reveal answer if in question mode, otherwise do nothing."""
-        if self.question_mode_enabled and not self.answer_revealed and not self.is_home_page:
+        """Handle Enter key - reveal answer."""
+        if not self.answer_revealed and not self.is_home_page:
             self.reveal_answer()
 
     def reveal_answer(self):
-        """Show the fact content when in Question Mode."""
-        if not self.question_mode_enabled:
-            return
-
+        """Show the fact/answer content."""
         # Finalize question timing
         self._finalize_question_view()
 
@@ -1590,6 +1649,9 @@ class FactDariApp:
         except Exception:
             pass
 
+        # Enable action buttons now that answer is revealed
+        self._enable_fact_action_buttons()
+
         # Display the fact content
         if self.all_facts and 0 <= self.current_fact_index < len(self.all_facts):
             fact_data = self.all_facts[self.current_fact_index]
@@ -1598,6 +1660,12 @@ class FactDariApp:
 
             # Show fact in the label with dynamic font sizing
             self.fact_label.config(text=content, font=(self.NORMAL_FONT[0], self.adjust_font_size(content)))
+
+            # Decrement question countdown (full review cycle complete)
+            try:
+                self._decrement_question_countdown(fact_id)
+            except Exception:
+                pass
 
             # Now track the fact view (starts the fact reading timer)
             self.track_fact_view(fact_id)
@@ -1621,6 +1689,9 @@ class FactDariApp:
         except Exception:
             pass
 
+        # Disable action buttons until answer is revealed
+        self._disable_fact_action_buttons()
+
         if question_text and question_id:
             # Show the question with dynamic font sizing
             display_text = question_text
@@ -1640,7 +1711,8 @@ class FactDariApp:
             self.reveal_button.pack(side="left", padx=5)
 
         else:
-            # Questions are being generated
+            # Questions are being generated - disable ALL navigation
+            self._disable_ui_during_generation()
             generating_text = "⏳ Generating question..."
             self.fact_label.config(text=generating_text, font=(self.NORMAL_FONT[0], self.adjust_font_size(generating_text)))
             # Hide reveal button while generating
@@ -1951,6 +2023,9 @@ class FactDariApp:
         """Show the next fact in the list"""
         if self.is_home_page:
             return
+        # Block navigation until answer is revealed
+        if not self.answer_revealed:
+            return
         # Stop any ongoing speech when changing facts
         self.stop_speaking()
 
@@ -1959,13 +2034,6 @@ class FactDariApp:
         # Reset question state for next fact
         self.answer_revealed = False
         self.current_question_id = None
-
-        # Decrement question countdown for current fact (if in question mode)
-        if self.question_mode_enabled and self.current_fact_id:
-            try:
-                self._decrement_question_countdown(self.current_fact_id)
-            except Exception:
-                pass
 
         if not self.all_facts:
             self.load_all_facts()
@@ -1988,6 +2056,9 @@ class FactDariApp:
         """Show the previous fact in the list"""
         if self.is_home_page:
             return
+        # Block navigation until answer is revealed
+        if not self.answer_revealed:
+            return
         # Stop any ongoing speech when changing facts
         self.stop_speaking()
 
@@ -1996,13 +2067,6 @@ class FactDariApp:
         # Reset question state for next fact
         self.answer_revealed = False
         self.current_question_id = None
-
-        # Decrement question countdown for current fact (if in question mode)
-        if self.question_mode_enabled and self.current_fact_id:
-            try:
-                self._decrement_question_countdown(self.current_fact_id)
-            except Exception:
-                pass
 
         if not self.all_facts:
             self.load_all_facts()
@@ -2058,13 +2122,12 @@ class FactDariApp:
         else:
             self.easy_button.config(image=self.easy_icon)
 
-        # Check if Question Mode is enabled
-        if self.question_mode_enabled and not self.answer_revealed:
-            # Display question instead of fact
+        # Show question first if answer not yet revealed
+        if not self.answer_revealed:
             self._display_question_for_current_fact()
             return
 
-        # Hide reveal button in normal mode
+        # Hide reveal button after answer is revealed
         try:
             self.reveal_button.pack_forget()
         except Exception:
@@ -2090,7 +2153,7 @@ class FactDariApp:
 
         # 1) Finalize previous view's duration if any
         try:
-            if self.current_review_log_id and self.current_fact_start_time:
+            if self.current_fact_log_id and self.current_fact_start_time:
                 end_point = now
                 # If currently paused, cap at pause start so paused time isn't counted
                 try:
@@ -2103,11 +2166,11 @@ class FactDariApp:
                     elapsed = 0
                 self.execute_update(
                     """
-                    UPDATE ReviewLogs
+                    UPDATE FactLogs
                     SET SessionDuration = ?
-                    WHERE ReviewLogID = ?
+                    WHERE FactLogID = ?
                     """,
-                    (elapsed, self.current_review_log_id)
+                    (elapsed, self.current_fact_log_id)
                 )
                 # Award XP for the just-finished view
                 try:
@@ -2151,24 +2214,24 @@ class FactDariApp:
 
             new_id = self.execute_insert_return_id(
                 """
-                INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID)
-                OUTPUT INSERTED.ReviewLogID
+                INSERT INTO FactLogs (FactID, ReviewDate, SessionID)
+                OUTPUT INSERTED.FactLogID
                 VALUES (?, GETDATE(), ?)
                 """,
                 (fact_id, self.current_session_id)
             )
-            self.current_review_log_id = new_id
+            self.current_fact_log_id = new_id
             self.current_fact_start_time = now
         except Exception as _:
             # If we couldn't insert with SessionID for some reason, fall back to basic insert
             self.execute_update(
                 """
-                INSERT INTO ReviewLogs (FactID, ReviewDate)
+                INSERT INTO FactLogs (FactID, ReviewDate)
                 VALUES (?, GETDATE())
                 """,
                 (fact_id,)
             )
-            self.current_review_log_id = None
+            self.current_fact_log_id = None
             self.current_fact_start_time = now
 
         # Force a streak check-in now that a log exists for today
@@ -2220,7 +2283,7 @@ class FactDariApp:
         If timed_out=True, also mark the log as ended due to inactivity.
         """
         try:
-            if self.current_review_log_id and self.current_fact_start_time:
+            if self.current_fact_log_id and self.current_fact_start_time:
                 # If timing out, cap elapsed at last activity to avoid counting idle time
                 end_ts = None
                 try:
@@ -2242,21 +2305,21 @@ class FactDariApp:
                 # Try to update with TimedOut flag if column exists
                 updated = self.execute_update(
                     """
-                    UPDATE ReviewLogs
+                    UPDATE FactLogs
                     SET SessionDuration = ?, TimedOut = ?
-                    WHERE ReviewLogID = ?
+                    WHERE FactLogID = ?
                     """,
-                    (elapsed, 1 if timed_out else 0, self.current_review_log_id)
+                    (elapsed, 1 if timed_out else 0, self.current_fact_log_id)
                 )
                 if not updated:
                     # Fallback without TimedOut if migration hasn't applied
                     self.execute_update(
                         """
-                        UPDATE ReviewLogs
+                        UPDATE FactLogs
                         SET SessionDuration = ?
-                        WHERE ReviewLogID = ?
+                        WHERE FactLogID = ?
                         """,
-                        (elapsed, self.current_review_log_id)
+                        (elapsed, self.current_fact_log_id)
                     )
                 # Award XP
                 try:
@@ -2266,7 +2329,7 @@ class FactDariApp:
         except Exception:
             pass
         finally:
-            self.current_review_log_id = None
+            self.current_fact_log_id = None
             self.current_fact_start_time = None
 
     def start_new_session(self):
@@ -2389,7 +2452,7 @@ class FactDariApp:
     
     def toggle_favorite(self):
         """Toggle the favorite status of the current fact"""
-        if self.is_home_page or not self.current_fact_id:
+        if not self._is_action_allowed() or not self.current_fact_id:
             return
         profile_id = self.get_active_profile_id()
 
@@ -2462,7 +2525,7 @@ class FactDariApp:
 
     def toggle_easy(self):
         """Toggle the 'known/easy' status of the current fact"""
-        if self.is_home_page or not self.current_fact_id:
+        if not self._is_action_allowed() or not self.current_fact_id:
             return
         profile_id = self.get_active_profile_id()
         new_status = not self.current_fact_is_easy
@@ -2542,6 +2605,8 @@ class FactDariApp:
     
     def add_new_fact(self):
         """Add a new fact to the database"""
+        if not self._is_action_allowed():
+            return
         # Pause review timer while user is adding a card
         self.pause_review_timer()
         # Create a popup window
@@ -2685,7 +2750,7 @@ class FactDariApp:
                         )
                         self.execute_update(
                             """
-                            INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactContentSnapshot, CategoryIDSnapshot)
+                            INSERT INTO FactLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactContentSnapshot, CategoryIDSnapshot)
                             VALUES (?, GETDATE(), ?, 0, 'add', ?, ?)
                             """,
                             (new_fact_id, self.current_session_id, content, category_id)
@@ -2748,7 +2813,7 @@ class FactDariApp:
     
     def edit_current_fact(self):
         """Edit the current fact"""
-        if not self.current_fact_id:
+        if not self._is_action_allowed() or not self.current_fact_id:
             return
         profile_id = self.get_active_profile_id()
         
@@ -2896,7 +2961,7 @@ class FactDariApp:
                         )
                         self.execute_update(
                             """
-                            INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactEdited, FactContentSnapshot, CategoryIDSnapshot)
+                            INSERT INTO FactLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactEdited, FactContentSnapshot, CategoryIDSnapshot)
                             VALUES (?, GETDATE(), ?, 0, 'edit', 1, ?, ?)
                             """,
                             (self.current_fact_id, self.current_session_id, content, category_id)
@@ -2940,7 +3005,7 @@ class FactDariApp:
     
     def delete_current_fact(self):
         """Delete the current fact"""
-        if not self.current_fact_id:
+        if not self._is_action_allowed() or not self.current_fact_id:
             return
         profile_id = self.get_active_profile_id()
         
@@ -2961,12 +3026,12 @@ class FactDariApp:
                     content_snapshot = None
                     category_snapshot = None
 
-                # Log the delete action in ReviewLogs (before deleting the Fact)
+                # Log the delete action in FactLogs (before deleting the Fact)
                 try:
                     if self.current_session_id:
                         self.execute_update(
                             """
-                            INSERT INTO ReviewLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactDeleted, FactContentSnapshot, CategoryIDSnapshot)
+                            INSERT INTO FactLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactDeleted, FactContentSnapshot, CategoryIDSnapshot)
                             VALUES (?, GETDATE(), ?, 0, 'delete', 1, ?, ?)
                             """,
                             (self.current_fact_id, self.current_session_id, content_snapshot, category_snapshot)
@@ -3396,6 +3461,12 @@ class FactDariApp:
         """Show the home page with welcome message and start button"""
         # End any active reviewing session and finalize current view
         self.end_active_session()
+
+        # Finalize any open question view and reset question state
+        self._finalize_question_view()
+        self.answer_revealed = False
+        self.current_question_id = None
+
         self.is_home_page = True
         
         # Hide all fact-related UI elements

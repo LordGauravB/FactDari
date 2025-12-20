@@ -22,7 +22,7 @@ IF OBJECT_ID('AchievementUnlocks', 'U') IS NOT NULL DROP TABLE AchievementUnlock
 IF OBJECT_ID('QuestionLogs', 'U') IS NOT NULL DROP TABLE QuestionLogs;
 IF OBJECT_ID('Questions', 'U') IS NOT NULL DROP TABLE Questions;
 IF OBJECT_ID('AIUsageLogs', 'U') IS NOT NULL DROP TABLE AIUsageLogs;
-IF OBJECT_ID('ReviewLogs', 'U') IS NOT NULL DROP TABLE ReviewLogs;
+IF OBJECT_ID('FactLogs', 'U') IS NOT NULL DROP TABLE FactLogs;
 IF OBJECT_ID('ReviewSessions', 'U') IS NOT NULL DROP TABLE ReviewSessions;
 IF OBJECT_ID('ProfileFacts', 'U') IS NOT NULL DROP TABLE ProfileFacts;
 IF OBJECT_ID('Achievements', 'U') IS NOT NULL DROP TABLE Achievements;
@@ -32,6 +32,7 @@ IF OBJECT_ID('GamificationProfile', 'U') IS NOT NULL DROP TABLE GamificationProf
 GO
 
 -- Step 4: Create GamificationProfile table (user identity and lifetime counters)
+-- Note: TotalAITokens/TotalAICost track ALL LLM usage (explanations + question generation)
 CREATE TABLE GamificationProfile (
     ProfileID INT IDENTITY(1,1) PRIMARY KEY,
     XP INT NOT NULL CONSTRAINT DF_GamificationProfile_XP DEFAULT 0,
@@ -44,8 +45,6 @@ CREATE TABLE GamificationProfile (
     TotalDeletes INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalDeletes DEFAULT 0,
     TotalAITokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalAITokens DEFAULT 0,
     TotalAICost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalAICost DEFAULT 0,
-    TotalQuestionTokens INT NOT NULL CONSTRAINT DF_GamificationProfile_TotalQuestionTokens DEFAULT 0,
-    TotalQuestionCost DECIMAL(19,9) NOT NULL CONSTRAINT DF_GamificationProfile_TotalQuestionCost DEFAULT 0,
     CurrentStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_CurrentStreak DEFAULT 0,
     LongestStreak INT NOT NULL CONSTRAINT DF_GamificationProfile_LongestStreak DEFAULT 0,
     LastCheckinDate DATE NULL
@@ -111,23 +110,23 @@ CREATE TABLE ReviewSessions (
         FOREIGN KEY (ProfileID) REFERENCES GamificationProfile(ProfileID)
 );
 
--- Step 9: Create ReviewLogs table with per-view duration and optional session link
-CREATE TABLE ReviewLogs (
-    ReviewLogID INT IDENTITY(1,1) PRIMARY KEY,
+-- Step 9: Create FactLogs table with per-view duration and optional session link
+CREATE TABLE FactLogs (
+    FactLogID INT IDENTITY(1,1) PRIMARY KEY,
     FactID INT NULL,
     ReviewDate DATETIME NOT NULL,
     SessionDuration INT, -- seconds
     SessionID INT NULL,
-    TimedOut BIT NOT NULL CONSTRAINT DF_ReviewLogs_TimedOut DEFAULT 0,
+    TimedOut BIT NOT NULL CONSTRAINT DF_FactLogs_TimedOut DEFAULT 0,
     -- Action metadata (view/add/edit/delete) and snapshots to preserve history after deletes
-    Action NVARCHAR(16) NOT NULL CONSTRAINT DF_ReviewLogs_Action DEFAULT 'view',
-    FactEdited BIT NOT NULL CONSTRAINT DF_ReviewLogs_FactEdited DEFAULT 0,
-    FactDeleted BIT NOT NULL CONSTRAINT DF_ReviewLogs_FactDeleted DEFAULT 0,
+    Action NVARCHAR(16) NOT NULL CONSTRAINT DF_FactLogs_Action DEFAULT 'view',
+    FactEdited BIT NOT NULL CONSTRAINT DF_FactLogs_FactEdited DEFAULT 0,
+    FactDeleted BIT NOT NULL CONSTRAINT DF_FactLogs_FactDeleted DEFAULT 0,
     FactContentSnapshot NVARCHAR(MAX) NULL,
     CategoryIDSnapshot INT NULL,
-    CONSTRAINT FK_ReviewLogs_Facts FOREIGN KEY (FactID)
+    CONSTRAINT FK_FactLogs_Facts FOREIGN KEY (FactID)
         REFERENCES Facts(FactID) ON DELETE SET NULL,
-    CONSTRAINT FK_ReviewLogs_ReviewSessions FOREIGN KEY (SessionID)
+    CONSTRAINT FK_FactLogs_ReviewSessions FOREIGN KEY (SessionID)
         REFERENCES ReviewSessions(SessionID)
 );
 
@@ -158,6 +157,7 @@ CREATE TABLE AIUsageLogs (
 );
 
 -- Step 11: Create Questions table (cache of pre-generated questions, up to 3 per fact)
+-- Note: LLM generation costs are logged to AIUsageLogs with OperationType='QUESTION_GENERATION'
 CREATE TABLE Questions (
     QuestionID INT IDENTITY(1,1) PRIMARY KEY,
 
@@ -168,15 +168,7 @@ CREATE TABLE Questions (
     -- The generated question content
     QuestionText NVARCHAR(MAX) NOT NULL,
 
-    -- LLM generation cost (one-time when question is created)
-    ModelName NVARCHAR(200) NULL,
-    Provider NVARCHAR(100) NULL,
-    InputTokens INT NULL,
-    OutputTokens INT NULL,
-    TotalTokens AS (ISNULL(InputTokens, 0) + ISNULL(OutputTokens, 0)) PERSISTED,
-    Cost DECIMAL(19,9) NULL,
-    CurrencyCode CHAR(3) NOT NULL CONSTRAINT DF_Questions_CurrencyCode DEFAULT 'USD',
-    LatencyMs INT NULL,
+    -- Generation status
     Status NVARCHAR(16) NOT NULL CONSTRAINT DF_Questions_Status DEFAULT 'SUCCESS',
 
     -- Usage stats
@@ -200,8 +192,8 @@ CREATE TABLE QuestionLogs (
 
     -- Timing metrics
     QuestionShownAt DATETIME NOT NULL CONSTRAINT DF_QuestionLogs_QuestionShownAt DEFAULT GETDATE(),
-    AnswerRevealedAt DATETIME NULL,
-    QuestionReadingDurationSec INT NULL,    -- Calculated when answer is revealed
+    QuestionViewEndedAt DATETIME NULL,
+    QuestionReadingDurationSec INT NULL,    -- Calculated when question view ends
 
     CreatedAt DATETIME NOT NULL CONSTRAINT DF_QuestionLogs_CreatedAt DEFAULT GETDATE()
 );
@@ -236,9 +228,9 @@ CREATE UNIQUE INDEX UX_AchievementUnlocks_Profile_Achievement ON AchievementUnlo
 -- Helpful indexes for app queries
 CREATE INDEX IX_Facts_CategoryID ON Facts(CategoryID);
 CREATE INDEX IX_ReviewSessions_ProfileID ON ReviewSessions(ProfileID);
-CREATE INDEX IX_ReviewLogs_FactID ON ReviewLogs(FactID);
-CREATE INDEX IX_ReviewLogs_ReviewDate ON ReviewLogs(ReviewDate);
-CREATE INDEX IX_ReviewLogs_SessionID ON ReviewLogs(SessionID);
+CREATE INDEX IX_FactLogs_FactID ON FactLogs(FactID);
+CREATE INDEX IX_FactLogs_ReviewDate ON FactLogs(ReviewDate);
+CREATE INDEX IX_FactLogs_SessionID ON FactLogs(SessionID);
 CREATE INDEX IX_AIUsageLogs_FactID ON AIUsageLogs(FactID);
 CREATE INDEX IX_AIUsageLogs_SessionID ON AIUsageLogs(SessionID);
 CREATE INDEX IX_AIUsageLogs_ProfileID ON AIUsageLogs(ProfileID);
@@ -1233,9 +1225,11 @@ GO
 SELECT 'Categories' AS TableName, COUNT(*) AS RecordCount FROM Categories
 UNION ALL SELECT 'Facts', COUNT(*) FROM Facts
 UNION ALL SELECT 'ProfileFacts', COUNT(*) FROM ProfileFacts
-UNION ALL SELECT 'ReviewLogs', COUNT(*) FROM ReviewLogs
+UNION ALL SELECT 'FactLogs', COUNT(*) FROM FactLogs
 UNION ALL SELECT 'ReviewSessions', COUNT(*) FROM ReviewSessions
 UNION ALL SELECT 'AIUsageLogs', COUNT(*) FROM AIUsageLogs
+UNION ALL SELECT 'Questions', COUNT(*) FROM Questions
+UNION ALL SELECT 'QuestionLogs', COUNT(*) FROM QuestionLogs
 UNION ALL SELECT 'GamificationProfile', COUNT(*) FROM GamificationProfile
 UNION ALL SELECT 'Achievements', COUNT(*) FROM Achievements
 UNION ALL SELECT 'AchievementUnlocks', COUNT(*) FROM AchievementUnlocks;

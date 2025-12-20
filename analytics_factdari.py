@@ -76,7 +76,7 @@ def chart_data():
                 CONVERT(varchar, rl.ReviewDate, 23) as Date,
                 COUNT(DISTINCT rl.FactID) as FactsReviewed,
                 COUNT(*) as TotalReviews
-            FROM ReviewLogs rl
+            FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.ReviewDate >= ? AND (rl.Action IS NULL OR rl.Action = 'view')
               AND COALESCE(rl.TimedOut, 0) = 0
@@ -147,7 +147,7 @@ def chart_data():
                 DATEPART(hour, rl.ReviewDate) as Hour,
                 DATEPART(weekday, rl.ReviewDate) as DayOfWeek,
                 COUNT(*) as ReviewCount
-            FROM ReviewLogs rl
+            FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.ReviewDate >= ? AND (rl.Action IS NULL OR rl.Action = 'view')
               AND COALESCE(rl.TimedOut, 0) = 0
@@ -263,7 +263,7 @@ def chart_data():
             SELECT c.CategoryName, COUNT(DISTINCT rl.FactID) as ViewedCount
             FROM Categories c
             INNER JOIN Facts f ON c.CategoryID = f.CategoryID
-            INNER JOIN ReviewLogs rl ON f.FactID = rl.FactID
+            INNER JOIN FactLogs rl ON f.FactID = rl.FactID
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE())
               AND (rl.Action IS NULL OR rl.Action = 'view')
@@ -309,7 +309,7 @@ def chart_data():
         # Count of distinct facts viewed today
         'viewedTodayCount': fetch_query("""
             SELECT COUNT(DISTINCT rl.FactID) as ViewedTodayCount
-            FROM ReviewLogs rl
+            FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE())
               AND (rl.Action IS NULL OR rl.Action = 'view')
@@ -339,7 +339,7 @@ def chart_data():
                     s.SessionID,
                     COUNT(DISTINCT rl.FactID) as FactCount
                 FROM ReviewSessions s
-                LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
+                LEFT JOIN FactLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
                 WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
                   AND s.ProfileID = ?
                 GROUP BY s.SessionID
@@ -354,7 +354,7 @@ def chart_data():
                     ELSE 0 
                 END as BestFactsPerMinute
             FROM ReviewSessions s
-            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
+            LEFT JOIN FactLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
             WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
               AND s.ProfileID = ?
             GROUP BY s.SessionID, s.DurationSeconds
@@ -394,7 +394,7 @@ def chart_data():
                 MIN(SessionDuration) as MinTimePerReview,
                 MAX(SessionDuration) as MaxTimePerReview,
                 COUNT(*) as TotalReviews
-            FROM ReviewLogs rl
+            FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.SessionDuration IS NOT NULL AND rl.SessionDuration > 0
               AND (rl.Action IS NULL OR rl.Action = 'view')
@@ -407,10 +407,10 @@ def chart_data():
                 c.CategoryName,
                 AVG(rl.SessionDuration) as AvgReviewTime,
                 SUM(rl.SessionDuration) as TotalReviewTime,
-                COUNT(rl.ReviewLogID) as ReviewCount
+                COUNT(rl.FactLogID) as ReviewCount
             FROM Categories c
             JOIN Facts f ON c.CategoryID = f.CategoryID AND f.CreatedBy = ?
-            JOIN ReviewLogs rl ON f.FactID = rl.FactID
+            JOIN FactLogs rl ON f.FactID = rl.FactID
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.SessionDuration IS NOT NULL AND rl.SessionDuration > 0
               AND (rl.Action IS NULL OR rl.Action = 'view')
@@ -441,7 +441,7 @@ def chart_data():
                 s.StartTime,
                 s.DurationSeconds,
                 COUNT(DISTINCT rl.FactID) as UniqueFactsReviewed,
-                COUNT(rl.ReviewLogID) as TotalReviews,
+                COUNT(rl.FactLogID) as TotalReviews,
                 CASE 
                     WHEN s.DurationSeconds > 0 
                     THEN CAST(COUNT(DISTINCT rl.FactID) * 60.0 / s.DurationSeconds as DECIMAL(10,2))
@@ -449,11 +449,11 @@ def chart_data():
                 END as FactsPerMinute,
                 CASE 
                     WHEN s.DurationSeconds > 0 
-                    THEN CAST(COUNT(rl.ReviewLogID) * 60.0 / s.DurationSeconds as DECIMAL(10,2))
+                    THEN CAST(COUNT(rl.FactLogID) * 60.0 / s.DurationSeconds as DECIMAL(10,2))
                     ELSE 0 
                 END as ReviewsPerMinute
             FROM ReviewSessions s
-            LEFT JOIN ReviewLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
+            LEFT JOIN FactLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
             WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
               AND s.ProfileID = ?
             GROUP BY s.SessionID, s.StartTime, s.DurationSeconds
@@ -467,7 +467,7 @@ def chart_data():
                 COUNT(CASE WHEN rl.TimedOut = 1 THEN 1 END) as TimeoutCount,
                 COUNT(*) as TotalReviews,
                 CAST(COUNT(CASE WHEN rl.TimedOut = 1 THEN 1 END) * 100.0 / COUNT(*) as DECIMAL(5,2)) as TimeoutPercentage
-            FROM ReviewLogs rl
+            FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.ReviewDate >= ? AND (rl.Action IS NULL OR rl.Action = 'view')
               AND rs.ProfileID = ?
@@ -500,7 +500,7 @@ def chart_data():
                 END as DayName,
                 COUNT(*) as ReviewCount,
                 COUNT(DISTINCT FactID) as UniqueFactsCount
-            FROM ReviewLogs rl
+            FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
               AND COALESCE(rl.TimedOut, 0) = 0
@@ -512,7 +512,7 @@ def chart_data():
             SELECT TOP 5
                 DATEPART(hour, ReviewDate) as Hour,
                 COUNT(*) as ReviewCount
-            FROM ReviewLogs rl
+            FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
               AND COALESCE(rl.TimedOut, 0) = 0
@@ -540,7 +540,7 @@ def chart_data():
                 COUNT(*) as TotalReviews,
                 COUNT(DISTINCT FactID) as UniqueFactsReviewed,
                 COUNT(DISTINCT CONVERT(date, ReviewDate)) as ActiveDays
-            FROM ReviewLogs rl
+            FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rl.ReviewDate >= DATEADD(month, -6, GETDATE())
               AND (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
@@ -709,7 +709,7 @@ def chart_data():
                 SELECT
                     rl.SessionID,
                     COUNT(DISTINCT rl.FactID) as UniqueFactsReviewed
-                FROM ReviewLogs rl
+                FROM FactLogs rl
                 WHERE (rl.Action IS NULL OR rl.Action = 'view')
                   AND COALESCE(rl.TimedOut, 0) = 0
                 GROUP BY rl.SessionID
@@ -725,7 +725,7 @@ def chart_data():
             SELECT
                 COALESCE(rl.Action, 'view') as ActionType,
                 COUNT(*) as ActionCount
-            FROM ReviewLogs rl
+            FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rs.ProfileID = ?
             GROUP BY COALESCE(rl.Action, 'view')
@@ -1027,10 +1027,10 @@ def chart_data():
             s.StartTime,
             s.EndTime,
             s.DurationSeconds,
-            COUNT(rl.ReviewLogID) AS Views,
+            COUNT(rl.FactLogID) AS Views,
             COUNT(DISTINCT rl.FactID) AS DistinctFacts
         FROM ReviewSessions s
-        LEFT JOIN ReviewLogs rl ON rl.SessionID = s.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
+        LEFT JOIN FactLogs rl ON rl.SessionID = s.SessionID AND (rl.Action IS NULL OR rl.Action = 'view') AND COALESCE(rl.TimedOut, 0) = 0
         WHERE s.ProfileID = ?
         GROUP BY s.SessionID, s.StartTime, s.EndTime, s.DurationSeconds
         ORDER BY s.SessionID DESC
@@ -1040,12 +1040,12 @@ def chart_data():
     # Last card reviews (top 50 by latest session start time, then review time)
     recent_card_reviews = fetch_query("""
         SELECT TOP 50
-            rl.ReviewLogID,
+            rl.FactLogID,
             s.StartTime,
             rl.ReviewDate,
             COALESCE(c.CategoryName, c2.CategoryName) AS CategoryName,
             COALESCE(f.Content, rl.FactContentSnapshot) AS Content
-        FROM ReviewLogs rl
+        FROM FactLogs rl
         JOIN ReviewSessions s ON s.SessionID = rl.SessionID
         LEFT JOIN Facts f ON f.FactID = rl.FactID
         LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
@@ -1053,7 +1053,7 @@ def chart_data():
         WHERE (rl.Action IS NULL OR rl.Action = 'view')
           AND COALESCE(rl.TimedOut, 0) = 0
           AND s.ProfileID = ?
-        ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.ReviewLogID DESC
+        ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.FactLogID DESC
     """, (profile_id,))
     formatted_data['recent_card_reviews'] = format_table_data(recent_card_reviews)
 
@@ -1061,12 +1061,12 @@ def chart_data():
     if return_all:
         all_recent_card_reviews = fetch_query("""
             SELECT TOP 500
-                rl.ReviewLogID,
+                rl.FactLogID,
                 s.StartTime,
                 rl.ReviewDate,
                 COALESCE(c.CategoryName, c2.CategoryName) AS CategoryName,
                 COALESCE(f.Content, rl.FactContentSnapshot) AS Content
-            FROM ReviewLogs rl
+            FROM FactLogs rl
             JOIN ReviewSessions s ON s.SessionID = rl.SessionID
             LEFT JOIN Facts f ON f.FactID = rl.FactID
             LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
@@ -1074,7 +1074,7 @@ def chart_data():
             WHERE (rl.Action IS NULL OR rl.Action = 'view')
               AND COALESCE(rl.TimedOut, 0) = 0
               AND s.ProfileID = ?
-            ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.ReviewLogID DESC
+            ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.FactLogID DESC
         """, (profile_id,))
         formatted_data['all_recent_card_reviews'] = format_table_data(all_recent_card_reviews)
 
@@ -1148,7 +1148,7 @@ def calculate_review_streak(profile_id: int):
 
     query = """
     SELECT DISTINCT CONVERT(date, rl.ReviewDate) as ReviewDate
-    FROM ReviewLogs rl
+    FROM FactLogs rl
     JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
     WHERE (rl.Action IS NULL OR rl.Action = 'view')
       AND COALESCE(rl.TimedOut, 0) = 0

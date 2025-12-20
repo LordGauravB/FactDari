@@ -168,7 +168,7 @@ class TestDatabaseHelpers:
         sample_queries = [
             "SELECT * FROM Facts WHERE FactID = ?",
             "UPDATE Facts SET TotalViews = TotalViews + 1 WHERE FactID = ?",
-            "INSERT INTO ReviewLogs (FactID, ReviewDate) VALUES (?, GETDATE())",
+            "INSERT INTO FactLogs (FactID, ReviewDate) VALUES (?, GETDATE())",
         ]
 
         for query in sample_queries:

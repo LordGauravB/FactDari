@@ -58,8 +58,8 @@ erDiagram
         int FactsDeleted
     }
 
-    ReviewLogs {
-        int ReviewLogID PK
+    FactLogs {
+        int FactLogID PK
         int FactID FK
         datetime ReviewDate
         int SessionDuration
@@ -124,8 +124,8 @@ erDiagram
     Facts ||--o{ ProfileFacts : "has state"
     
     %% --- Logging & History ---
-    Facts ||--o{ ReviewLogs : logs
-    ReviewSessions ||--o{ ReviewLogs : tracks
+    Facts ||--o{ FactLogs : logs
+    ReviewSessions ||--o{ FactLogs : tracks
     
     %% --- AI ---
     Facts ||--o{ AIUsageLogs : "AI Context"

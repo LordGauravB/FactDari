@@ -15,8 +15,7 @@ This is a comprehensive reference guide defining every table and column in your 
 | **`TotalKnown`** | `INT` | **Lifetime Counter.** Incremented when user clicks the "Known" (Easy) button. Triggers "Knowledge" achievements. |
 | **`TotalFavorites`** | `INT` | **Lifetime Counter.** Incremented when user clicks the "Star" button. |
 | **`TotalAdds`** / **`Edits`** / **`Deletes`** | `INT` | **Activity Counters.** Incremented during CRUD operations to reward content curation. |
-| **`TotalAITokens`** / **`TotalAICost`** | `INT/DECIMAL` | **Usage Tracking.** Aggregates cost from `AIUsageLogs`. Used to display total spend or potentially limit usage. |
-| **`TotalQuestionTokens`** / **`TotalQuestionCost`** | `INT/DECIMAL` | **Question Generation Tracking.** Aggregates cost from `QuestionLogs` for LLM-generated questions. |
+| **`TotalAITokens`** / **`TotalAICost`** | `INT/DECIMAL` | **Usage Tracking.** Aggregates ALL LLM costs from `AIUsageLogs` (both explanations and question generation). Used to display total spend or potentially limit usage. |
 | **`CurrentStreak`** | `INT` | **Streak Counter.** Updated by `daily_checkin()`. Resets to 0 if `LastCheckinDate` is older than yesterday. |
 | **`LongestStreak`** | `INT` | **High Score.** Stores the highest value `CurrentStreak` has ever reached. |
 | **`LastCheckinDate`** | `DATE` | **State Marker.** The last date the user opened the app or reviewed a card. Used to calculate if a streak continues or breaks. |
@@ -78,7 +77,7 @@ This is a comprehensive reference guide defining every table and column in your 
 
 | Column | Data Type | Definition & Application Use Case |
 | :--- | :--- | :--- |
-| **`SessionID`** | `INT (PK)` | **Grouping.** Created when `start_reviewing()` is called. Links multiple `ReviewLogs`. |
+| **`SessionID`** | `INT (PK)` | **Grouping.** Created when `start_reviewing()` is called. Links multiple `FactLogs`. |
 | **`ProfileID`** | `INT (FK)` | **User Link.** Who owns this session. |
 | **`StartTime`** | `DATETIME` | **Start Timer.** Set when the user enters the review screen. |
 | **`EndTime`** | `DATETIME` | **End Timer.** Set when user clicks "Home" or closes the app. |
@@ -88,13 +87,13 @@ This is a comprehensive reference guide defining every table and column in your 
 
 ---
 
-### 6. Table: `ReviewLogs`
+### 6. Table: `FactLogs`
 **Definition:** A granular log of every single interaction (view, add, edit, delete).
 **Primary Use:** The raw data source for the Heatmap, Activity Timeline, and "Cards Reviewed Today" counters.
 
 | Column | Data Type | Definition & Application Use Case |
 | :--- | :--- | :--- |
-| **`ReviewLogID`** | `INT (PK)` | **Identity.** |
+| **`FactLogID`** | `INT (PK)` | **Identity.** |
 | **`FactID`** | `INT (FK)` | **Target.** The fact being interacted with. **ON DELETE SET NULL**: If fact is deleted, the log remains for stats but `FactID` becomes NULL. |
 | **`ReviewDate`** | `DATETIME` | **Timestamp.** Exact moment the card was shown. Used for Heatmap (Hour of Day). |
 | **`SessionDuration`** | `INT` | **Reading Time.** How long the user stared at *this specific card*. The app pauses this timer if a popup opens. |
@@ -118,7 +117,7 @@ This is a comprehensive reference guide defining every table and column in your 
 | **`FactID`** | `INT (FK, NULL)` | **Target (optional).** Links the AI call to a fact. NULL if not tied to a fact. |
 | **`SessionID`** | `INT (FK, NULL)` | **Session (optional).** Associates the AI call with an active review session if present. |
 | **`ProfileID`** | `INT (FK)` | **User.** Defaults to 1; used for per-profile cost/stats. |
-| **`OperationType`** | `NVARCHAR` | **Context.** Usually 'EXPLANATION'. |
+| **`OperationType`** | `NVARCHAR` | **Context.** 'EXPLANATION' for AI fact explanations, 'QUESTION_GENERATION' for generating cached questions. |
 | **`Status`** | `NVARCHAR` | **Outcome.** 'SUCCESS' or 'FAILED'. Drives success/failure counts. |
 | **`ModelName`** | `NVARCHAR` | **Model Used.** Stored for debugging/analytics (shown in recent AI table). |
 | **`Provider`** | `NVARCHAR` | **Provider Tag.** Used to group cost/latency by provider. |
@@ -135,22 +134,14 @@ This is a comprehensive reference guide defining every table and column in your 
 
 ### 8. Table: `Questions`
 **Definition:** Cache of pre-generated LLM questions for each fact (up to 3 per fact).
-**Primary Use:** Storing reusable questions to avoid repeated LLM calls. When a fact needs a question, check this table first — only call the LLM if fewer than 3 questions exist.
+**Primary Use:** Storing reusable questions to avoid repeated LLM calls. When a fact needs a question, check this table first — only call the LLM if no questions exist. LLM generation costs are logged to `AIUsageLogs` with `OperationType='QUESTION_GENERATION'`.
 
 | Column | Data Type | Definition & Application Use Case |
 | :--- | :--- | :--- |
 | **`QuestionID`** | `INT (PK)` | **Identity.** |
 | **`FactID`** | `INT (FK)` | **Target.** Links the cached question to the source fact/answer. **ON DELETE CASCADE**: If fact is deleted, its cached questions are removed. |
 | **`QuestionText`** | `NVARCHAR(MAX)` | **Content.** The actual LLM-generated question text. |
-| **`ModelName`** | `NVARCHAR` | **Model Used.** Stored for debugging/analytics. |
-| **`Provider`** | `NVARCHAR` | **Provider Tag.** Used to group cost/latency by provider. |
-| **`InputTokens`** | `INT` | **Cost Basis.** Number of tokens sent to AI (fact content + prompt). |
-| **`OutputTokens`** | `INT` | **Cost Basis.** Number of tokens in the generated question. |
-| **`TotalTokens`** | `COMPUTED` | **Sum.** `InputTokens + OutputTokens`; used in cost analytics. |
-| **`Cost`** | `DECIMAL` | **Financial.** Calculated in Python based on `config.AI_PRICING` and stored here. |
-| **`CurrencyCode`** | `CHAR(3)` | **Currency.** Defaults to 'USD'. |
-| **`LatencyMs`** | `INT` | **Performance.** Time taken for the API to generate the question. |
-| **`Status`** | `NVARCHAR` | **Outcome.** 'SUCCESS' or 'FAILED'. Drives success/failure counts. |
+| **`Status`** | `NVARCHAR` | **Outcome.** 'SUCCESS' or 'FAILED'. Tracks if generation succeeded. |
 | **`TimesShown`** | `INT` | **Usage Counter.** How many times this cached question has been shown to users. |
 | **`LastShownAt`** | `DATETIME` | **Usage Timestamp.** When this question was last displayed. |
 | **`GeneratedAt`** | `DATETIME` | **Timestamp.** When the question was generated by the LLM. |
@@ -168,8 +159,8 @@ This is a comprehensive reference guide defining every table and column in your 
 | **`SessionID`** | `INT (FK, NULL)` | **Session (optional).** Associates the question view with an active review session. |
 | **`ProfileID`** | `INT (FK)` | **User.** Defaults to 1; used for per-profile stats. |
 | **`QuestionShownAt`** | `DATETIME` | **Start Timer.** When the question was displayed to the user. |
-| **`AnswerRevealedAt`** | `DATETIME` | **End Timer.** When the user clicked to reveal the answer/fact. |
-| **`QuestionReadingDurationSec`** | `INT` | **Engagement.** Calculated time spent reading the question before revealing the answer. |
+| **`QuestionViewEndedAt`** | `DATETIME` | **End Timer.** When the user stopped viewing the question (revealed answer, navigated away, or clicked Home). |
+| **`QuestionReadingDurationSec`** | `INT` | **Engagement.** Calculated time spent reading the question before view ended. |
 | **`CreatedAt`** | `DATETIME` | **Timestamp.** When the log entry was created. |
 
 ---

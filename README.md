@@ -62,7 +62,7 @@ The analytics dashboard provides comprehensive visualizations of your learning p
 | **Session Analytics Tab** | |
 | Session Metrics | Cards for avg/total/max duration, session count, facts/session, best efficiency |
 | Session Duration Distribution | Pie chart bucketed from < 1min to > 1hr |
-| Review Time Per Fact | Stats display (avg/min/max) from ReviewLogs |
+| Review Time Per Fact | Stats display (avg/min/max) from FactLogs |
 | Daily Session Duration | Multi-line trend chart (last 30 days) |
 | Category Review Time | Horizontal bar of avg review time by category |
 | Session Efficiency | Table of top 100 sessions with facts/min and reviews/min |
@@ -285,7 +285,7 @@ util/RunFactDari.vbs
 - **Facts**: Stores fact content, category link, global view counts, and computed content key for duplicate prevention
 - **ProfileFacts**: Per-profile fact state (personal review count, favorite flag, known/easy flag, last viewed date, and `KnownSince` timestamp for learning velocity tracking)
 - **ReviewSessions**: Tracks review sessions (start/end, duration, timeout flag, per-session action counters)
-- **ReviewLogs**: One row per view/action (per-view duration, optional session link, action type, content snapshots for deleted facts)
+- **FactLogs**: One row per view/action (per-view duration, optional session link, action type, content snapshots for deleted facts)
 - **GamificationProfile**: Single-row profile for XP, level, streaks, lifetime counters, and AI usage totals
 - **Achievements**: Catalog of unlockable achievements (code, category, threshold, reward XP)
 - **AchievementUnlocks**: Records which achievements have been unlocked (with notification flag)

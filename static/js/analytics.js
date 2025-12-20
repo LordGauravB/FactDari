@@ -3047,13 +3047,13 @@
       icon: '👁️',
       title: 'Viewed Today',
       description: 'The total number of distinct facts you have reviewed today. Each fact is only counted once, even if you\'ve viewed it multiple times today.',
-      formula: 'SELECT COUNT(DISTINCT FactID) FROM ReviewLogs WHERE ReviewDate = TODAY AND Action = \'view\''
+      formula: 'SELECT COUNT(DISTINCT FactID) FROM FactLogs WHERE ReviewDate = TODAY AND Action = \'view\''
     },
     'review-streak': {
       icon: '🔥',
       title: 'Review Streak',
       description: 'The number of consecutive days you have reviewed at least one fact. Your streak resets to 0 if you miss a day without any reviews.',
-      formula: 'Count consecutive days (including today) where ReviewLogs has at least 1 view entry, going backwards until a gap is found.'
+      formula: 'Count consecutive days (including today) where FactLogs has at least 1 view entry, going backwards until a gap is found.'
     },
     'categories': {
       icon: '📊',
@@ -3131,13 +3131,13 @@
       icon: '📊',
       title: 'Avg Facts/Session',
       description: 'The average number of unique facts you review per session. Higher values indicate more productive sessions.',
-      formula: 'SELECT AVG(FactCount) FROM (SELECT COUNT(DISTINCT FactID) as FactCount FROM ReviewLogs GROUP BY SessionID)'
+      formula: 'SELECT AVG(FactCount) FROM (SELECT COUNT(DISTINCT FactID) as FactCount FROM FactLogs GROUP BY SessionID)'
     },
     'best-efficiency': {
       icon: '⚡',
       title: 'Best Efficiency',
       description: 'Your highest review efficiency measured in facts per minute. This is calculated as (unique facts reviewed × 60) / session duration in seconds.',
-      formula: 'SELECT MAX(COUNT(DISTINCT FactID) * 60.0 / DurationSeconds) FROM ReviewLogs JOIN ReviewSessions'
+      formula: 'SELECT MAX(COUNT(DISTINCT FactID) * 60.0 / DurationSeconds) FROM FactLogs JOIN ReviewSessions'
     },
     'total-ai-calls': {
       icon: '🤖',
