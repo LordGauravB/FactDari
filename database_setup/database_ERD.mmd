@@ -32,6 +32,7 @@ erDiagram
         nvarchar ContentKey "Computed/Persisted"
         date DateAdded
         int TotalViews
+        int QuestionsRefreshCountdown "default 50"
         int CreatedBy FK "default 1"
     }
 
@@ -91,6 +92,27 @@ erDiagram
         datetime CreatedAt
     }
 
+    Questions {
+        int QuestionID PK
+        int FactID FK
+        nvarchar QuestionText
+        nvarchar Status "default SUCCESS"
+        int TimesShown "default 0"
+        datetime LastShownAt
+        datetime GeneratedAt
+    }
+
+    QuestionLogs {
+        int QuestionLogID PK
+        int QuestionID FK
+        int SessionID FK
+        int ProfileID FK "default 1"
+        datetime QuestionShownAt
+        datetime QuestionViewEndedAt
+        int QuestionReadingDurationSec
+        datetime CreatedAt
+    }
+
     Achievements {
         int AchievementID PK
         nvarchar Code "UNIQUE"
@@ -130,6 +152,12 @@ erDiagram
     %% --- AI ---
     Facts ||--o{ AIUsageLogs : "AI Context"
     ReviewSessions ||--o{ AIUsageLogs : "AI Session"
+
+    %% --- Questions ---
+    Facts ||--o{ Questions : "has questions"
+    Questions ||--o{ QuestionLogs : "logs usage"
+    GamificationProfile ||--o{ QuestionLogs : "incurs"
+    ReviewSessions ||--o{ QuestionLogs : "tracks"
 
     %% --- Gamification ---
     Achievements ||--o{ AchievementUnlocks : unlocks

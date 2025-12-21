@@ -595,9 +595,9 @@ def chart_data():
                 COALESCE(AVG(LatencyMs), 0) as AvgLatency,
                 SUM(CASE WHEN Status = 'SUCCESS' THEN 1 ELSE 0 END) as SuccessCount,
                 SUM(CASE WHEN Status = 'FAILED' THEN 1 ELSE 0 END) as FailedCount,
-                COALESCE(AVG(CASE WHEN OperationType = 'EXPLANATION' THEN ReadingDurationSec END), 0) as AvgReadingTime,
-                COALESCE(MIN(CASE WHEN OperationType = 'EXPLANATION' THEN ReadingDurationSec END), 0) as MinReadingTime,
-                COALESCE(MAX(CASE WHEN OperationType = 'EXPLANATION' THEN ReadingDurationSec END), 0) as MaxReadingTime
+                COALESCE(AVG(CASE WHEN OperationType = 'EXPLANATION' AND Status = 'SUCCESS' AND ReadingDurationSec > 0 THEN ReadingDurationSec END), 0) as AvgReadingTime,
+                COALESCE(MIN(CASE WHEN OperationType = 'EXPLANATION' AND Status = 'SUCCESS' AND ReadingDurationSec > 0 THEN ReadingDurationSec END), 0) as MinReadingTime,
+                COALESCE(MAX(CASE WHEN OperationType = 'EXPLANATION' AND Status = 'SUCCESS' AND ReadingDurationSec > 0 THEN ReadingDurationSec END), 0) as MaxReadingTime
             FROM AIUsageLogs
             WHERE ProfileID = ?
         """, (profile_id,)),
@@ -889,6 +889,32 @@ def chart_data():
             ORDER BY COUNT(q.QuestionID) DESC
         """, (profile_id,)),
 
+        # Facts with Questions vs Without Questions (for pie chart)
+        'factsQuestionCoverage': fetch_query("""
+            SELECT
+                CASE WHEN q.FactID IS NOT NULL THEN 'With Questions' ELSE 'Without Questions' END as Status,
+                COUNT(DISTINCT f.FactID) as FactCount
+            FROM Facts f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            LEFT JOIN Questions q ON f.FactID = q.FactID
+            WHERE f.CreatedBy = ? AND c.IsActive = 1
+            GROUP BY CASE WHEN q.FactID IS NOT NULL THEN 'With Questions' ELSE 'Without Questions' END
+        """, (profile_id,)),
+
+        # Facts with/without Questions by Category (for stacked bar chart)
+        'factsQuestionCoverageByCategory': fetch_query("""
+            SELECT
+                c.CategoryName,
+                COUNT(DISTINCT CASE WHEN q.FactID IS NOT NULL THEN f.FactID END) as WithQuestions,
+                COUNT(DISTINCT CASE WHEN q.FactID IS NULL THEN f.FactID END) as WithoutQuestions
+            FROM Facts f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            LEFT JOIN Questions q ON f.FactID = q.FactID
+            WHERE f.CreatedBy = ? AND c.IsActive = 1
+            GROUP BY c.CategoryName
+            ORDER BY c.CategoryName
+        """, (profile_id,)),
+
         # Question Reading Time Distribution
         'questionReadingTimeDistribution': fetch_query("""
             SELECT
@@ -981,6 +1007,32 @@ def chart_data():
             WHERE ProfileID = ? AND QuestionReadingDurationSec IS NOT NULL
             GROUP BY DATEPART(hour, QuestionShownAt)
             ORDER BY DATEPART(hour, QuestionShownAt)
+        """, (profile_id,)),
+
+        # Facts with highest QuestionsRefreshCountdown (recently refreshed, countdown near 50)
+        'factsHighestRefreshCountdown': fetch_query("""
+            SELECT TOP 50
+                f.Content,
+                f.QuestionsRefreshCountdown,
+                c.CategoryName,
+                (SELECT COUNT(*) FROM Questions q WHERE q.FactID = f.FactID) as QuestionCount
+            FROM Facts f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE f.CreatedBy = ? AND c.IsActive = 1
+            ORDER BY f.QuestionsRefreshCountdown DESC
+        """, (profile_id,)),
+
+        # Facts with lowest QuestionsRefreshCountdown (due for refresh soon, countdown near 0)
+        'factsLowestRefreshCountdown': fetch_query("""
+            SELECT TOP 50
+                f.Content,
+                f.QuestionsRefreshCountdown,
+                c.CategoryName,
+                (SELECT COUNT(*) FROM Questions q WHERE q.FactID = f.FactID) as QuestionCount
+            FROM Facts f
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE f.CreatedBy = ? AND c.IsActive = 1
+            ORDER BY f.QuestionsRefreshCountdown ASC
         """, (profile_id,))
     }
 
@@ -1219,12 +1271,16 @@ def chart_data():
         'questions_shown_today': data['questionsShownToday'][0].get('Count', 0) if data['questionsShownToday'] else 0,
         'avg_question_reading_time': data['avgQuestionReadingTime'][0] if data['avgQuestionReadingTime'] else {},
         'questions_by_category': format_pie_chart(data['questionsByCategory'], 'CategoryName', 'QuestionCount'),
+        'facts_question_coverage': format_pie_chart(data['factsQuestionCoverage'], 'Status', 'FactCount'),
+        'facts_question_coverage_by_category': format_stacked_bar_chart(data['factsQuestionCoverageByCategory']),
         'question_reading_time_distribution': format_pie_chart(data['questionReadingTimeDistribution'], 'TimeRange', 'Count'),
         'questions_generated_timeline': format_questions_timeline(data['questionsGeneratedTimeline'], start_date=thirty_days_ago, end_date=today_str),
         'questions_shown_timeline': format_questions_shown_timeline(data['questionsShownTimeline'], start_date=thirty_days_ago, end_date=today_str),
         'most_questioned_facts': format_table_data(data['mostQuestionedFacts']),
         'recent_question_activity': format_table_data(data['recentQuestionActivity']),
         'question_engagement_by_hour': format_table_data(data['questionEngagementByHour']),
+        'facts_highest_refresh_countdown': format_table_data(data['factsHighestRefreshCountdown']),
+        'facts_lowest_refresh_countdown': format_table_data(data['factsLowestRefreshCountdown']),
         # New analytics
         'category_completion_rate': format_table_data(data['categoryCompletionRate']),
         'learning_velocity': format_table_data(data['learningVelocity']),
@@ -1505,6 +1561,29 @@ def format_pie_chart(data, label_field, value_field):
     return {
         'labels': [row[label_field] for row in data],
         'data': [row[value_field] for row in data]
+    }
+
+def format_stacked_bar_chart(data):
+    """Format data for stacked bar chart showing facts with/without questions by category"""
+    if not data:
+        return {'labels': [], 'datasets': []}
+
+    labels = [row['CategoryName'] for row in data]
+    with_questions = [row.get('WithQuestions', 0) or 0 for row in data]
+    without_questions = [row.get('WithoutQuestions', 0) or 0 for row in data]
+
+    return {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'With Questions',
+                'data': with_questions
+            },
+            {
+                'label': 'Without Questions',
+                'data': without_questions
+            }
+        ]
     }
 
 def format_line_chart(data, start_date=None, end_date=None):
@@ -1976,18 +2055,12 @@ def format_questions_timeline(data, start_date=None, end_date=None):
             {
                 'label': 'Questions Generated',
                 'data': generated,
-                'borderColor': '#10b981',
-                'backgroundColor': 'rgba(16, 185, 129, 0.1)',
-                'fill': True,
-                'tension': 0.4
+                'backgroundColor': '#10b981'
             },
             {
                 'label': 'Failed',
                 'data': failed,
-                'borderColor': '#ef4444',
-                'backgroundColor': 'rgba(239, 68, 68, 0.1)',
-                'fill': True,
-                'tension': 0.4
+                'backgroundColor': '#ef4444'
             }
         ]
     }

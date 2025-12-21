@@ -146,6 +146,7 @@ class FactDariApp:
         # Timer pause state (exclude non-review time like add/edit/delete dialogs)
         self.timer_paused = False
         self.pause_started_at = None
+        self.pause_depth = 0
         self.category_dropdown_open = False
         self._dropdown_seen_open = False
         # Prevent overlapping AI requests
@@ -263,7 +264,8 @@ class FactDariApp:
                                              textvariable=self.category_var, 
                                              state="readonly", 
                                              width=15,
-                                             style='Custom.TCombobox')
+                                             style='Custom.TCombobox',
+                                             postcommand=self.on_category_dropdown_open)
         
         self.category_dropdown['values'] = self.load_categories()
         self.category_dropdown.pack(side="left")
@@ -1092,6 +1094,11 @@ class FactDariApp:
         except Exception:
             win.geometry(self.POPUP_EDIT_CARD_SIZE)
         win.configure(bg=self.BG_COLOR)
+        try:
+            win.transient(self.root)
+            win.grab_set()
+        except Exception:
+            pass
 
         ai_usage_row_id = None
         reading_started_at = None
@@ -2334,15 +2341,26 @@ class FactDariApp:
     def pause_review_timer(self):
         """Pause the current review timer (exclude time until resumed)."""
         try:
-            if self.current_fact_start_time and not self.timer_paused:
-                self.pause_started_at = datetime.now()
+            depth = getattr(self, "pause_depth", 0)
+            if depth < 0:
+                depth = 0
+            if depth == 0:
+                if self.current_fact_start_time and not self.timer_paused:
+                    self.pause_started_at = datetime.now()
                 self.timer_paused = True
+            self.pause_depth = depth + 1
         except Exception:
             pass
 
     def resume_review_timer(self):
         """Resume the review timer, shifting the start time forward by the paused duration."""
         try:
+            depth = getattr(self, "pause_depth", 0)
+            if depth > 0:
+                depth -= 1
+            self.pause_depth = max(0, depth)
+            if self.pause_depth > 0:
+                return
             if self.timer_paused:
                 if self.current_fact_start_time and self.pause_started_at:
                     delta = datetime.now() - self.pause_started_at
@@ -2694,6 +2712,11 @@ class FactDariApp:
         add_window.title("Add New Fact")
         add_window.geometry(f"{self.POPUP_ADD_CARD_SIZE}{self.POPUP_POSITION}")
         add_window.configure(bg=self.BG_COLOR)
+        try:
+            add_window.transient(self.root)
+            add_window.grab_set()
+        except Exception:
+            pass
         profile_id = self.get_active_profile_id()
         
         # On close, resume timer then destroy
@@ -2921,6 +2944,11 @@ class FactDariApp:
         edit_window.title("Edit Fact")
         edit_window.geometry(f"{self.POPUP_EDIT_CARD_SIZE}{self.POPUP_POSITION}")
         edit_window.configure(bg=self.BG_COLOR)
+        try:
+            edit_window.transient(self.root)
+            edit_window.grab_set()
+        except Exception:
+            pass
 
         # Resume timer when window is closed via [X]
         def on_close_edit():
@@ -3268,6 +3296,11 @@ class FactDariApp:
         except Exception:
             cat_window.geometry(self.POPUP_CATEGORIES_SIZE)
         cat_window.configure(bg=self.BG_COLOR)
+        try:
+            cat_window.transient(self.root)
+            cat_window.grab_set()
+        except Exception:
+            pass
         
         # Create header
         tk.Label(cat_window, text="Manage Categories", fg=self.TEXT_COLOR, bg=self.BG_COLOR, 
@@ -3553,6 +3586,8 @@ class FactDariApp:
     def on_category_dropdown_open(self, event=None):
         """Pause timing while the category dropdown is open."""
         try:
+            if getattr(self, "category_dropdown_open", False):
+                return
             self.pause_review_timer()
             self.category_dropdown_open = True
             self._dropdown_seen_open = False

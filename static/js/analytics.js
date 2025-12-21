@@ -20,6 +20,9 @@
   let aiRecentUsageData = [];
   // Question analytics datasets
   let questionsRecentData = [];
+  let mostQuestionedData = [];
+  let highestRefreshCountdownData = [];
+  let lowestRefreshCountdownData = [];
   // Currency settings
   let currentCurrency = 'USD';
   const USD_TO_GBP_RATE = 0.79; // Approximate conversion rate
@@ -331,8 +334,7 @@
     destroyChart(key);
 
     const axisTitles = {
-      reviews_per_day: { x: 'Date', y: 'Reviews' },
-      questions_shown_timeline: { x: 'Date', y: 'Questions Shown' }
+      reviews_per_day: { x: 'Date', y: 'Reviews' }
     };
     const titles = axisTitles[key] || {};
     
@@ -1106,10 +1108,14 @@
         renderQuestionMetrics(data.question_summary, data.avg_question_reading_time, data.questions_generated_today);
         renderQuestionsGeneratedTimeline('questions_generated_timeline', 'questions-generated-timeline', data.questions_generated_timeline);
         pieChart('questions_by_category', 'questions-by-category', data.questions_by_category);
+        pieChart('facts_question_coverage', 'facts-question-coverage', data.facts_question_coverage);
+        renderFactsQuestionCoverageByCategory('facts_question_coverage_by_category', 'facts-question-coverage-by-category', data.facts_question_coverage_by_category);
         pieChart('reading_time_distribution', 'reading-time-distribution', data.question_reading_time_distribution);
-        lineChart('questions_shown_timeline', 'questions-shown-timeline', data.questions_shown_timeline);
+        renderQuestionsShownTimeline('questions_shown_timeline', 'questions-shown-timeline', data.questions_shown_timeline);
         renderMostQuestionedTable(data.most_questioned_facts);
         renderRecentQuestionsTable(data.recent_question_activity);
+        renderHighestRefreshCountdownTable(data.facts_highest_refresh_countdown);
+        renderLowestRefreshCountdownTable(data.facts_lowest_refresh_countdown);
 
         // New analytics charts
         renderCategoryCompletionRate('category_completion_rate', 'category-completion-rate', data.category_completion_rate);
@@ -1206,7 +1212,9 @@
             key === 'favorite-facts-table' || key === 'known-facts-table' ||
             key === 'ai-most-explained-table' || key === 'ai-usage-log-table' ||
             key === 'ai-provider-comparison' || key === 'session-actions-table' ||
-            key === 'achievements-table') {
+            key === 'achievements-table' || key === 'highest-refresh-countdown-table' ||
+            key === 'lowest-refresh-countdown-table' || key === 'most-questioned-table' ||
+            key === 'recent-questions-table') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
           
@@ -1432,6 +1440,105 @@
               tbody.innerHTML = achievementsData.innerHTML;
             }
             table.appendChild(tbody);
+
+          } else if (key === 'highest-refresh-countdown-table') {
+            headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Countdown</th><th>Questions</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            highestRefreshCountdownData.forEach((row, index) => {
+              const tr = document.createElement('tr');
+              const factContent = row.Content || '';
+
+              let medalClass = '';
+              if (index === 0) medalClass = 'medal-gold';
+              else if (index === 1) medalClass = 'medal-silver';
+              else if (index === 2) medalClass = 'medal-bronze';
+
+              tr.innerHTML = `
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
+                <td style="text-align: center;" class="${medalClass}">${row.QuestionsRefreshCountdown || 0}</td>
+                <td style="text-align: center;">${row.QuestionCount || 0}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+          } else if (key === 'lowest-refresh-countdown-table') {
+            headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Countdown</th><th>Questions</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            lowestRefreshCountdownData.forEach((row, index) => {
+              const tr = document.createElement('tr');
+              const factContent = row.Content || '';
+
+              let medalClass = '';
+              if (index === 0) medalClass = 'medal-gold';
+              else if (index === 1) medalClass = 'medal-silver';
+              else if (index === 2) medalClass = 'medal-bronze';
+
+              tr.innerHTML = `
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
+                <td style="text-align: center;" class="${medalClass}">${row.QuestionsRefreshCountdown || 0}</td>
+                <td style="text-align: center;">${row.QuestionCount || 0}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+          } else if (key === 'most-questioned-table') {
+            headerRow.innerHTML = '<th>Fact</th><th>Category</th><th>Questions</th><th>Times Shown</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            mostQuestionedData.forEach((row, index) => {
+              const tr = document.createElement('tr');
+              const factContent = row.FactContent || '';
+
+              let medalClass = '';
+              if (index === 0) medalClass = 'medal-gold';
+              else if (index === 1) medalClass = 'medal-silver';
+              else if (index === 2) medalClass = 'medal-bronze';
+
+              tr.innerHTML = `
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
+                <td style="text-align: center;" class="${medalClass}">${row.QuestionCount || 0}</td>
+                <td style="text-align: center;">${row.TotalTimesShown || 0}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+          } else if (key === 'recent-questions-table') {
+            headerRow.innerHTML = '<th>Time</th><th>Question</th><th>Fact</th><th>Category</th><th>Reading Time</th>';
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            questionsRecentData.forEach(row => {
+              const tr = document.createElement('tr');
+              const time = row.QuestionShownAt ? new Date(row.QuestionShownAt).toLocaleString() : '';
+              const questionText = row.QuestionText || '';
+              const factContent = row.FactContent || '';
+              const readingTime = row.QuestionReadingDurationSec ? `${row.QuestionReadingDurationSec}s` : '--';
+
+              tr.innerHTML = `
+                <td>${escapeHtml(time)}</td>
+                <td><span class="fact-text">${escapeHtml(questionText)}</span></td>
+                <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td>${escapeHtml(row.CategoryName || '')}</td>
+                <td style="text-align: center;">${readingTime}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
           }
 
           tableContainer.appendChild(table);
@@ -1462,6 +1569,14 @@
             title.textContent = 'Recent Session Actions';
           } else if (key === 'achievements-table') {
             title.textContent = 'Recent Achievements';
+          } else if (key === 'highest-refresh-countdown-table') {
+            title.textContent = `Recently Refreshed Facts (${highestRefreshCountdownData.length} total)`;
+          } else if (key === 'lowest-refresh-countdown-table') {
+            title.textContent = `Due for Refresh Facts (${lowestRefreshCountdownData.length} total)`;
+          } else if (key === 'most-questioned-table') {
+            title.textContent = `Most Questioned Facts (${mostQuestionedData.length} total)`;
+          } else if (key === 'recent-questions-table') {
+            title.textContent = `Recent Question Activity (${questionsRecentData.length} entries)`;
           }
           modalChartContainer.insertBefore(title, tableContainer);
           
@@ -1545,7 +1660,13 @@
             'category-completion-rate': 'category_completion_rate',
             'learning-velocity': 'learning_velocity',
             'peak-productivity': 'peak_productivity',
-            'action-breakdown': 'action_breakdown'
+            'action-breakdown': 'action_breakdown',
+            'questions-generated-timeline': 'questions_generated_timeline',
+            'questions-by-category': 'questions_by_category',
+            'facts-question-coverage': 'facts_question_coverage',
+            'facts-question-coverage-by-category': 'facts_question_coverage_by_category',
+            'reading-time-distribution': 'reading_time_distribution',
+            'questions-shown-timeline': 'questions_shown_timeline'
           };
           const chartKey = idMap[key];
           if (chartKey) {
@@ -1599,11 +1720,15 @@
                 chartOptions.indexAxis = chartRef.config.options.indexAxis;
               }
             }
-            
+
+            // Copy over custom plugins array (for things like percentage labels)
+            const chartPlugins = chartRef.config.plugins || [];
+
             charts.modal = new Chart(ctx, {
               type: chartRef.config.type,
               data: JSON.parse(JSON.stringify(chartRef.config.data)), // Deep clone
-              options: chartOptions
+              options: chartOptions,
+              plugins: chartPlugins
             });
           }
         }
@@ -3257,6 +3382,8 @@
     const successful = summary?.SuccessfulQuestions || 0;
     const failed = summary?.FailedQuestions || 0;
     const avgReading = readingTime?.AvgReadingTime || 0;
+    const minReading = readingTime?.MinReadingTime || 0;
+    const maxReading = readingTime?.MaxReadingTime || 0;
     const today = generatedToday || 0;
 
     setText('#total-questions', total.toLocaleString());
@@ -3265,6 +3392,11 @@
     setText('#failed-questions', failed.toLocaleString());
     setText('#avg-reading-time', avgReading > 0 ? `${Math.round(avgReading)}s` : '--');
     setText('#questions-today', today.toLocaleString());
+
+    // Question Reading Time Stats (Lifetime)
+    setText('#avg-question-reading-time', avgReading > 0 ? `${Math.round(avgReading)}s` : '--');
+    setText('#min-question-reading-time', minReading > 0 ? `${Math.round(minReading)}s` : '--');
+    setText('#max-question-reading-time', maxReading > 0 ? `${Math.round(maxReading)}s` : '--');
   }
 
   function renderQuestionsGeneratedTimeline(key, elementId, payload) {
@@ -3340,10 +3472,226 @@
     });
   }
 
+  function renderQuestionsShownTimeline(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: payload,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            display: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            title: {
+              display: true,
+              text: 'Date',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
+            }
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Questions Shown',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Avg Reading Time (s)',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            grid: {
+              drawOnChartArea: false
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              usePointStyle: true
+            }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1
+          }
+        }
+      }
+    });
+  }
+
+  function renderFactsQuestionCoverageByCategory(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+
+    // Calculate percentages for each category
+    const withQuestions = payload.datasets?.[0]?.data || [];
+    const withoutQuestions = payload.datasets?.[1]?.data || [];
+    const percentages = withQuestions.map((val, i) => {
+      const total = (val || 0) + (withoutQuestions[i] || 0);
+      return total > 0 ? Math.round((val / total) * 100) : 0;
+    });
+
+    // Style the datasets
+    const styledDatasets = (payload.datasets || []).map((dataset, index) => {
+      const colors = index === 0
+        ? { bg: isDarkMode ? 'rgba(34, 197, 94, 0.8)' : 'rgba(34, 197, 94, 0.8)', border: '#22c55e' }  // Green for "With Questions"
+        : { bg: isDarkMode ? 'rgba(239, 68, 68, 0.8)' : 'rgba(239, 68, 68, 0.8)', border: '#ef4444' }; // Red for "Without Questions"
+
+      return {
+        ...dataset,
+        backgroundColor: colors.bg,
+        borderColor: colors.border,
+        borderWidth: 1
+      };
+    });
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: payload.labels || [],
+        datasets: styledDatasets
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            stacked: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            title: {
+              display: true,
+              text: 'Category',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
+            }
+          },
+          y: {
+            stacked: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            title: {
+              display: true,
+              text: 'Number of Facts',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              usePointStyle: true
+            }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1,
+            callbacks: {
+              afterBody: function(context) {
+                const idx = context[0].dataIndex;
+                return `Coverage: ${percentages[idx]}%`;
+              }
+            }
+          }
+        }
+      },
+      plugins: [{
+        id: 'percentageLabels',
+        afterDatasetsDraw: function(chart) {
+          const ctx = chart.ctx;
+          ctx.save();
+          ctx.font = 'bold 11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillStyle = isDarkMode ? '#f1f5f9' : '#0f172a';
+
+          // Get the meta for the last dataset (top of the stack)
+          const lastDatasetIndex = chart.data.datasets.length - 1;
+          const meta = chart.getDatasetMeta(lastDatasetIndex);
+
+          meta.data.forEach((bar, index) => {
+            const percentage = percentages[index];
+            const x = bar.x;
+            const y = bar.y - 5; // Position above the bar
+            ctx.fillText(`${percentage}%`, x, y);
+          });
+
+          ctx.restore();
+        }
+      }]
+    });
+  }
+
   function renderMostQuestionedTable(data) {
     const tbody = qs('#most-questioned-table tbody');
     if (!tbody) return;
 
+    mostQuestionedData = data || [];
     tbody.innerHTML = '';
 
     (data || []).forEach((row, index) => {
@@ -3394,6 +3742,64 @@
         <td>${factDisplay}</td>
         <td>${escapeHtml(row.CategoryName || '')}</td>
         <td style="text-align: center;">${readingTime}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderHighestRefreshCountdownTable(data) {
+    const tbody = qs('#highest-refresh-countdown-table tbody');
+    if (!tbody) return;
+
+    highestRefreshCountdownData = data || [];
+    tbody.innerHTML = '';
+
+    (data || []).slice(0, 10).forEach((row, index) => {
+      const tr = document.createElement('tr');
+      const factContent = row.Content || '';
+      const displayText = factContent.length > 80
+        ? `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 80))}...</span>`
+        : `<span class="fact-text">${escapeHtml(factContent)}</span>`;
+
+      let medalClass = '';
+      if (index === 0) medalClass = 'medal-gold';
+      else if (index === 1) medalClass = 'medal-silver';
+      else if (index === 2) medalClass = 'medal-bronze';
+
+      tr.innerHTML = `
+        <td>${displayText}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
+        <td style="text-align: center;" class="${medalClass}">${row.QuestionsRefreshCountdown || 0}</td>
+        <td style="text-align: center;">${row.QuestionCount || 0}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderLowestRefreshCountdownTable(data) {
+    const tbody = qs('#lowest-refresh-countdown-table tbody');
+    if (!tbody) return;
+
+    lowestRefreshCountdownData = data || [];
+    tbody.innerHTML = '';
+
+    (data || []).slice(0, 10).forEach((row, index) => {
+      const tr = document.createElement('tr');
+      const factContent = row.Content || '';
+      const displayText = factContent.length > 80
+        ? `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 80))}...</span>`
+        : `<span class="fact-text">${escapeHtml(factContent)}</span>`;
+
+      let medalClass = '';
+      if (index === 0) medalClass = 'medal-gold';
+      else if (index === 1) medalClass = 'medal-silver';
+      else if (index === 2) medalClass = 'medal-bronze';
+
+      tr.innerHTML = `
+        <td>${displayText}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
+        <td style="text-align: center;" class="${medalClass}">${row.QuestionsRefreshCountdown || 0}</td>
+        <td style="text-align: center;">${row.QuestionCount || 0}</td>
       `;
       tbody.appendChild(tr);
     });
