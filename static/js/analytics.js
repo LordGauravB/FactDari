@@ -1202,11 +1202,134 @@
     const closeBtn = modal?.querySelector('.modal-close');
     const modalCanvas = modal?.querySelector('#modal-chart');
     const modalChartContainer = modal?.querySelector('.modal-chart-container');
-    
+    const modalTitle = modal?.querySelector('.modal-title');
+    const modalDescription = modal?.querySelector('.modal-description');
+
+    // Title mapping for all expandable items
+    const titleMap = {
+      'most-reviewed-table': () => `Most Reviewed Facts (${fullMostReviewedData.length} total)`,
+      'least-reviewed-table': () => `Least Reviewed Facts (${fullLeastReviewedData.length} total)`,
+      'favorite-facts-table': () => `Favorite Facts (${fullFavoriteData.length} total)`,
+      'known-facts-table': () => `Known Facts (${fullKnownData.length} total)`,
+      'ai-most-explained-table': () => `Most Explained Facts by AI (${aiMostExplainedData.length} total)`,
+      'ai-usage-log-table': () => `Recent AI Usage Log (${aiRecentUsageData.length} entries)`,
+      'ai-provider-comparison': () => 'AI Provider Comparison',
+      'session-actions-table': () => 'Recent Session Actions',
+      'achievements-table': () => 'Recent Achievements',
+      'highest-refresh-countdown-table': () => `Recently Refreshed Facts (${highestRefreshCountdownData.length} total)`,
+      'lowest-refresh-countdown-table': () => `Due for Refresh Facts (${lowestRefreshCountdownData.length} total)`,
+      'most-questioned-table': () => `Most Questioned Facts (${mostQuestionedData.length} total)`,
+      'recent-questions-table': () => `Recent Question Activity (${questionsRecentData.length} entries)`,
+      'review-heatmap-chart': () => 'Review Activity Heatmap',
+      'sessions-table': () => `Recent Sessions (${(sessionsData || []).length} total)`,
+      'session-efficiency-table': () => 'Session Efficiency',
+      'recent-reviews-table': () => {
+        const rows = (recentReviewsData500 && recentReviewsData500.length) ? recentReviewsData500 : recentReviewsData50;
+        return `Recent Reviews (${(rows || []).length} total)`;
+      },
+      'category-distribution': () => 'Category Distribution',
+      'favorite-categories': () => 'Favorite Facts by Category',
+      'known-categories': () => 'Known Facts by Category',
+      'categories-viewed-today': () => 'Categories Viewed Today',
+      'reviews-per-day': () => 'Reviews Per Day (Last 30 Days)',
+      'facts-timeline': () => 'Facts Added Over Time',
+      'category-reviews': () => 'Reviews by Category',
+      'session-duration-distribution': () => 'Session Duration Distribution',
+      'daily-session-duration': () => 'Daily Session Duration Trend (Last 30 Days)',
+      'category-review-time': () => 'Average Review Time by Category',
+      'timeout-analysis': () => 'Session Timeout Analysis (Last 30 Days)',
+      'known-vs-unknown': () => 'Known vs Unknown Facts',
+      'weekly-pattern': () => 'Weekly Review Pattern',
+      'top-hours': () => 'Top Review Hours',
+      'monthly-progress': () => 'Monthly Progress Overview (Last 6 Months)',
+      'session-actions-chart': () => 'Session Actions Distribution',
+      'ai-cost-timeline': () => 'AI Cost Over Time (Last 30 Days)',
+      'ai-token-distribution': () => 'AI Token Distribution',
+      'ai-usage-by-category': () => 'AI Usage by Category',
+      'ai-question-gen-by-category': () => 'Question Generation by Category',
+      'ai-usage-by-operation': () => 'AI Usage by Operation',
+      'ai-latency-distribution': () => 'AI Response Latency Distribution',
+      'ai-usage-trend': () => 'AI Usage Trend (Last 30 Days)',
+      'category-completion-rate': () => 'Category Completion Rate',
+      'learning-velocity': () => 'Learning Velocity Trend',
+      'peak-productivity': () => 'Peak Productivity Hours',
+      'action-breakdown': () => 'Action Breakdown',
+      'questions-generated-timeline': () => 'Questions Generated Over Time (Last 30 Days)',
+      'questions-by-category': () => 'Questions by Category',
+      'facts-question-coverage': () => 'Facts Question Coverage',
+      'facts-question-coverage-by-category': () => 'Question Coverage by Category',
+      'reading-time-distribution': () => 'Reading Time Distribution',
+      'questions-shown-timeline': () => 'Questions Shown Over Time (Last 30 Days)'
+    };
+
+    // Description mapping for all expandable items
+    const descriptionMap = {
+      'category-distribution': 'Distribution of facts across different categories',
+      'favorite-categories': 'Distribution of favorite facts by category',
+      'known-categories': 'Distribution of known facts by category',
+      'categories-viewed-today': 'Categories of facts reviewed today',
+      'known-vs-unknown': 'Ratio of known vs unknown facts',
+      'weekly-pattern': 'Review activity by day of week',
+      'top-hours': 'Your top 5 most active hours',
+      'facts-timeline': 'Timeline of when facts were added',
+      'category-reviews': 'Total reviews per category',
+      'monthly-progress': 'Monthly reviews, unique facts, and active days',
+      'category-completion-rate': 'Percentage of facts marked as "known" per category',
+      'learning-velocity': 'Average days from fact creation to marked as "known" by category',
+      'action-breakdown': 'Distribution of actions (view, add, edit, delete)',
+      'peak-productivity': 'Session efficiency (facts/min) by hour of day',
+      'most-reviewed-table': 'Top most frequently reviewed facts',
+      'least-reviewed-table': 'Top least reviewed facts',
+      'favorite-facts-table': 'Random favorite facts',
+      'known-facts-table': 'Random known facts',
+      'review-heatmap-chart': 'Your review patterns heatmap per day per hour',
+      'reviews-per-day': 'Daily review activity',
+      'session-duration-distribution': 'How long your sessions typically last',
+      'category-review-time': 'Which categories take longer to review',
+      'daily-session-duration': 'Session duration patterns',
+      'timeout-analysis': 'Track session timeouts and inactivity patterns',
+      'session-efficiency-table': 'Detailed efficiency metrics for the last 100 sessions',
+      'sessions-table': 'Review sessions summary',
+      'recent-reviews-table': 'Ordered by latest session start',
+      'session-actions-table': 'Added / Edited / Deleted counts per last 100 sessions',
+      'session-actions-chart': 'Sessions action counts',
+      'questions-generated-timeline': 'Daily question generation (successful vs failed)',
+      'questions-by-category': 'Question distribution across categories',
+      'facts-question-coverage': 'Facts with questions vs without questions',
+      'facts-question-coverage-by-category': 'Facts with/without questions per category',
+      'reading-time-distribution': 'How long users spend reading questions',
+      'questions-shown-timeline': 'Daily count of questions displayed to user',
+      'most-questioned-table': 'Facts with the most generated questions',
+      'recent-questions-table': 'Recent question views and engagement',
+      'highest-refresh-countdown-table': 'Facts with recently refreshed questions (countdown near 50)',
+      'lowest-refresh-countdown-table': 'Facts due for question refresh soon (countdown near 0)',
+      'achievements-table': '10 most recently unlocked achievements',
+      'ai-cost-timeline': 'Daily AI costs',
+      'ai-token-distribution': 'Input vs Output tokens',
+      'ai-usage-by-category': 'AI explanations by fact category',
+      'ai-question-gen-by-category': 'Question generation by fact category',
+      'ai-usage-by-operation': 'Explanations vs Question Generation',
+      'ai-usage-trend': 'Daily AI calls and tokens usage',
+      'ai-latency-distribution': 'Distribution of API response times',
+      'ai-provider-comparison': 'Compare costs and performance across AI providers',
+      'ai-most-explained-table': 'Facts that have been explained by AI most frequently',
+      'ai-usage-log-table': 'AI API calls'
+    };
+
     qsa('.expand-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const key = btn.getAttribute('data-chart');
-        
+
+        // Set modal title
+        if (modalTitle && titleMap[key]) {
+          modalTitle.textContent = titleMap[key]();
+        }
+
+        // Set modal description
+        if (modalDescription) {
+          modalDescription.textContent = descriptionMap[key] || '';
+        }
+
         // Handle tables and heatmap differently
         if (key === 'most-reviewed-table' || key === 'least-reviewed-table' ||
             key === 'favorite-facts-table' || key === 'known-facts-table' ||
@@ -1543,44 +1666,11 @@
           }
 
           tableContainer.appendChild(table);
-          
+
           modalChartContainer.innerHTML = '';
           modalChartContainer.style.height = 'auto';
           modalChartContainer.appendChild(tableContainer);
-          
-          // Add a title above the table
-          const title = document.createElement('h3');
-          title.style.marginBottom = '16px';
-          title.style.color = 'var(--text)';
-          if (key === 'most-reviewed-table') {
-            title.textContent = `All Most Reviewed Facts (${fullMostReviewedData.length} total)`;
-          } else if (key === 'least-reviewed-table') {
-            title.textContent = `All Least Reviewed Facts (${fullLeastReviewedData.length} total)`;
-          } else if (key === 'favorite-facts-table') {
-            title.textContent = `All Favorite Facts (${fullFavoriteData.length} total)`;
-          } else if (key === 'known-facts-table') {
-            title.textContent = `All Known Facts (${fullKnownData.length} total)`;
-          } else if (key === 'ai-most-explained-table') {
-            title.textContent = `Most Explained Facts by AI (${aiMostExplainedData.length} total)`;
-          } else if (key === 'ai-usage-log-table') {
-            title.textContent = `Recent AI Usage Log (${aiRecentUsageData.length} entries)`;
-          } else if (key === 'ai-provider-comparison') {
-            title.textContent = 'AI Provider Comparison';
-          } else if (key === 'session-actions-table') {
-            title.textContent = 'Recent Session Actions';
-          } else if (key === 'achievements-table') {
-            title.textContent = 'Recent Achievements';
-          } else if (key === 'highest-refresh-countdown-table') {
-            title.textContent = `Recently Refreshed Facts (${highestRefreshCountdownData.length} total)`;
-          } else if (key === 'lowest-refresh-countdown-table') {
-            title.textContent = `Due for Refresh Facts (${lowestRefreshCountdownData.length} total)`;
-          } else if (key === 'most-questioned-table') {
-            title.textContent = `Most Questioned Facts (${mostQuestionedData.length} total)`;
-          } else if (key === 'recent-questions-table') {
-            title.textContent = `Recent Question Activity (${questionsRecentData.length} entries)`;
-          }
-          modalChartContainer.insertBefore(title, tableContainer);
-          
+
         } else if (key === 'review-heatmap-chart') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
@@ -1597,7 +1687,7 @@
             sourceHeatmap.style.gap = '4px';
             modalChartContainer.appendChild(sourceHeatmap);
           }
-          
+
         } else if (key === 'sessions-table') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
@@ -1683,7 +1773,7 @@
             modalChartContainer.innerHTML = '';
             modalChartContainer.style.height = '60vh';
             modalChartContainer.style.overflow = 'hidden';
-            
+
             const newCanvas = document.createElement('canvas');
             newCanvas.id = 'modal-chart';
             modalChartContainer.appendChild(newCanvas);
@@ -1762,13 +1852,13 @@
           `;
           table.appendChild(thead);
           const tbody = document.createElement('tbody');
-          
+
           // Get session efficiency data from the page
           const existingRows = document.querySelectorAll('#session-efficiency-table tbody tr');
           existingRows.forEach(row => {
             tbody.appendChild(row.cloneNode(true));
           });
-          
+
           table.appendChild(tbody);
           tableContainer.appendChild(table);
           modalChartContainer.appendChild(tableContainer);
@@ -1781,7 +1871,7 @@
           document.body.style.overflow = 'hidden'; // Disable page scrolling
           modalChartContainer.innerHTML = '';
           modalChartContainer.style.height = 'auto';
-          
+
           const tableContainer = document.createElement('div');
           tableContainer.className = 'table-container';
           const table = document.createElement('table');
@@ -1821,6 +1911,7 @@
           modalChartContainer.innerHTML = '';
           modalChartContainer.style.height = 'auto';
 
+          const rows = (recentReviewsData500 && recentReviewsData500.length) ? recentReviewsData500 : recentReviewsData50;
           const tableContainer = document.createElement('div');
           tableContainer.className = 'table-container';
           const table = document.createElement('table');
@@ -1836,7 +1927,6 @@
           `;
           table.appendChild(thead);
           const tbody = document.createElement('tbody');
-          const rows = (recentReviewsData500 && recentReviewsData500.length) ? recentReviewsData500 : recentReviewsData50;
           (rows || []).forEach(row => {
             const tr = document.createElement('tr');
             const sessionStart = row.StartTime ? new Date(row.StartTime).toLocaleString() : '';
