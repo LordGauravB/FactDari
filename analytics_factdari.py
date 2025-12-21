@@ -563,19 +563,7 @@ def chart_data():
             GROUP BY DATEPART(hour, ReviewDate)
             ORDER BY COUNT(*) DESC
         """, (profile_id,)),
-        
-        'categoryGrowthTrend': fetch_query("""
-            SELECT
-                c.CategoryName,
-                COUNT(f.FactID) as AllTime
-            FROM Categories c
-            LEFT JOIN Facts f ON c.CategoryID = f.CategoryID AND f.CreatedBy = ?
-            WHERE c.CreatedBy = ?
-            GROUP BY c.CategoryName
-            HAVING COUNT(f.FactID) > 0
-            ORDER BY COUNT(f.FactID) DESC
-        """, (profile_id, profile_id)),
-        
+
         # New chart for Progress tab
         'monthlyProgress': fetch_query("""
             SELECT
@@ -844,19 +832,23 @@ def chart_data():
         'questionSummary': fetch_query("""
             SELECT
                 COUNT(*) as TotalQuestions,
-                SUM(TimesShown) as TotalTimesShown,
-                COALESCE(AVG(CAST(TimesShown as FLOAT)), 0) as AvgTimesShown,
-                SUM(CASE WHEN Status = 'SUCCESS' THEN 1 ELSE 0 END) as SuccessfulQuestions,
-                SUM(CASE WHEN Status = 'FAILED' THEN 1 ELSE 0 END) as FailedQuestions
-            FROM Questions
-        """),
+                SUM(q.TimesShown) as TotalTimesShown,
+                COALESCE(AVG(CAST(q.TimesShown as FLOAT)), 0) as AvgTimesShown,
+                SUM(CASE WHEN q.Status = 'SUCCESS' THEN 1 ELSE 0 END) as SuccessfulQuestions,
+                SUM(CASE WHEN q.Status = 'FAILED' THEN 1 ELSE 0 END) as FailedQuestions
+            FROM Questions q
+            JOIN Facts f ON q.FactID = f.FactID
+            WHERE f.CreatedBy = ?
+        """, (profile_id,)),
 
         # Questions Generated Today
         'questionsGeneratedToday': fetch_query("""
             SELECT COUNT(*) as Count
-            FROM Questions
-            WHERE CONVERT(date, GeneratedAt) = CONVERT(date, GETDATE())
-        """),
+            FROM Questions q
+            JOIN Facts f ON q.FactID = f.FactID
+            WHERE CONVERT(date, q.GeneratedAt) = CONVERT(date, GETDATE())
+              AND f.CreatedBy = ?
+        """, (profile_id,)),
 
         # Questions Shown Today
         'questionsShownToday': fetch_query("""
@@ -887,9 +879,10 @@ def chart_data():
             FROM Questions q
             JOIN Facts f ON q.FactID = f.FactID
             JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE f.CreatedBy = ?
             GROUP BY c.CategoryName
             ORDER BY COUNT(q.QuestionID) DESC
-        """),
+        """, (profile_id,)),
 
         # Question Reading Time Distribution
         'questionReadingTimeDistribution': fetch_query("""
@@ -919,15 +912,16 @@ def chart_data():
         # Questions Generated Over Time (last 30 days)
         'questionsGeneratedTimeline': fetch_query("""
             SELECT
-                CONVERT(varchar, GeneratedAt, 23) as Date,
+                CONVERT(varchar, q.GeneratedAt, 23) as Date,
                 COUNT(*) as QuestionsGenerated,
-                SUM(CASE WHEN Status = 'SUCCESS' THEN 1 ELSE 0 END) as Successful,
-                SUM(CASE WHEN Status = 'FAILED' THEN 1 ELSE 0 END) as Failed
-            FROM Questions
-            WHERE GeneratedAt >= ?
-            GROUP BY CONVERT(varchar, GeneratedAt, 23)
-            ORDER BY CONVERT(varchar, GeneratedAt, 23)
-        """, (thirty_days_ago,)),
+                SUM(CASE WHEN q.Status = 'SUCCESS' THEN 1 ELSE 0 END) as Successful,
+                SUM(CASE WHEN q.Status = 'FAILED' THEN 1 ELSE 0 END) as Failed
+            FROM Questions q
+            JOIN Facts f ON q.FactID = f.FactID
+            WHERE q.GeneratedAt >= ? AND f.CreatedBy = ?
+            GROUP BY CONVERT(varchar, q.GeneratedAt, 23)
+            ORDER BY CONVERT(varchar, q.GeneratedAt, 23)
+        """, (thirty_days_ago, profile_id)),
 
         # Questions Shown Timeline (last 30 days)
         'questionsShownTimeline': fetch_query("""
@@ -951,9 +945,10 @@ def chart_data():
             FROM Questions q
             JOIN Facts f ON q.FactID = f.FactID
             JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE f.CreatedBy = ?
             GROUP BY f.Content, c.CategoryName
             ORDER BY COUNT(q.QuestionID) DESC
-        """),
+        """, (profile_id,)),
 
         # Recent Question Activity
         'recentQuestionActivity': fetch_query("""
@@ -1192,7 +1187,6 @@ def chart_data():
         'known_vs_unknown': format_known_unknown_chart(data['knownVsUnknownRatio']),
         'weekly_review_pattern': format_weekly_pattern(data['weeklyReviewPattern']),
         'top_review_hours': format_top_hours(data['topReviewHours']),
-        'category_growth_trend': format_growth_trend(data['categoryGrowthTrend']),
         # New Progress chart
         'monthly_progress': format_monthly_progress(data['monthlyProgress']),
         # Gamification exports
@@ -1714,28 +1708,6 @@ def format_top_hours(data):
             'borderColor': '#059669',
             'borderWidth': 1
         }]
-    }
-
-def format_growth_trend(data):
-    """Format category growth trend"""
-    categories = []
-    all_time = []
-    
-    for row in data[:8]:  # Top 8 categories
-        categories.append(row.get('CategoryName', ''))
-        all_time.append(row.get('AllTime', 0))
-    
-    return {
-        'labels': categories,
-        'datasets': [
-            {
-                'label': 'Total Facts (Lifetime)',
-                'data': all_time,
-                'backgroundColor': '#3b82f6',
-                'borderColor': '#2563eb',
-                'borderWidth': 1
-            }
-        ]
     }
 
 def format_monthly_progress(data):

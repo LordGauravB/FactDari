@@ -1063,8 +1063,7 @@
         doughnutChart('known_vs_unknown', 'known-vs-unknown', data.known_vs_unknown);
         renderRadarChart('weekly_pattern', 'weekly-pattern', data.weekly_review_pattern);
         renderHorizontalBarChart('top_hours', 'top-hours', data.top_review_hours);
-        renderGroupedBarChart('growth_trend', 'growth-trend', data.category_growth_trend);
-        
+
         lineChart('reviews_per_day', 'reviews-per-day', data.reviews_per_day);
         // removed avg view duration chart
         barChart('facts_timeline', 'facts-timeline', data.facts_added_timeline);
@@ -1533,7 +1532,6 @@
             'known-vs-unknown': 'known_vs_unknown',
             'weekly-pattern': 'weekly_pattern',
             'top-hours': 'top_hours',
-            'growth-trend': 'growth_trend',
             'monthly-progress': 'monthly_progress',
             'session-actions-chart': 'session_actions',
             'ai-cost-timeline': 'ai_cost_timeline',
@@ -2214,8 +2212,7 @@
     const ctx = canvas.getContext('2d');
 
     const axisTitles = {
-      session_actions: { x: 'Session (oldest → newest)', y: 'Count' },
-      growth_trend: { x: 'Category', y: 'Total Facts (Lifetime)' }
+      session_actions: { x: 'Session (oldest → newest)', y: 'Count' }
     };
     const titles = axisTitles[key] || {};
     

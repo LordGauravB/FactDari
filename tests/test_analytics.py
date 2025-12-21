@@ -403,7 +403,6 @@ class TestProgressAnalytics:
             'monthly_progress',
             'category_completion_rate',
             'learning_velocity',
-            'category_growth_trend',
         ]
         for key in progress_keys:
             assert key in data, f"Missing progress key: {key}"
