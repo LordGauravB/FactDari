@@ -24,8 +24,25 @@
   let highestRefreshCountdownData = [];
   let lowestRefreshCountdownData = [];
   // Currency settings
-  let currentCurrency = 'USD';
-  const USD_TO_GBP_RATE = 0.79; // Approximate conversion rate
+  const configEl = document.getElementById('analytics-web-config');
+  let analyticsWebConfig = {};
+  if (configEl) {
+    const raw = configEl.getAttribute('data-config') || '';
+    try {
+      analyticsWebConfig = JSON.parse(raw);
+    } catch (err) {
+      analyticsWebConfig = {};
+    }
+  }
+  const refreshSecondsRaw = parseInt(analyticsWebConfig.auto_refresh_seconds, 10);
+  const AUTO_REFRESH_SECONDS = Number.isFinite(refreshSecondsRaw) && refreshSecondsRaw > 0
+    ? refreshSecondsRaw
+    : 300;
+  const defaultCurrencyRaw = String(analyticsWebConfig.default_currency || 'USD').toUpperCase();
+  const DEFAULT_CURRENCY = defaultCurrencyRaw === 'GBP' ? 'GBP' : 'USD';
+  const rateRaw = Number(analyticsWebConfig.usd_to_gbp_rate);
+  const USD_TO_GBP_RATE = Number.isFinite(rateRaw) ? rateRaw : 0.79;
+  let currentCurrency = DEFAULT_CURRENCY;
   let cachedAIData = null; // Store AI data for currency conversion
   // Current datasets and sort state for main tables
   let currentMostData = [];
@@ -1975,18 +1992,20 @@
   function showLoadingState() { qs('#loading-screen')?.classList.remove('hidden'); }
   function hideLoadingState() { qs('#loading-screen')?.classList.add('hidden'); }
 
-  function startCountdown(seconds = 300) {
+  function startCountdown(seconds = AUTO_REFRESH_SECONDS) {
     const el = qs('#countdown');
     if (countdownInterval) clearInterval(countdownInterval);
     if (refreshInterval) clearInterval(refreshInterval);
+    if (!Number.isFinite(seconds) || seconds <= 0) seconds = AUTO_REFRESH_SECONDS;
+    let remaining = seconds;
     const update = () => {
-      const m = Math.floor(seconds/60); const s = seconds%60;
+      const m = Math.floor(remaining / 60); const s = remaining % 60;
       if (el) el.textContent = `${m}m ${s}s`;
-      if (seconds-- <= 0) { load(); seconds = 300; }
+      if (remaining-- <= 0) { load(); remaining = seconds; }
     };
     update();
     countdownInterval = setInterval(update, 1000);
-    refreshInterval = setInterval(load, 300000);
+    refreshInterval = setInterval(load, seconds * 1000);
   }
 
   // Add theme detection and update
@@ -2021,7 +2040,7 @@
           case 'r':
             e.preventDefault();
             load();
-            startCountdown(300);
+            startCountdown();
             break;
           case '1':
           case '2':
@@ -3968,10 +3987,10 @@
       refreshBtn.style.animation = 'spin 0.5s ease';
       setTimeout(() => refreshBtn.style.animation = '', 500);
       load();
-      startCountdown(300);
+      startCountdown();
     });
 
     // Initial load
-    load().then(() => startCountdown(300));
+    load().then(() => startCountdown());
   });
 })();

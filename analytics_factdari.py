@@ -13,7 +13,7 @@ logger = config.setup_logging('factdari.analytics')
 app = Flask(__name__)
 
 # Secret key for CSRF protection (use environment variable in production)
-app.config['SECRET_KEY'] = os.environ.get('FACTDARI_SECRET_KEY', os.urandom(32).hex())
+app.config['SECRET_KEY'] = config.ANALYTICS_SECRET_KEY
 
 # CSRF Protection
 csrf = CSRFProtect(app)
@@ -28,6 +28,38 @@ limiter = Limiter(
 
 # Get database connection string from config
 CONN_STR = config.get_connection_string()
+
+TOP_N_DEFAULT = int(config.ANALYTICS_CONFIG.get('top_n_default', 10) or 10)
+TOP_N_SESSIONS = int(config.ANALYTICS_CONFIG.get('top_n_sessions', 100) or 100)
+TOP_N_REVIEWS = int(config.ANALYTICS_CONFIG.get('top_n_reviews', 50) or 50)
+TOP_N_REVIEWS_EXPANDED = int(config.ANALYTICS_CONFIG.get('top_n_reviews_expanded', 500) or 500)
+TOP_N_HOURS = int(config.ANALYTICS_CONFIG.get('top_n_hours', 5) or 5)
+MONTHLY_PROGRESS_MONTHS = int(config.ANALYTICS_CONFIG.get('monthly_progress_months', 6) or 6)
+
+def _format_latency_seconds(ms_value: int) -> str:
+    seconds = ms_value / 1000.0
+    return f"{seconds:g}"
+
+def _build_latency_case_expr(edges_ms) -> str:
+    edges = sorted({int(x) for x in (edges_ms or []) if x is not None})
+    if not edges:
+        edges = [500, 1000, 2000, 5000]
+    parts = []
+    prev = None
+    for edge in edges:
+        if prev is None:
+            label = f"< {_format_latency_seconds(edge)}s"
+        else:
+            label = f"{_format_latency_seconds(prev)}-{_format_latency_seconds(edge)}s"
+        parts.append(f"WHEN LatencyMs < {edge} THEN '{label}'")
+        prev = edge
+    else_label = f"> {_format_latency_seconds(edges[-1])}s"
+    case_expr = "CASE\n                " + "\n                ".join(parts) + f"\n                ELSE '{else_label}'\n            END"
+    return case_expr
+
+LATENCY_CASE_EXPR = _build_latency_case_expr(
+    config.ANALYTICS_CONFIG.get('latency_bucket_edges_ms', [500, 1000, 2000, 5000])
+)
 
 def fetch_query(query, params=None):
     """Execute a SELECT query and return the results"""
@@ -67,7 +99,10 @@ def get_default_profile_id():
 @app.route('/')
 def index():
     """Render the main analytics page"""
-    return render_template('analytics_factdari.html')
+    return render_template(
+        'analytics_factdari.html',
+        analytics_web_config=config.ANALYTICS_WEB_CONFIG
+    )
 
 # No static resource route is needed; template uses CDN-only assets
 
@@ -127,8 +162,8 @@ def chart_data():
         """, (thirty_days_ago, profile_id)),
         
         # Most reviewed facts (top 10 for display)
-        'mostReviewedFacts': fetch_query("""
-            SELECT TOP 10
+        'mostReviewedFacts': fetch_query(f"""
+            SELECT TOP {TOP_N_DEFAULT}
                 f.Content,
                 COALESCE(pf.PersonalReviewCount, 0) AS ReviewCount,
                 c.CategoryName,
@@ -144,8 +179,8 @@ def chart_data():
         """, (profile_id, profile_id, profile_id)),
         
         # Least reviewed facts (include 0 reviews; show zeros first, then oldest last viewed)
-        'leastReviewedFacts': fetch_query("""
-            SELECT TOP 10
+        'leastReviewedFacts': fetch_query(f"""
+            SELECT TOP {TOP_N_DEFAULT}
                 f.Content,
                 COALESCE(pf.PersonalReviewCount, 0) AS ReviewCount,
                 c.CategoryName,
@@ -167,10 +202,10 @@ def chart_data():
         """, (profile_id, profile_id, profile_id)),
         
         # Facts added over time
-        'factsAddedOverTime': fetch_query("""
+        'factsAddedOverTime': fetch_query(f"""
             SELECT Date, FactsAdded
             FROM (
-                SELECT TOP 10 
+                SELECT TOP {TOP_N_DEFAULT} 
                     CONVERT(varchar, DateAdded, 23) as Date,
                     COUNT(FactID) as FactsAdded
                 FROM Facts
@@ -222,8 +257,8 @@ def chart_data():
         """, (profile_id, profile_id, profile_id)),
         
         # All favorite facts
-        'allFavoriteFacts': fetch_query("""
-            SELECT TOP 10
+        'allFavoriteFacts': fetch_query(f"""
+            SELECT TOP {TOP_N_DEFAULT}
                 f.Content,
                 COALESCE(pf.PersonalReviewCount, 0) AS ReviewCount,
                 c.CategoryName,
@@ -261,8 +296,8 @@ def chart_data():
         """, (profile_id, profile_id, profile_id) if not return_all else (profile_id, profile_id, profile_id)),
         
         # All known facts
-        'allKnownFacts': fetch_query("""
-            SELECT TOP 10
+        'allKnownFacts': fetch_query(f"""
+            SELECT TOP {TOP_N_DEFAULT}
                 f.Content,
                 COALESCE(pf.PersonalReviewCount, 0) AS ReviewCount,
                 c.CategoryName,
@@ -476,8 +511,8 @@ def chart_data():
             ORDER BY CONVERT(varchar, StartTime, 23)
         """, (thirty_days_ago, profile_id)),
         
-        'sessionEfficiency': fetch_query("""
-            SELECT TOP 100
+        'sessionEfficiency': fetch_query(f"""
+            SELECT TOP {TOP_N_SESSIONS}
                 s.SessionID,
                 s.StartTime,
                 s.DurationSeconds,
@@ -549,8 +584,8 @@ def chart_data():
             ORDER BY DATEPART(weekday, ReviewDate)
         """, (profile_id,)),
         
-        'topReviewHours': fetch_query("""
-            SELECT TOP 5
+        'topReviewHours': fetch_query(f"""
+            SELECT TOP {TOP_N_HOURS}
                 DATEPART(hour, ReviewDate) as Hour,
                 COUNT(*) as ReviewCount
             FROM FactLogs rl
@@ -562,7 +597,7 @@ def chart_data():
         """, (profile_id,)),
 
         # New chart for Progress tab
-        'monthlyProgress': fetch_query("""
+        'monthlyProgress': fetch_query(f"""
             SELECT
                 YEAR(ReviewDate) as Year,
                 MONTH(ReviewDate) as Month,
@@ -571,7 +606,7 @@ def chart_data():
                 COUNT(DISTINCT CONVERT(date, ReviewDate)) as ActiveDays
             FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
-            WHERE rl.ReviewDate >= DATEADD(month, -6, GETDATE())
+            WHERE rl.ReviewDate >= DATEADD(month, -{MONTHLY_PROGRESS_MONTHS}, GETDATE())
               AND (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
               AND COALESCE(rl.TimedOut, 0) = 0
             GROUP BY YEAR(ReviewDate), MONTH(ReviewDate)
@@ -643,31 +678,18 @@ def chart_data():
             ORDER BY COUNT(*) DESC
         """, (profile_id,)),
 
-        'aiLatencyDistribution': fetch_query("""
+        'aiLatencyDistribution': fetch_query(f"""
             SELECT
-                CASE
-                    WHEN LatencyMs < 500 THEN '< 0.5s'
-                    WHEN LatencyMs < 1000 THEN '0.5-1s'
-                    WHEN LatencyMs < 2000 THEN '1-2s'
-                    WHEN LatencyMs < 5000 THEN '2-5s'
-                    ELSE '> 5s'
-                END as LatencyRange,
+                {LATENCY_CASE_EXPR} as LatencyRange,
                 COUNT(*) as CallCount
             FROM AIUsageLogs
             WHERE ProfileID = ? AND LatencyMs IS NOT NULL
-            GROUP BY
-                CASE
-                    WHEN LatencyMs < 500 THEN '< 0.5s'
-                    WHEN LatencyMs < 1000 THEN '0.5-1s'
-                    WHEN LatencyMs < 2000 THEN '1-2s'
-                    WHEN LatencyMs < 5000 THEN '2-5s'
-                    ELSE '> 5s'
-                END
+            GROUP BY {LATENCY_CASE_EXPR}
             ORDER BY MIN(LatencyMs)
         """, (profile_id,)),
 
-        'aiMostExplainedFacts': fetch_query("""
-            SELECT TOP 10
+        'aiMostExplainedFacts': fetch_query(f"""
+            SELECT TOP {TOP_N_DEFAULT}
                 COALESCE(f.Content, 'Deleted Fact') as Content,
                 COALESCE(c.CategoryName, 'Unknown') as CategoryName,
                 COUNT(*) as CallCount,
@@ -680,8 +702,8 @@ def chart_data():
             ORDER BY COUNT(*) DESC
         """, (profile_id,)),
 
-        'aiRecentUsage': fetch_query("""
-            SELECT TOP 50
+        'aiRecentUsage': fetch_query(f"""
+            SELECT TOP {TOP_N_REVIEWS}
                 ai.CreatedAt,
                 COALESCE(LEFT(f.Content, 100), 'Deleted Fact') as FactContent,
                 ai.OperationType,
@@ -962,8 +984,8 @@ def chart_data():
         """, (thirty_days_ago, profile_id)),
 
         # Most Questioned Facts (facts with most questions)
-        'mostQuestionedFacts': fetch_query("""
-            SELECT TOP 10
+        'mostQuestionedFacts': fetch_query(f"""
+            SELECT TOP {TOP_N_DEFAULT}
                 LEFT(f.Content, 100) as FactContent,
                 c.CategoryName,
                 COUNT(q.QuestionID) as QuestionCount,
@@ -977,8 +999,8 @@ def chart_data():
         """, (profile_id,)),
 
         # Recent Question Activity
-        'recentQuestionActivity': fetch_query("""
-            SELECT TOP 50
+        'recentQuestionActivity': fetch_query(f"""
+            SELECT TOP {TOP_N_REVIEWS}
                 ql.QuestionShownAt,
                 LEFT(q.QuestionText, 100) as QuestionText,
                 LEFT(f.Content, 100) as FactContent,
@@ -1005,8 +1027,8 @@ def chart_data():
         """, (profile_id,)),
 
         # Facts with highest QuestionsRefreshCountdown (recently refreshed, countdown near 50)
-        'factsHighestRefreshCountdown': fetch_query("""
-            SELECT TOP 50
+        'factsHighestRefreshCountdown': fetch_query(f"""
+            SELECT TOP {TOP_N_REVIEWS}
                 f.Content,
                 f.QuestionsRefreshCountdown,
                 c.CategoryName,
@@ -1018,8 +1040,8 @@ def chart_data():
         """, (profile_id,)),
 
         # Facts with lowest QuestionsRefreshCountdown (due for refresh soon, countdown near 0)
-        'factsLowestRefreshCountdown': fetch_query("""
-            SELECT TOP 50
+        'factsLowestRefreshCountdown': fetch_query(f"""
+            SELECT TOP {TOP_N_REVIEWS}
                 f.Content,
                 f.QuestionsRefreshCountdown,
                 c.CategoryName,
@@ -1135,8 +1157,8 @@ def chart_data():
 
     # Recent unlocked achievements
     try:
-        recent_achievements = fetch_query("""
-            SELECT TOP 10 a.Code, a.Name, a.RewardXP, u.UnlockDate
+        recent_achievements = fetch_query(f"""
+            SELECT TOP {TOP_N_DEFAULT} a.Code, a.Name, a.RewardXP, u.UnlockDate
             FROM AchievementUnlocks u
             JOIN Achievements a ON a.AchievementID = u.AchievementID
             WHERE u.ProfileID = ?
@@ -1336,8 +1358,8 @@ def chart_data():
     # removed avg per-view duration series
 
     # Add recent session summaries (last 100 sessions)
-    recent_sessions = fetch_query("""
-        SELECT TOP 100
+    recent_sessions = fetch_query(f"""
+        SELECT TOP {TOP_N_SESSIONS}
             s.SessionID,
             s.StartTime,
             s.EndTime,
@@ -1353,8 +1375,8 @@ def chart_data():
     formatted_data['recent_sessions'] = recent_sessions
 
     # Last card reviews (top 50 by latest session start time, then review time)
-    recent_card_reviews = fetch_query("""
-        SELECT TOP 50
+    recent_card_reviews = fetch_query(f"""
+        SELECT TOP {TOP_N_REVIEWS}
             rl.FactLogID,
             s.StartTime,
             rl.ReviewDate,
@@ -1374,8 +1396,8 @@ def chart_data():
 
     # If all=true also provide the last 500 reviews for modal expansion
     if return_all:
-        all_recent_card_reviews = fetch_query("""
-            SELECT TOP 500
+        all_recent_card_reviews = fetch_query(f"""
+            SELECT TOP {TOP_N_REVIEWS_EXPANDED}
                 rl.FactLogID,
                 s.StartTime,
                 rl.ReviewDate,
@@ -1394,8 +1416,8 @@ def chart_data():
         formatted_data['all_recent_card_reviews'] = format_table_data(all_recent_card_reviews)
 
     # Session actions (Add/Edit/Delete) per recent sessions
-    session_actions_rows = fetch_query("""
-        SELECT TOP 100
+    session_actions_rows = fetch_query(f"""
+        SELECT TOP {TOP_N_SESSIONS}
             s.SessionID,
             s.StartTime,
             ISNULL(s.FactsAdded, 0) AS FactsAdded,

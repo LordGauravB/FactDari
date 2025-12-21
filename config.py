@@ -3,6 +3,37 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 
+def _get_float_env(var_name: str, default: str = "0") -> float:
+    """Safely parse a float from environment variables."""
+    try:
+        return float(os.environ.get(var_name, default))
+    except (ValueError, TypeError) as e:
+        # Log at debug level since this is expected for invalid env vars
+        logger = logging.getLogger('factdari.config')
+        logger.debug(f"Could not parse {var_name} as float, using default: {e}")
+        try:
+            return float(default)
+        except (ValueError, TypeError):
+            return 0.0
+
+def _get_int_list_env(var_name: str, default_csv: str) -> list:
+    """Parse a comma-separated list of ints from env, with a safe fallback."""
+    raw = os.environ.get(var_name, default_csv)
+    values = []
+    for part in (raw or '').split(','):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            values.append(int(part))
+        except (ValueError, TypeError) as e:
+            logger = logging.getLogger('factdari.config')
+            logger.debug(f"Could not parse {var_name} as int list, using default: {e}")
+            return [int(p.strip()) for p in default_csv.split(',') if p.strip()]
+    if values:
+        return values
+    return [int(p.strip()) for p in default_csv.split(',') if p.strip()]
+
 # Base directory where the application is installed
 # Use environment variable if provided, otherwise use relative path
 BASE_DIR = os.environ.get('FACTDARI_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
@@ -72,6 +103,13 @@ UI_CONFIG = {
     'popup_confirm_size': "360x180",
     'popup_rename_size': "420x200",
     'corner_radius': 15,
+    'window_opacity_default': _get_float_env('FACTDARI_WINDOW_OPACITY_DEFAULT', '0.9'),
+    'window_opacity_focus': _get_float_env('FACTDARI_WINDOW_OPACITY_FOCUS', '1.0'),
+    'window_opacity_blur': _get_float_env('FACTDARI_WINDOW_OPACITY_BLUR', '0.7'),
+    'tooltip_delay_ms': int(os.environ.get('FACTDARI_TOOLTIP_DELAY_MS', '400')),
+    'status_clear_delay_ms': int(os.environ.get('FACTDARI_STATUS_CLEAR_DELAY_MS', '3000')),
+    'ui_update_initial_delay_ms': int(os.environ.get('FACTDARI_UI_UPDATE_INITIAL_DELAY_MS', '250')),
+    'ui_update_interval_ms': int(os.environ.get('FACTDARI_UI_UPDATE_INTERVAL_MS', '100')),
     
     # Colors
     'bg_color': "#1e1e1e",
@@ -98,20 +136,6 @@ UI_CONFIG = {
 }
 
 
-def _get_float_env(var_name: str, default: str = "0") -> float:
-    """Safely parse a float from environment variables."""
-    try:
-        return float(os.environ.get(var_name, default))
-    except (ValueError, TypeError) as e:
-        # Log at debug level since this is expected for invalid env vars
-        logger = logging.getLogger('factdari.config')
-        logger.debug(f"Could not parse {var_name} as float, using default: {e}")
-        try:
-            return float(default)
-        except (ValueError, TypeError):
-            return 0.0
-
-
 # AI pricing/configuration (used for cost estimation and logging)
 AI_PRICING = {
     'provider': os.environ.get('FACTDARI_AI_PROVIDER', 'together'),
@@ -120,6 +144,16 @@ AI_PRICING = {
     'prompt_cost_per_1k': _get_float_env('FACTDARI_AI_PROMPT_COST_PER_1K', '0.0006'),
     'completion_cost_per_1k': _get_float_env('FACTDARI_AI_COMPLETION_COST_PER_1K', '0.0017'),
     'currency': os.environ.get('FACTDARI_AI_CURRENCY', 'USD'),
+}
+
+AI_REQUEST_CONFIG = {
+    'endpoint': os.environ.get('FACTDARI_AI_ENDPOINT', 'https://api.together.xyz/v1/chat/completions'),
+    'timeout_seconds': int(os.environ.get('FACTDARI_AI_TIMEOUT_SECONDS', '30')),
+    'explanation_max_tokens': int(os.environ.get('FACTDARI_AI_EXPLANATION_MAX_TOKENS', '500')),
+    'explanation_temperature': _get_float_env('FACTDARI_AI_EXPLANATION_TEMPERATURE', '0.35'),
+    'question_max_tokens': int(os.environ.get('FACTDARI_AI_QUESTION_MAX_TOKENS', '300')),
+    'question_temperature': _get_float_env('FACTDARI_AI_QUESTION_TEMPERATURE', '0.7'),
+    'question_cooldown_seconds': int(os.environ.get('FACTDARI_AI_QUESTION_COOLDOWN_SECONDS', '60')),
 }
 
 
@@ -175,17 +209,36 @@ ANALYTICS_CONFIG = {
     # Time windows for analytics queries (in days)
     'recent_days_window': int(os.environ.get('FACTDARI_ANALYTICS_RECENT_DAYS', '7')),
     'history_days_window': int(os.environ.get('FACTDARI_ANALYTICS_HISTORY_DAYS', '30')),
+    'monthly_progress_months': int(os.environ.get('FACTDARI_ANALYTICS_MONTHLY_PROGRESS_MONTHS', '6')),
 
     # Pagination limits
     'top_n_default': int(os.environ.get('FACTDARI_ANALYTICS_TOP_N', '10')),
     'top_n_sessions': int(os.environ.get('FACTDARI_ANALYTICS_TOP_SESSIONS', '100')),
     'top_n_reviews': int(os.environ.get('FACTDARI_ANALYTICS_TOP_REVIEWS', '50')),
     'top_n_reviews_expanded': int(os.environ.get('FACTDARI_ANALYTICS_TOP_REVIEWS_EXPANDED', '500')),
+    'top_n_hours': int(os.environ.get('FACTDARI_ANALYTICS_TOP_HOURS', '5')),
+    'latency_bucket_edges_ms': _get_int_list_env(
+        'FACTDARI_ANALYTICS_LATENCY_BUCKETS_MS',
+        '500,1000,2000,5000'
+    ),
 
     # Rate limiting
     'rate_limit_per_minute': int(os.environ.get('FACTDARI_RATE_LIMIT_PER_MINUTE', '60')),
     'rate_limit_per_second': int(os.environ.get('FACTDARI_RATE_LIMIT_PER_SECOND', '5')),
 }
+
+ANALYTICS_WEB_CONFIG = {
+    'auto_refresh_seconds': int(os.environ.get('FACTDARI_ANALYTICS_AUTO_REFRESH_SECONDS', '300')),
+    'default_currency': os.environ.get('FACTDARI_ANALYTICS_DEFAULT_CURRENCY', 'USD'),
+    'usd_to_gbp_rate': _get_float_env('FACTDARI_ANALYTICS_USD_TO_GBP_RATE', '0.79'),
+}
+
+ANALYTICS_APP_CONFIG = {
+    'url': os.environ.get('FACTDARI_ANALYTICS_URL', 'http://localhost:5000'),
+    'launch_delay_ms': int(os.environ.get('FACTDARI_ANALYTICS_LAUNCH_DELAY_MS', '1000')),
+}
+
+ANALYTICS_SECRET_KEY = os.environ.get('FACTDARI_SECRET_KEY', os.urandom(32).hex())
 
 # Logging configuration
 LOGGING_CONFIG = {

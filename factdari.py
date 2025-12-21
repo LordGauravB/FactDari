@@ -1,4 +1,4 @@
-﻿#FactDari.py - Simple Fact Viewer Application
+#FactDari.py - Simple Fact Viewer Application
 import os
 import sys
 import signal
@@ -24,10 +24,12 @@ import gamification
 
 class ToolTip:
     """Lightweight tooltip for Tk widgets."""
-    def __init__(self, widget, text, delay=400):
+    def __init__(self, widget, text, delay=None):
         self.widget = widget
         self.text = text
-        self.delay = delay
+        if delay is None:
+            delay = config.UI_CONFIG['tooltip_delay_ms']
+        self.delay = int(delay)
         self.tipwindow = None
         self._after_id = None
         widget.bind("<Enter>", self._schedule)
@@ -123,6 +125,29 @@ class FactDariApp:
         except Exception:
             self.ai_completion_cost_per_1k = 0.0
         self.ai_currency = config.AI_PRICING.get('currency', 'USD')
+
+        # AI request settings
+        ai_req = config.AI_REQUEST_CONFIG
+        self.ai_endpoint = ai_req['endpoint']
+        self.ai_timeout_seconds = int(ai_req['timeout_seconds'])
+        self.ai_explanation_max_tokens = int(ai_req['explanation_max_tokens'])
+        self.ai_explanation_temperature = float(ai_req['explanation_temperature'])
+        self.ai_question_max_tokens = int(ai_req['question_max_tokens'])
+        self.ai_question_temperature = float(ai_req['question_temperature'])
+
+        # UI timing/opacity settings
+        ui_cfg = config.UI_CONFIG
+        self.STATUS_CLEAR_DELAY_MS = int(ui_cfg['status_clear_delay_ms'])
+        self.UI_UPDATE_INITIAL_DELAY_MS = int(ui_cfg['ui_update_initial_delay_ms'])
+        self.UI_UPDATE_INTERVAL_MS = int(ui_cfg['ui_update_interval_ms'])
+        self.WINDOW_OPACITY_DEFAULT = float(ui_cfg['window_opacity_default'])
+        self.WINDOW_OPACITY_FOCUS = float(ui_cfg['window_opacity_focus'])
+        self.WINDOW_OPACITY_BLUR = float(ui_cfg['window_opacity_blur'])
+
+        # Analytics app launch settings
+        analytics_cfg = config.ANALYTICS_APP_CONFIG
+        self.analytics_url = analytics_cfg['url']
+        self.analytics_launch_delay_ms = int(analytics_cfg['launch_delay_ms'])
         
         # Instance variables
         self.x_window = 0
@@ -158,7 +183,7 @@ class FactDariApp:
         self.question_request_inflight = False
         self.question_generation_fact_id = None
         # Question generation throttling to avoid rapid retries on failures
-        self.question_generation_cooldown_seconds = 60
+        self.question_generation_cooldown_seconds = int(config.AI_REQUEST_CONFIG['question_cooldown_seconds'])
         self.question_generation_last_attempt = {}
         # Inactivity tracking
         self.idle_timeout_seconds = getattr(config, 'IDLE_TIMEOUT_SECONDS', 300)
@@ -191,7 +216,7 @@ class FactDariApp:
         self.setup_ui()
         
         # Set initial transparency
-        self.root.attributes('-alpha', 0.9)
+        self.root.attributes('-alpha', self.WINDOW_OPACITY_DEFAULT)
         
         # Bind events
         self.bind_events()
@@ -201,7 +226,7 @@ class FactDariApp:
         self.apply_rounded_corners()
         self.set_static_position()
         self.update_coordinates()
-        self.root.after(250, self.update_ui)
+        self.root.after(self.UI_UPDATE_INITIAL_DELAY_MS, self.update_ui)
 
         # Show the home page
         self.show_home_page()
@@ -511,8 +536,8 @@ class FactDariApp:
         """Bind all event handlers"""
         self.title_bar.bind("<Button-1>", self.on_press)
         self.title_bar.bind("<B1-Motion>", self.on_drag)
-        self.root.bind("<FocusIn>", lambda event: self.root.attributes('-alpha', 1.0))
-        self.root.bind("<FocusOut>", lambda event: self.root.attributes('-alpha', 0.7))
+        self.root.bind("<FocusIn>", lambda event: self.root.attributes('-alpha', self.WINDOW_OPACITY_FOCUS))
+        self.root.bind("<FocusOut>", lambda event: self.root.attributes('-alpha', self.WINDOW_OPACITY_BLUR))
         self.root.bind("<s>", self.set_static_position)
         self.category_dropdown.bind("<Button-1>", self.on_category_dropdown_open, add="+")
         self.category_dropdown.bind("<<ComboboxSelected>>", self.on_category_dropdown_selected)
@@ -635,7 +660,7 @@ class FactDariApp:
         if not getattr(self, 'gamify', None):
             try:
                 self.status_label.config(text="Gamification unavailable", fg=self.STATUS_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
             except Exception:
                 pass
             return
@@ -973,7 +998,7 @@ class FactDariApp:
                         self.handle_idle_timeout()
             except Exception:
                 pass
-        self.root.after(100, self.update_ui)
+        self.root.after(self.UI_UPDATE_INTERVAL_MS, self.update_ui)
     
     def update_fact_count(self):
         """Update the fact count display"""
@@ -1048,8 +1073,8 @@ class FactDariApp:
             return
         if getattr(self, "ai_request_inflight", False):
             try:
-                self.status_label.config(text="AI request already in progress…", fg=self.STATUS_COLOR)
-                self.clear_status_after_delay(3000)
+                self.status_label.config(text="AI request already in progress...", fg=self.STATUS_COLOR)
+                self.clear_status_after_delay()
             except Exception:
                 pass
             return
@@ -1057,7 +1082,7 @@ class FactDariApp:
         fact_text = (self.fact_label.cget("text") or "").strip()
         if not fact_text:
             self.status_label.config(text="No fact to explain", fg=self.RED_COLOR)
-            self.clear_status_after_delay(3000)
+            self.clear_status_after_delay()
             return
 
         fact_id = self.current_fact_id
@@ -1213,18 +1238,18 @@ class FactDariApp:
                         "content": f"Explain simply and wit an analogy in the second short paragraph:\n\n{fact_text}"
                     }
                 ],
-                "max_tokens": 500,
-                "temperature": 0.35,
+                "max_tokens": self.ai_explanation_max_tokens,
+                "temperature": self.ai_explanation_temperature,
             }
             headers = {
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             }
             resp = requests.post(
-                "https://api.together.xyz/v1/chat/completions",
+                self.ai_endpoint,
                 json=payload,
                 headers=headers,
-                timeout=30
+                timeout=self.ai_timeout_seconds
             )
             _record_latency()
             if resp.status_code != 200:
@@ -1278,9 +1303,9 @@ class FactDariApp:
         completion_cost = (completion_val / 1000.0) * float(getattr(self, 'ai_completion_cost_per_1k', 0) or 0)
         return round(prompt_cost + completion_cost, 9)
 
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
     # Question Mode: LLM-generated questions before showing facts
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
 
     def _call_together_ai_for_questions(self, fact_text: str, api_key: str):
         """Call Together AI to generate 3 questions for a fact; returns (list_of_questions, usage_info)."""
@@ -1316,18 +1341,18 @@ class FactDariApp:
                         "content": f"Fact: {fact_text}"
                     }
                 ],
-                "max_tokens": 300,
-                "temperature": 0.7,
+                "max_tokens": self.ai_question_max_tokens,
+                "temperature": self.ai_question_temperature,
             }
             headers = {
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             }
             resp = requests.post(
-                "https://api.together.xyz/v1/chat/completions",
+                self.ai_endpoint,
                 json=payload,
                 headers=headers,
-                timeout=30
+                timeout=self.ai_timeout_seconds
             )
             _record_latency()
             if resp.status_code != 200:
@@ -1702,7 +1727,7 @@ class FactDariApp:
 
             # Show contextual hint for answer state
             self.status_label.config(text="<- Previous, -> Next", fg=self.STATUS_COLOR)
-            self.clear_status_after_delay(3000)
+            self.clear_status_after_delay()
 
     def _display_question_for_current_fact(self):
         """Display the question for the current fact (Question Mode)."""
@@ -1771,7 +1796,7 @@ class FactDariApp:
 
         # Show contextual hint for question state
         self.status_label.config(text="Press Space or Enter to reveal answer", fg=self.STATUS_COLOR)
-        self.clear_status_after_delay(3000)
+        self.clear_status_after_delay()
 
     def _render_markdown_to_text(self, text_widget, markdown_text):
         """Render markdown text with formatting tags in a tkinter Text widget.
@@ -2001,12 +2026,15 @@ class FactDariApp:
         # Check if Flask server is already running
         if hasattr(self, 'flask_process') and self.flask_process.poll() is None:
             # Server is running, just open the browser
-            webbrowser.open("http://localhost:5000")
+            webbrowser.open(self.analytics_url)
         else:
             # Start the Flask server
             self.start_flask_server()
             # Wait a moment for the server to start
-            self.root.after(1000, lambda: webbrowser.open("http://localhost:5000"))
+            self.root.after(
+                self.analytics_launch_delay_ms,
+                lambda: webbrowser.open(self.analytics_url)
+            )
 
     def start_flask_server(self):
         """Start the Flask server in a separate process"""
@@ -2205,7 +2233,7 @@ class FactDariApp:
         # Update status with fact position
         self.status_label.config(text=f"Fact {self.current_fact_index + 1} of {len(self.all_facts)}",
                                fg=self.STATUS_COLOR)
-        self.clear_status_after_delay(3000)
+        self.clear_status_after_delay()
     
     def track_fact_view(self, fact_id):
         """Track that a fact has been viewed"""
@@ -2317,7 +2345,7 @@ class FactDariApp:
                             text=f"Streak active: {streak} day(s)!",
                             fg=self.GREEN_COLOR
                         )
-                        self.clear_status_after_delay(3000)
+                        self.clear_status_after_delay()
                         self._streak_shown_today = True
         except Exception as e:
             print(f"Error updating streak: {e}")
@@ -2441,7 +2469,7 @@ class FactDariApp:
                     if streak:
                         try:
                             self.status_label.config(text=f"Daily streak: {int(streak)} day(s)", fg=self.STATUS_COLOR)
-                            self.clear_status_after_delay(3000)
+                            self.clear_status_after_delay()
                         except Exception:
                             pass
                 if unlocked:
@@ -2452,7 +2480,7 @@ class FactDariApp:
                         pass
                     try:
                         self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                        self.clear_status_after_delay(3000)
+                        self.clear_status_after_delay()
                     except Exception:
                         pass
                 # Refresh level display
@@ -2577,7 +2605,7 @@ class FactDariApp:
                     fact.append(new_status)
                 self.all_facts[self.current_fact_index] = tuple(fact)
             
-            self.clear_status_after_delay(3000)
+            self.clear_status_after_delay()
             # Gamification: award on favorite and unlock using current favorites count
             try:
                 if new_status and getattr(self, 'gamify', None):
@@ -2596,7 +2624,7 @@ class FactDariApp:
                         self.gamify.award_xp(fav_xp)
                     if unlocked:
                         self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                        self.clear_status_after_delay(3000)
+                        self.clear_status_after_delay()
                         try:
                             self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
                         except Exception:
@@ -2658,7 +2686,7 @@ class FactDariApp:
                     fact.append(False)
                 fact[3] = new_status
                 self.all_facts[self.current_fact_index] = tuple(fact)
-            self.clear_status_after_delay(3000)
+            self.clear_status_after_delay()
             # Gamification: award when marking known, unlock using current known count
             try:
                 if new_status and getattr(self, 'gamify', None):
@@ -2676,7 +2704,7 @@ class FactDariApp:
                         self.gamify.award_xp(known_xp)
                     if unlocked:
                         self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                        self.clear_status_after_delay(3000)
+                        self.clear_status_after_delay()
                         try:
                             self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
                         except Exception:
@@ -2763,7 +2791,7 @@ class FactDariApp:
 
             if not content:
                 self.status_label.config(text="Fact content is required!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
                 return
             
             # Get category ID
@@ -2773,7 +2801,7 @@ class FactDariApp:
             )
             if not cat_result or len(cat_result) == 0:
                 self.status_label.config(text="Category not found!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
                 return
                 
             category_id = cat_result[0][0]
@@ -2793,7 +2821,7 @@ class FactDariApp:
                 dup = []
             if dup:
                 self.status_label.config(text="Fact Already Exists!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
                 return
 
             # Insert the new fact and get its ID
@@ -2824,7 +2852,7 @@ class FactDariApp:
                 except Exception:
                     pass
                 self.status_label.config(text="New fact added successfully!", fg=self.GREEN_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
                 self.update_fact_count()
                 # Log the add action in current session (if any)
                 try:
@@ -2854,7 +2882,7 @@ class FactDariApp:
                             self.gamify.award_xp(add_xp)
                         if unlocked:
                             self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                            self.clear_status_after_delay(3000)
+                            self.clear_status_after_delay()
                             try:
                                 self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
                             except Exception:
@@ -2882,7 +2910,7 @@ class FactDariApp:
                         pass
             else:
                 self.status_label.config(text="Error adding new fact!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
         
         # Buttons row
         btn_row = tk.Frame(add_window, bg=self.BG_COLOR)
@@ -2991,7 +3019,7 @@ class FactDariApp:
             
             if not content:
                 self.status_label.config(text="Fact content is required!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
                 return
             
             # Get category ID
@@ -3001,7 +3029,7 @@ class FactDariApp:
             )
             if not cat_result or len(cat_result) == 0:
                 self.status_label.config(text="Category not found!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
                 return
                 
             category_id = cat_result[0][0]
@@ -3023,7 +3051,7 @@ class FactDariApp:
                 dup = []
             if dup:
                 self.status_label.config(text="Another fact with identical content already exists!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
                 return
 
             # Update the fact
@@ -3044,7 +3072,7 @@ class FactDariApp:
                     pass
                 edit_window.destroy()
                 self.status_label.config(text="Fact updated successfully!", fg=self.GREEN_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
                 # Log the edit action in current session (if any)
                 try:
                     if self.current_session_id:
@@ -3071,7 +3099,7 @@ class FactDariApp:
                             self.gamify.award_xp(edit_xp)
                         if unlocked:
                             self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                            self.clear_status_after_delay(3000)
+                            self.clear_status_after_delay()
                             try:
                                 self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
                             except Exception:
@@ -3102,7 +3130,7 @@ class FactDariApp:
                     self.all_facts[self.current_fact_index] = tuple(fact)
             else:
                 self.status_label.config(text="Error updating fact!", fg=self.RED_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
         
         # Update button
         update_button = tk.Button(edit_window, text="Update Fact", bg=self.BLUE_COLOR, fg=self.TEXT_COLOR, 
@@ -3162,7 +3190,7 @@ class FactDariApp:
                 )
                 if success:
                     self.status_label.config(text="Fact deleted!", fg=self.RED_COLOR)
-                    self.clear_status_after_delay(3000)
+                    self.clear_status_after_delay()
                     self.update_fact_count()
                     # Gamification: count delete
                     try:
@@ -3174,7 +3202,7 @@ class FactDariApp:
                                 self.gamify.award_xp(del_xp)
                             if unlocked:
                                 self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                                self.clear_status_after_delay(3000)
+                                self.clear_status_after_delay()
                                 try:
                                     self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
                                 except Exception:
@@ -3202,10 +3230,10 @@ class FactDariApp:
                             self.question_shown_at = None
                             self.answer_revealed = False
                             self.status_label.config(text="Press 'a' to add a new fact", fg=self.STATUS_COLOR)
-                            self.clear_status_after_delay(3000)
+                            self.clear_status_after_delay()
                 else:
                     self.status_label.config(text="Error deleting fact!", fg=self.RED_COLOR)
-                    self.clear_status_after_delay(3000)
+                    self.clear_status_after_delay()
         finally:
             # Always resume after delete flow
             self.resume_review_timer()
@@ -3236,7 +3264,7 @@ class FactDariApp:
         if unlocked:
             try:
                 self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
             except Exception:
                 pass
             try:
@@ -3526,7 +3554,7 @@ class FactDariApp:
                             self.gamify.award_xp(del_xp * int(fact_count))
                         if unlocked:
                             self.status_label.config(text=f"Achievement: {unlocked[-1]['Name']} (+{unlocked[-1]['RewardXP']} XP)", fg=self.GREEN_COLOR)
-                            self.clear_status_after_delay(3000)
+                            self.clear_status_after_delay()
                             try:
                                 self.gamify.mark_unlocked_notified_by_codes([u.get('Code') for u in unlocked if u.get('Code')])
                             except Exception:
@@ -3641,8 +3669,10 @@ class FactDariApp:
             self.current_question_id = None
             self.display_current_fact()
     
-    def clear_status_after_delay(self, delay_ms=3000):
-        """Clear the status message after a specified delay"""
+    def clear_status_after_delay(self, delay_ms=None):
+        """Clear the status message after a specified delay."""
+        if delay_ms is None:
+            delay_ms = self.STATUS_CLEAR_DELAY_MS
         self.root.after(delay_ms, lambda: self.status_label.config(text=""))
     
     def show_home_page(self):
@@ -3725,7 +3755,7 @@ class FactDariApp:
         
         # Update status to shortcut hint
         self.status_label.config(text="Press 'r' to start reviewing", fg=self.STATUS_COLOR)
-        self.clear_status_after_delay(3000)
+        self.clear_status_after_delay()
 
         # Apply rounded corners again after UI changes
         self.root.update_idletasks()
@@ -3812,7 +3842,7 @@ class FactDariApp:
         else:
             self.fact_label.config(text="No facts found. Add some facts first!")
             self.status_label.config(text="Press 'a' to add a new fact", fg=self.STATUS_COLOR)
-            self.clear_status_after_delay(3000)
+            self.clear_status_after_delay()
 
         # Apply rounded corners again after UI changes
         self.root.update_idletasks()
@@ -3849,7 +3879,7 @@ class FactDariApp:
                 if self.idle_navigate_home and self.idle_end_session:
                     msg += "; returned to Home"
                 self.status_label.config(text=msg, fg=self.STATUS_COLOR)
-                self.clear_status_after_delay(3000)
+                self.clear_status_after_delay()
             except Exception:
                 pass
         except Exception:
