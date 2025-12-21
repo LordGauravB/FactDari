@@ -331,7 +331,8 @@
     destroyChart(key);
 
     const axisTitles = {
-      reviews_per_day: { x: 'Date', y: 'Reviews' }
+      reviews_per_day: { x: 'Date', y: 'Reviews' },
+      questions_shown_timeline: { x: 'Date', y: 'Questions Shown' }
     };
     const titles = axisTitles[key] || {};
     
@@ -3075,177 +3076,177 @@
   const metricInfoData = {
     'total-facts': {
       icon: '📚',
-      title: 'Total Facts',
-      description: 'The total number of facts currently stored in your collection. This represents all unique pieces of knowledge you\'ve added.',
-      formula: 'SELECT COUNT(*) FROM Facts'
+      title: 'Active Total Facts',
+      description: 'The total number of facts in active categories. Inactive categories are excluded.',
+      formula: 'SELECT COUNT(*) FROM Facts f JOIN Categories c ON c.CategoryID = f.CategoryID WHERE c.IsActive = 1 AND f.CreatedBy = ? AND c.CreatedBy = ?'
     },
     'viewed-today': {
       icon: '👁️',
       title: 'Viewed Today',
       description: 'The total number of distinct facts you have reviewed today. Each fact is only counted once, even if you\'ve viewed it multiple times today.',
-      formula: 'SELECT COUNT(DISTINCT FactID) FROM FactLogs WHERE ReviewDate = TODAY AND Action = \'view\''
+      formula: 'SELECT COUNT(DISTINCT rl.FactID) FROM FactLogs rl JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE()) AND (rl.Action IS NULL OR rl.Action = \'view\') AND COALESCE(rl.TimedOut, 0) = 0 AND rs.ProfileID = ?'
     },
     'review-streak': {
       icon: '🔥',
       title: 'Review Streak',
       description: 'The number of consecutive days you have reviewed at least one fact. Your streak resets to 0 if you miss a day without any reviews.',
-      formula: 'Count consecutive days (including today) where FactLogs has at least 1 view entry, going backwards until a gap is found.'
+      formula: 'Count consecutive days (including today) with at least 1 FactLogs view joined to ReviewSessions where ProfileID = ? and TimedOut = 0.'
     },
     'categories': {
       icon: '📊',
       title: 'Active Categories',
       description: 'The number of active fact categories in your collection. Categories help organize your facts into meaningful groups. Inactive categories are excluded.',
-      formula: 'SELECT COUNT(*) FROM Categories WHERE IsActive = 1'
+      formula: 'SELECT COUNT(*) FROM Categories WHERE IsActive = 1 AND CreatedBy = ?'
     },
     'favorites': {
       icon: '⭐',
       title: 'Favorites',
       description: 'The number of facts you\'ve marked as favorites. Favorite facts can be easily accessed and reviewed separately.',
-      formula: 'SELECT COUNT(*) FROM ProfileFacts WHERE IsFavorite = 1'
+      formula: 'SELECT COUNT(*) FROM ProfileFacts WHERE ProfileID = ? AND IsFavorite = 1'
     },
     'known-facts': {
       icon: '✅',
       title: 'Known Facts',
       description: 'The number of facts you\'ve marked as "known". These are facts you\'ve mastered and feel confident about.',
-      formula: 'SELECT COUNT(*) FROM ProfileFacts WHERE IsEasy = 1'
+      formula: 'SELECT COUNT(*) FROM ProfileFacts WHERE ProfileID = ? AND IsEasy = 1'
     },
     'lifetime-adds': {
       icon: '➕',
       title: 'Facts Added',
       description: 'The total number of facts you\'ve added to your collection since you started using FactDari. This counter increments each time you create a new fact.',
-      formula: 'SELECT TotalAdds FROM GamificationProfile'
+      formula: 'SELECT TotalAdds FROM GamificationProfile WHERE ProfileID = ?'
     },
     'lifetime-edits': {
       icon: '✏️',
       title: 'Facts Edited',
       description: 'The total number of times you\'ve edited existing facts. Each edit to a fact\'s content increments this counter.',
-      formula: 'SELECT TotalEdits FROM GamificationProfile'
+      formula: 'SELECT TotalEdits FROM GamificationProfile WHERE ProfileID = ?'
     },
     'lifetime-deletes': {
       icon: '🗑️',
       title: 'Facts Deleted',
       description: 'The total number of facts you\'ve deleted from your collection. Deleted facts are removed but this counter preserves your activity history.',
-      formula: 'SELECT TotalDeletes FROM GamificationProfile'
+      formula: 'SELECT TotalDeletes FROM GamificationProfile WHERE ProfileID = ?'
     },
     'lifetime-reviews': {
       icon: '📖',
       title: 'Total Reviews',
       description: 'The total number of fact reviews you\'ve completed. Each time you view a fact for at least 2 seconds, it counts as one review.',
-      formula: 'SELECT TotalReviews FROM GamificationProfile'
+      formula: 'SELECT TotalReviews FROM GamificationProfile WHERE ProfileID = ?'
     },
     'lifetime-streak': {
       icon: '🔥',
       title: 'Day Streak',
       description: 'Your current streak shows consecutive days with at least one review. Your best streak is the longest consecutive run you\'ve achieved. Missing a day resets your current streak to 0.',
-      formula: 'SELECT CurrentStreak, LongestStreak FROM GamificationProfile'
+      formula: 'SELECT CurrentStreak, LongestStreak FROM GamificationProfile WHERE ProfileID = ?'
     },
     'avg-session': {
       icon: '⏱️',
       title: 'Average Session',
-      description: 'The average duration of your review sessions in minutes. Only sessions with recorded duration greater than 0 are included in this calculation.',
-      formula: 'SELECT AVG(DurationSeconds) / 60 FROM ReviewSessions WHERE DurationSeconds > 0'
+      description: 'The average duration of your review sessions. Only sessions with recorded duration greater than 0 are included in this calculation.',
+      formula: 'SELECT AVG(DurationSeconds) / 60 FROM ReviewSessions WHERE DurationSeconds > 0 AND ProfileID = ?'
     },
     'total-time': {
       icon: '⏳',
       title: 'Total Time',
-      description: 'The cumulative time you\'ve spent reviewing facts across all sessions, displayed in hours. This represents your total learning investment.',
-      formula: 'SELECT SUM(DurationSeconds) / 3600 FROM ReviewSessions WHERE DurationSeconds > 0'
+      description: 'The cumulative time you\'ve spent reviewing facts across all sessions. This represents your total learning investment.',
+      formula: 'SELECT SUM(DurationSeconds) / 3600 FROM ReviewSessions WHERE DurationSeconds > 0 AND ProfileID = ?'
     },
     'longest-session': {
       icon: '🏁',
       title: 'Longest Session',
-      description: 'The duration of your longest single review session in minutes. This is your personal best for sustained focus.',
-      formula: 'SELECT MAX(DurationSeconds) / 60 FROM ReviewSessions WHERE DurationSeconds > 0'
+      description: 'The duration of your longest single review session. This is your personal best for sustained focus.',
+      formula: 'SELECT MAX(DurationSeconds) / 60 FROM ReviewSessions WHERE DurationSeconds > 0 AND ProfileID = ?'
     },
     'total-sessions': {
       icon: '📈',
       title: 'Total Sessions',
       description: 'The total number of review sessions you\'ve completed. A session starts when you begin reviewing and ends when you press Home, the app times out due to inactivity, or the app closes.',
-      formula: 'SELECT COUNT(*) FROM ReviewSessions WHERE DurationSeconds > 0'
+      formula: 'SELECT COUNT(*) FROM ReviewSessions WHERE DurationSeconds > 0 AND ProfileID = ?'
     },
     'avg-facts-session': {
       icon: '📊',
       title: 'Avg Facts/Session',
       description: 'The average number of unique facts you review per session. Higher values indicate more productive sessions.',
-      formula: 'SELECT AVG(FactCount) FROM (SELECT COUNT(DISTINCT FactID) as FactCount FROM FactLogs GROUP BY SessionID)'
+      formula: 'SELECT AVG(FactCount) FROM (SELECT s.SessionID, COUNT(DISTINCT rl.FactID) as FactCount FROM ReviewSessions s LEFT JOIN FactLogs rl ON s.SessionID = rl.SessionID AND (rl.Action IS NULL OR rl.Action = \'view\') AND COALESCE(rl.TimedOut, 0) = 0 WHERE s.DurationSeconds > 0 AND s.ProfileID = ? GROUP BY s.SessionID) AS SessionFacts'
     },
     'best-efficiency': {
       icon: '⚡',
       title: 'Best Efficiency',
-      description: 'Your highest review efficiency measured in facts per minute. This is calculated as (unique facts reviewed × 60) / session duration in seconds.',
-      formula: 'SELECT MAX(COUNT(DISTINCT FactID) * 60.0 / DurationSeconds) FROM FactLogs JOIN ReviewSessions'
+      description: 'Your highest review efficiency measured in facts per minute. This is calculated as (unique facts reviewed x 60) / session duration in seconds.',
+      formula: 'SELECT TOP 1 COUNT(DISTINCT rl.FactID) * 60.0 / s.DurationSeconds FROM ReviewSessions s LEFT JOIN FactLogs rl ON s.SessionID = rl.SessionID WHERE (rl.Action IS NULL OR rl.Action = \'view\') AND COALESCE(rl.TimedOut, 0) = 0 AND s.DurationSeconds > 0 AND s.ProfileID = ? GROUP BY s.SessionID, s.DurationSeconds ORDER BY COUNT(DISTINCT rl.FactID) * 60.0 / s.DurationSeconds DESC'
     },
     'total-ai-calls': {
       icon: '🤖',
       title: 'Total AI Calls',
-      description: 'The total number of AI API calls made to generate explanations for your facts. Each time you request an AI explanation, it counts as one call.',
-      formula: 'SELECT COUNT(*) FROM AIUsageLogs'
+      description: 'The total number of AI API calls across all operations (explanations, question generation, etc.).',
+      formula: 'SELECT COUNT(*) FROM AIUsageLogs WHERE ProfileID = ?'
     },
     'total-ai-tokens': {
       icon: '🔢',
       title: 'Total Tokens',
-      description: 'The total number of tokens consumed across all AI calls. Tokens are the basic units of text processing - both your input (the fact) and the AI\'s output (the explanation) consume tokens.',
-      formula: 'SELECT SUM(TotalTokens) FROM AIUsageLogs'
+      description: 'The total number of tokens consumed across all AI calls. Tokens are the basic units of text processing for both input and output.',
+      formula: 'SELECT SUM(TotalTokens) FROM AIUsageLogs WHERE ProfileID = ?'
     },
     'total-ai-cost': {
       icon: '💰',
       title: 'Total Cost',
-      description: 'The cumulative cost of all AI API calls. Cost is calculated based on the number of input and output tokens used, with rates varying by AI provider and model.',
-      formula: 'SELECT SUM(Cost) FROM AIUsageLogs'
+      description: 'The cumulative cost of all AI API calls across all operations.',
+      formula: 'SELECT SUM(Cost) FROM AIUsageLogs WHERE ProfileID = ?'
     },
     'avg-ai-cost': {
       icon: '📊',
       title: 'Avg Cost/Call',
-      description: 'The average cost per AI API call. This helps you understand your typical spending per explanation request.',
-      formula: 'SELECT AVG(Cost) FROM AIUsageLogs'
+      description: 'The average cost per AI API call across all operations.',
+      formula: 'SELECT AVG(Cost) FROM AIUsageLogs WHERE ProfileID = ?'
     },
     'avg-ai-latency': {
       icon: '⚡',
       title: 'Avg Latency',
-      description: 'The average response time for AI API calls in milliseconds. Lower latency means faster explanations. This depends on the AI provider, model, and network conditions.',
-      formula: 'SELECT AVG(LatencyMs) FROM AIUsageLogs'
+      description: 'The average response time for AI API calls in milliseconds across all operations.',
+      formula: 'SELECT AVG(LatencyMs) FROM AIUsageLogs WHERE ProfileID = ?'
     },
     'ai-success-rate': {
       icon: '✅',
       title: 'Success Rate',
-      description: 'The percentage of AI API calls that completed successfully. Failed calls may be due to network issues, API errors, or rate limiting.',
-      formula: 'SELECT (SUM(CASE WHEN Status = \'SUCCESS\' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) FROM AIUsageLogs'
+      description: 'The percentage of AI API calls that completed successfully across all operations.',
+      formula: 'SELECT (SUM(CASE WHEN Status = \'SUCCESS\' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) FROM AIUsageLogs WHERE ProfileID = ?'
     },
     'total-questions': {
       icon: '❓',
       title: 'Total Questions',
       description: 'The total number of questions that have been generated for facts.',
-      formula: 'SELECT COUNT(*) FROM Questions'
+      formula: 'SELECT COUNT(*) FROM Questions q JOIN Facts f ON q.FactID = f.FactID WHERE f.CreatedBy = ?'
     },
     'times-shown': {
       icon: '👁️',
       title: 'Times Shown',
       description: 'The total number of times questions have been displayed to users.',
-      formula: 'SELECT SUM(TimesShown) FROM Questions'
+      formula: 'SELECT SUM(q.TimesShown) FROM Questions q JOIN Facts f ON q.FactID = f.FactID WHERE f.CreatedBy = ?'
     },
     'successful-questions': {
       icon: '✅',
       title: 'Successful Generations',
       description: 'The number of questions that were successfully generated by the AI.',
-      formula: 'SELECT COUNT(*) FROM Questions WHERE Status = \'SUCCESS\''
+      formula: 'SELECT COUNT(*) FROM Questions q JOIN Facts f ON q.FactID = f.FactID WHERE q.Status = \'SUCCESS\' AND f.CreatedBy = ?'
     },
     'failed-questions': {
       icon: '❌',
       title: 'Failed Generations',
       description: 'The number of question generation attempts that failed.',
-      formula: 'SELECT COUNT(*) FROM Questions WHERE Status = \'FAILED\''
+      formula: 'SELECT COUNT(*) FROM Questions q JOIN Facts f ON q.FactID = f.FactID WHERE q.Status = \'FAILED\' AND f.CreatedBy = ?'
     },
     'avg-reading-time': {
       icon: '⏱️',
       title: 'Average Reading Time',
       description: 'The average time users spend reading questions before revealing the answer.',
-      formula: 'SELECT AVG(QuestionReadingDurationSec) FROM QuestionLogs'
+      formula: 'SELECT AVG(QuestionReadingDurationSec) FROM QuestionLogs WHERE QuestionReadingDurationSec IS NOT NULL AND ProfileID = ?'
     },
     'questions-today': {
       icon: '📅',
       title: 'Generated Today',
       description: 'The number of questions generated today.',
-      formula: 'SELECT COUNT(*) FROM Questions WHERE CONVERT(date, GeneratedAt) = CONVERT(date, GETDATE())'
+      formula: 'SELECT COUNT(*) FROM Questions q JOIN Facts f ON q.FactID = f.FactID WHERE CONVERT(date, q.GeneratedAt) = CONVERT(date, GETDATE()) AND f.CreatedBy = ?'
     }
   };
 
@@ -3294,6 +3295,12 @@
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            title: {
+              display: true,
+              text: 'Date',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a',
+              padding: { top: 8 }
             }
           },
           y: {
@@ -3301,7 +3308,7 @@
             stacked: true,
             title: {
               display: true,
-              text: 'Questions',
+              text: 'Questions Generated',
               color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             ticks: {

@@ -1770,7 +1770,7 @@ body {
 }
 
 /* Total Facts */
-article[title="Total number of facts in your collection"] .metric-icon::before {
+article[title="Total number of facts in active categories"] .metric-icon::before {
   content: "\01F4DA"; /* 📚 */
   color: var(--text);
 }

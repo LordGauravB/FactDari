@@ -86,8 +86,10 @@ def chart_data():
     # Use config constants instead of hardcoded values
     recent_days = config.ANALYTICS_CONFIG['recent_days_window']
     history_days = config.ANALYTICS_CONFIG['history_days_window']
-    seven_days_ago = (datetime.now() - timedelta(days=recent_days)).strftime('%Y-%m-%d')
-    thirty_days_ago = (datetime.now() - timedelta(days=history_days)).strftime('%Y-%m-%d')
+    now = datetime.now()
+    seven_days_ago = (now - timedelta(days=recent_days)).strftime('%Y-%m-%d')
+    thirty_days_ago = (now - timedelta(days=history_days)).strftime('%Y-%m-%d')
+    today_str = now.strftime('%Y-%m-%d')
     profile_id = get_default_profile_id()
 
     # Check if we need to return all facts (explicit whitelist validation)
@@ -133,7 +135,7 @@ def chart_data():
         'mostReviewedFacts': fetch_query("""
             SELECT TOP 10
                 f.Content,
-                COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) AS ReviewCount,
+                COALESCE(pf.PersonalReviewCount, 0) AS ReviewCount,
                 c.CategoryName,
                 COALESCE(pf.IsFavorite, 0) AS IsFavorite,
                 COALESCE(pf.IsEasy, 0) AS IsEasy
@@ -142,15 +144,15 @@ def chart_data():
             JOIN Categories c ON f.CategoryID = c.CategoryID
             WHERE f.CreatedBy = ?
               AND c.CreatedBy = ?
-              AND (COALESCE(pf.PersonalReviewCount, 0) > 0 OR f.TotalViews > 0)
-            ORDER BY COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) DESC, f.TotalViews DESC
+              AND COALESCE(pf.PersonalReviewCount, 0) > 0
+            ORDER BY COALESCE(pf.PersonalReviewCount, 0) DESC
         """, (profile_id, profile_id, profile_id)),
         
         # Least reviewed facts (include 0 reviews; show zeros first, then oldest last viewed)
         'leastReviewedFacts': fetch_query("""
             SELECT TOP 10
                 f.Content,
-                COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) AS ReviewCount,
+                COALESCE(pf.PersonalReviewCount, 0) AS ReviewCount,
                 c.CategoryName,
                 CASE 
                     WHEN pf.LastViewedByUser IS NULL THEN NULL
@@ -164,7 +166,7 @@ def chart_data():
             WHERE f.CreatedBy = ?
               AND c.CreatedBy = ?
             ORDER BY 
-                COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) ASC,
+                COALESCE(pf.PersonalReviewCount, 0) ASC,
                 CASE WHEN pf.LastViewedByUser IS NULL THEN 0 ELSE 1 END ASC,
                 pf.LastViewedByUser ASC
         """, (profile_id, profile_id, profile_id)),
@@ -260,7 +262,7 @@ def chart_data():
             WHERE COALESCE(pf.IsFavorite, 0) = 1
               AND f.CreatedBy = ?
               AND c.CreatedBy = ?
-            ORDER BY COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) DESC, f.TotalViews DESC
+            ORDER BY COALESCE(pf.PersonalReviewCount, 0) DESC
         """, (profile_id, profile_id, profile_id) if not return_all else (profile_id, profile_id, profile_id)),
         
         # All known facts
@@ -299,7 +301,7 @@ def chart_data():
             WHERE COALESCE(pf.IsEasy, 0) = 1
               AND f.CreatedBy = ?
               AND c.CreatedBy = ?
-            ORDER BY COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) DESC, f.TotalViews DESC
+            ORDER BY COALESCE(pf.PersonalReviewCount, 0) DESC
         """, (profile_id, profile_id, profile_id) if not return_all else (profile_id, profile_id, profile_id)),
         
         # Categories viewed today
@@ -741,29 +743,32 @@ def chart_data():
         # Peak Productivity Times - Session efficiency by hour of day
         'peakProductivityTimes': fetch_query("""
             SELECT
-                DATEPART(hour, s.StartTime) as Hour,
+                session_stats.Hour,
                 COUNT(*) as SessionCount,
-                AVG(s.DurationSeconds) as AvgDuration,
-                AVG(CAST(sub.UniqueFactsReviewed as FLOAT)) as AvgFactsReviewed,
-                CASE
-                    WHEN AVG(s.DurationSeconds) > 0
-                    THEN CAST(AVG(CAST(sub.UniqueFactsReviewed as FLOAT)) * 60.0 / AVG(s.DurationSeconds) as DECIMAL(10,2))
-                    ELSE 0
-                END as AvgEfficiency
-            FROM ReviewSessions s
-            INNER JOIN (
+                AVG(session_stats.DurationSeconds) as AvgDuration,
+                AVG(CAST(session_stats.UniqueFactsReviewed as FLOAT)) as AvgFactsReviewed,
+                AVG(CAST(session_stats.FactsPerMinute as FLOAT)) as AvgEfficiency
+            FROM (
                 SELECT
-                    rl.SessionID,
-                    COUNT(DISTINCT rl.FactID) as UniqueFactsReviewed
-                FROM FactLogs rl
+                    s.SessionID,
+                    DATEPART(hour, s.StartTime) as Hour,
+                    s.DurationSeconds,
+                    COUNT(DISTINCT rl.FactID) as UniqueFactsReviewed,
+                    CASE
+                        WHEN s.DurationSeconds > 0
+                        THEN CAST(COUNT(DISTINCT rl.FactID) * 60.0 / s.DurationSeconds as DECIMAL(10,2))
+                        ELSE 0
+                    END as FactsPerMinute
+                FROM ReviewSessions s
+                JOIN FactLogs rl ON s.SessionID = rl.SessionID
                 WHERE (rl.Action IS NULL OR rl.Action = 'view')
                   AND COALESCE(rl.TimedOut, 0) = 0
-                GROUP BY rl.SessionID
-            ) sub ON s.SessionID = sub.SessionID
-            WHERE s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
-              AND s.ProfileID = ?
-            GROUP BY DATEPART(hour, s.StartTime)
-            ORDER BY DATEPART(hour, s.StartTime)
+                  AND s.DurationSeconds IS NOT NULL AND s.DurationSeconds > 0
+                  AND s.ProfileID = ?
+                GROUP BY s.SessionID, s.StartTime, s.DurationSeconds
+            ) as session_stats
+            GROUP BY session_stats.Hour
+            ORDER BY session_stats.Hour
         """, (profile_id,)),
 
         # Action Breakdown - Distribution of action types
@@ -1157,7 +1162,7 @@ def chart_data():
     formatted_data = {
         'category_distribution': format_pie_chart(data['categoryDistribution'], 'CategoryName', 'FactCount'),
         'active_categories_count': data['activeCategoriesCount'][0]['ActiveCount'] if data['activeCategoriesCount'] else 0,
-        'reviews_per_day': format_line_chart(data['factsViewedPerDay']),
+        'reviews_per_day': format_line_chart(data['factsViewedPerDay'], start_date=thirty_days_ago, end_date=today_str),
         'most_reviewed_facts': format_table_data(data['mostReviewedFacts']),
         'least_reviewed_facts': format_table_data(data['leastReviewedFacts']),
         'facts_added_timeline': format_timeline(data['factsAddedOverTime']),
@@ -1180,9 +1185,9 @@ def chart_data():
         'session_duration_distribution': format_pie_chart(data['sessionDurationDistribution'], 'DurationRange', 'SessionCount'),
         'avg_review_time_per_fact': data['avgReviewTimePerFact'][0] if data['avgReviewTimePerFact'] else {},
         'category_review_time': format_bar_chart(data['categoryReviewTime'], 'CategoryName', 'AvgReviewTime', 'Avg Review Time (s)'),
-        'daily_session_duration': format_duration_line_chart(data['dailySessionDuration']),
+        'daily_session_duration': format_duration_line_chart(data['dailySessionDuration'], start_date=thirty_days_ago, end_date=today_str),
         'session_efficiency': format_table_data(data['sessionEfficiency']),
-        'timeout_analysis': format_timeout_chart(data['timeoutAnalysis']),
+        'timeout_analysis': format_timeout_chart(data['timeoutAnalysis'], start_date=thirty_days_ago, end_date=today_str),
         # New Overview charts
         'known_vs_unknown': format_known_unknown_chart(data['knownVsUnknownRatio']),
         'weekly_review_pattern': format_weekly_pattern(data['weeklyReviewPattern']),
@@ -1196,7 +1201,7 @@ def chart_data():
         'achievements': achievements_full,
         # AI Usage Analytics
         'ai_usage_summary': data['aiUsageSummary'][0] if data['aiUsageSummary'] else {},
-        'ai_cost_timeline': format_ai_cost_timeline(data['aiCostTimeline']),
+        'ai_cost_timeline': format_ai_cost_timeline(data['aiCostTimeline'], start_date=thirty_days_ago, end_date=today_str),
         'ai_token_distribution': format_ai_token_distribution(data['aiTokenDistribution']),
         'ai_usage_by_category': format_pie_chart(data['aiUsageByCategory'], 'CategoryName', 'CallCount'),
         'ai_question_gen_by_category': format_pie_chart(data['aiQuestionGenByCategory'], 'CategoryName', 'CallCount'),
@@ -1207,7 +1212,7 @@ def chart_data():
         # AI Usage by Operation Type
         'ai_usage_by_operation': format_pie_chart(data['aiUsageByOperationType'], 'OperationType', 'CallCount'),
         'ai_operation_details': format_table_data(data['aiUsageByOperationType']),
-        'ai_cost_by_operation_timeline': format_ai_cost_by_operation_timeline(data['aiCostByOperationTimeline']),
+        'ai_cost_by_operation_timeline': format_ai_cost_by_operation_timeline(data['aiCostByOperationTimeline'], start_date=thirty_days_ago, end_date=today_str),
         # Question Analytics
         'question_summary': data['questionSummary'][0] if data['questionSummary'] else {},
         'questions_generated_today': data['questionsGeneratedToday'][0].get('Count', 0) if data['questionsGeneratedToday'] else 0,
@@ -1215,8 +1220,8 @@ def chart_data():
         'avg_question_reading_time': data['avgQuestionReadingTime'][0] if data['avgQuestionReadingTime'] else {},
         'questions_by_category': format_pie_chart(data['questionsByCategory'], 'CategoryName', 'QuestionCount'),
         'question_reading_time_distribution': format_pie_chart(data['questionReadingTimeDistribution'], 'TimeRange', 'Count'),
-        'questions_generated_timeline': format_questions_timeline(data['questionsGeneratedTimeline']),
-        'questions_shown_timeline': format_questions_shown_timeline(data['questionsShownTimeline']),
+        'questions_generated_timeline': format_questions_timeline(data['questionsGeneratedTimeline'], start_date=thirty_days_ago, end_date=today_str),
+        'questions_shown_timeline': format_questions_shown_timeline(data['questionsShownTimeline'], start_date=thirty_days_ago, end_date=today_str),
         'most_questioned_facts': format_table_data(data['mostQuestionedFacts']),
         'recent_question_activity': format_table_data(data['recentQuestionActivity']),
         'question_engagement_by_hour': format_table_data(data['questionEngagementByHour']),
@@ -1251,7 +1256,7 @@ def chart_data():
             JOIN Categories c ON f.CategoryID = c.CategoryID
             WHERE f.CreatedBy = ?
               AND c.CreatedBy = ?
-            ORDER BY COALESCE(pf.PersonalReviewCount, f.TotalViews, 0) DESC, f.TotalViews DESC, f.Content
+            ORDER BY COALESCE(pf.PersonalReviewCount, 0) DESC, f.Content
         """, (profile_id, profile_id, profile_id)))
         
         # Get ALL facts sorted by least reviewed (including 0 reviews)
@@ -1458,6 +1463,43 @@ def calculate_review_streak(profile_id: int):
         'last_review': last_review
     }
 
+def _parse_date_value(value):
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if value is None:
+        return None
+    try:
+        return datetime.strptime(str(value), '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        return None
+
+def _date_range(start_date, end_date):
+    current = start_date
+    while current <= end_date:
+        yield current
+        current += timedelta(days=1)
+
+def _fill_date_rows(data, start_date=None, end_date=None, date_field='Date'):
+    rows_by_date = {}
+    for row in data or []:
+        if not isinstance(row, dict):
+            continue
+        d = _parse_date_value(row.get(date_field))
+        if d is not None:
+            rows_by_date[d] = row
+
+    start = _parse_date_value(start_date) if start_date else (min(rows_by_date.keys()) if rows_by_date else None)
+    end = _parse_date_value(end_date) if end_date else (max(rows_by_date.keys()) if rows_by_date else None)
+
+    if start is None or end is None:
+        return []
+    if start > end:
+        start, end = end, start
+
+    return [(d, rows_by_date.get(d)) for d in _date_range(start, end)]
+
 def format_pie_chart(data, label_field, value_field):
     """Format data for pie charts"""
     return {
@@ -1465,17 +1507,25 @@ def format_pie_chart(data, label_field, value_field):
         'data': [row[value_field] for row in data]
     }
 
-def format_line_chart(data):
+def format_line_chart(data, start_date=None, end_date=None):
     """Format data for line charts showing reviews per day"""
     labels = []
     facts_reviewed = []
     total_reviews = []
-    
-    for row in data:
-        labels.append(row['Date'])
-        facts_reviewed.append(row['FactsReviewed'])
-        total_reviews.append(row['TotalReviews'])
-    
+
+    filled_rows = _fill_date_rows(data, start_date, end_date)
+    if filled_rows:
+        for day, row in filled_rows:
+            row = row or {}
+            labels.append(day.isoformat())
+            facts_reviewed.append(row.get('FactsReviewed', 0) or 0)
+            total_reviews.append(row.get('TotalReviews', 0) or 0)
+    else:
+        for row in data:
+            labels.append(row['Date'])
+            facts_reviewed.append(row['FactsReviewed'])
+            total_reviews.append(row['TotalReviews'])
+
     return {
         'labels': labels,
         'datasets': [
@@ -1584,19 +1634,30 @@ def format_single_line_chart(data, label='Series', value_field='Value'):
         }]
     }
 
-def format_duration_line_chart(data):
+def format_duration_line_chart(data, start_date=None, end_date=None):
     """Format duration data for line chart with multiple metrics"""
     labels = []
     avg_duration = []
     total_duration = []
     session_count = []
-    
-    for row in data:
-        labels.append(row['Date'])
-        avg_duration.append(round(row['AvgDuration'] / 60, 2) if row['AvgDuration'] else 0)  # Convert to minutes
-        total_duration.append(round(row['TotalDuration'] / 60, 2) if row['TotalDuration'] else 0)  # Convert to minutes
-        session_count.append(row['SessionCount'])
-    
+
+    filled_rows = _fill_date_rows(data, start_date, end_date)
+    if filled_rows:
+        for day, row in filled_rows:
+            row = row or {}
+            labels.append(day.isoformat())
+            avg_val = row.get('AvgDuration', 0) or 0
+            total_val = row.get('TotalDuration', 0) or 0
+            avg_duration.append(round(avg_val / 60, 2) if avg_val else 0)
+            total_duration.append(round(total_val / 60, 2) if total_val else 0)
+            session_count.append(row.get('SessionCount', 0) or 0)
+    else:
+        for row in data:
+            labels.append(row['Date'])
+            avg_duration.append(round(row['AvgDuration'] / 60, 2) if row['AvgDuration'] else 0)
+            total_duration.append(round(row['TotalDuration'] / 60, 2) if row['TotalDuration'] else 0)
+            session_count.append(row['SessionCount'])
+
     return {
         'labels': labels,
         'datasets': [
@@ -1627,17 +1688,25 @@ def format_duration_line_chart(data):
         ]
     }
 
-def format_timeout_chart(data):
+def format_timeout_chart(data, start_date=None, end_date=None):
     """Format timeout analysis data for chart"""
     labels = []
     timeout_count = []
     timeout_percentage = []
-    
-    for row in data:
-        labels.append(row['Date'])
-        timeout_count.append(row['TimeoutCount'])
-        timeout_percentage.append(float(row['TimeoutPercentage']) if row['TimeoutPercentage'] else 0)
-    
+
+    filled_rows = _fill_date_rows(data, start_date, end_date)
+    if filled_rows:
+        for day, row in filled_rows:
+            row = row or {}
+            labels.append(day.isoformat())
+            timeout_count.append(row.get('TimeoutCount', 0) or 0)
+            timeout_percentage.append(float(row.get('TimeoutPercentage') or 0))
+    else:
+        for row in data:
+            labels.append(row['Date'])
+            timeout_count.append(row['TimeoutCount'])
+            timeout_percentage.append(float(row['TimeoutPercentage']) if row['TimeoutPercentage'] else 0)
+
     return {
         'labels': labels,
         'datasets': [
@@ -1760,7 +1829,7 @@ def format_monthly_progress(data):
         ]
     }
 
-def format_ai_cost_timeline(data):
+def format_ai_cost_timeline(data, start_date=None, end_date=None):
     """Format AI cost timeline data for chart"""
     labels = []
     costs = []
@@ -1769,14 +1838,26 @@ def format_ai_cost_timeline(data):
     cumulative_cost = []
     running_total = 0
 
-    for row in data:
-        labels.append(row.get('Date', ''))
-        cost = float(row.get('DailyCost', 0) or 0)
-        costs.append(round(cost, 4))
-        tokens.append(row.get('DailyTokens', 0))
-        calls.append(row.get('Calls', 0))
-        running_total += cost
-        cumulative_cost.append(round(running_total, 4))
+    filled_rows = _fill_date_rows(data, start_date, end_date)
+    if filled_rows:
+        for day, row in filled_rows:
+            row = row or {}
+            labels.append(day.isoformat())
+            cost = float(row.get('DailyCost', 0) or 0)
+            costs.append(round(cost, 4))
+            tokens.append(row.get('DailyTokens', 0) or 0)
+            calls.append(row.get('Calls', 0) or 0)
+            running_total += cost
+            cumulative_cost.append(round(running_total, 4))
+    else:
+        for row in data:
+            labels.append(row.get('Date', ''))
+            cost = float(row.get('DailyCost', 0) or 0)
+            costs.append(round(cost, 4))
+            tokens.append(row.get('DailyTokens', 0))
+            calls.append(row.get('Calls', 0))
+            running_total += cost
+            cumulative_cost.append(round(running_total, 4))
 
     return {
         'labels': labels,
@@ -1815,14 +1896,22 @@ def format_ai_token_distribution(data):
         'data': [row.get('InputTokens', 0), row.get('OutputTokens', 0)]
     }
 
-def format_ai_cost_by_operation_timeline(data):
+def format_ai_cost_by_operation_timeline(data, start_date=None, end_date=None):
     """Format AI cost timeline split by operation type for stacked chart"""
-    if not data:
+    if not data and not (start_date and end_date):
         return {'labels': [], 'datasets': []}
 
+    start = _parse_date_value(start_date) if start_date else None
+    end = _parse_date_value(end_date) if end_date else None
+    if start and end:
+        dates = [d.isoformat() for d in _date_range(start, end)]
+    else:
+        dates = sorted(set(row.get('Date', '') for row in data))
+
     # Group by date, then by operation type
-    dates = sorted(set(row.get('Date', '') for row in data))
     operation_types = sorted(set(row.get('OperationType', 'EXPLANATION') for row in data))
+    if not operation_types:
+        return {'labels': dates, 'datasets': []}
 
     # Create a lookup dict
     lookup = {}
@@ -1856,9 +1945,9 @@ def format_ai_cost_by_operation_timeline(data):
         'datasets': datasets
     }
 
-def format_questions_timeline(data):
+def format_questions_timeline(data, start_date=None, end_date=None):
     """Format questions generated timeline for chart"""
-    if not data:
+    if not data and not (start_date and end_date):
         return {'labels': [], 'datasets': []}
 
     labels = []
@@ -1866,11 +1955,20 @@ def format_questions_timeline(data):
     successful = []
     failed = []
 
-    for row in data:
-        labels.append(row.get('Date', ''))
-        generated.append(row.get('QuestionsGenerated', 0))
-        successful.append(row.get('Successful', 0))
-        failed.append(row.get('Failed', 0))
+    filled_rows = _fill_date_rows(data, start_date, end_date)
+    if filled_rows:
+        for day, row in filled_rows:
+            row = row or {}
+            labels.append(day.isoformat())
+            generated.append(row.get('QuestionsGenerated', 0) or 0)
+            successful.append(row.get('Successful', 0) or 0)
+            failed.append(row.get('Failed', 0) or 0)
+    else:
+        for row in data:
+            labels.append(row.get('Date', ''))
+            generated.append(row.get('QuestionsGenerated', 0))
+            successful.append(row.get('Successful', 0))
+            failed.append(row.get('Failed', 0))
 
     return {
         'labels': labels,
@@ -1894,19 +1992,27 @@ def format_questions_timeline(data):
         ]
     }
 
-def format_questions_shown_timeline(data):
+def format_questions_shown_timeline(data, start_date=None, end_date=None):
     """Format questions shown timeline for chart"""
-    if not data:
+    if not data and not (start_date and end_date):
         return {'labels': [], 'datasets': []}
 
     labels = []
     shown = []
     avg_reading_time = []
 
-    for row in data:
-        labels.append(row.get('Date', ''))
-        shown.append(row.get('QuestionsShown', 0))
-        avg_reading_time.append(round(float(row.get('AvgReadingTime', 0) or 0), 1))
+    filled_rows = _fill_date_rows(data, start_date, end_date)
+    if filled_rows:
+        for day, row in filled_rows:
+            row = row or {}
+            labels.append(day.isoformat())
+            shown.append(row.get('QuestionsShown', 0) or 0)
+            avg_reading_time.append(round(float(row.get('AvgReadingTime', 0) or 0), 1))
+    else:
+        for row in data:
+            labels.append(row.get('Date', ''))
+            shown.append(row.get('QuestionsShown', 0))
+            avg_reading_time.append(round(float(row.get('AvgReadingTime', 0) or 0), 1))
 
     return {
         'labels': labels,
