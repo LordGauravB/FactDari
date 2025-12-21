@@ -46,7 +46,6 @@ This is a comprehensive reference guide defining every table and column in your 
 | **`FactID`** | `INT (PK)` | **Reference.** The core ID used throughout the app to link logs, user states, and AI usage. |
 | **`CategoryID`** | `INT (FK)` | **Grouping.** Links the fact to a Category. |
 | **`Content`** | `NVARCHAR` | **Payload.** The actual text string displayed on the `fact_label` in the GUI. |
-| **`ContentKey`** | `COMPUTED` | **Deduplication.** A persisted column that lowercases text and removes whitespace. A unique index on this prevents users from adding duplicate facts via `add_new_fact()`. |
 | **`DateAdded`** | `DATE` | **Timeline.** Used in analytics to show "Facts Added Over Time". |
 | **`TotalViews`** | `INT` | **Global Stat.** A counter of how many times this fact has been seen by *anyone* (global popularity). |
 | **`QuestionsRefreshCountdown`** | `INT` | **Question Refresh Countdown.** Starts at 50, decrements by 1 each review. When it reaches 0, delete old questions, regenerate fresh ones, and reset to 50. |
