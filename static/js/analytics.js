@@ -1217,7 +1217,8 @@
             key === 'recent-questions-table') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
-          
+          document.body.style.overflow = 'hidden'; // Disable page scrolling
+
           // Create a new table with ALL facts
           const tableContainer = document.createElement('div');
           tableContainer.className = 'table-container';
@@ -1583,7 +1584,8 @@
         } else if (key === 'review-heatmap-chart') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
-          
+          document.body.style.overflow = 'hidden'; // Disable page scrolling
+
           // Clone the heatmap for the modal
           const sourceHeatmap = qs('#review-heatmap')?.cloneNode(true);
           if (sourceHeatmap) {
@@ -1599,9 +1601,10 @@
         } else if (key === 'sessions-table') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
+          document.body.style.overflow = 'hidden'; // Disable page scrolling
           modalChartContainer.innerHTML = '';
           modalChartContainer.style.height = 'auto';
-          
+
           const tableContainer = document.createElement('div');
           tableContainer.className = 'table-container';
           const table = document.createElement('table');
@@ -1672,9 +1675,10 @@
           if (chartKey) {
             const chartRef = charts[chartKey];
             if (!chartRef || !modal || !modalChartContainer) return;
-            
+
             modal.style.display = 'flex';
-            
+            document.body.style.overflow = 'hidden'; // Disable page scrolling
+
             // Clear and recreate canvas
             modalChartContainer.innerHTML = '';
             modalChartContainer.style.height = '60vh';
@@ -1737,9 +1741,10 @@
         if (key === 'session-efficiency-table') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
+          document.body.style.overflow = 'hidden'; // Disable page scrolling
           modalChartContainer.innerHTML = '';
           modalChartContainer.style.height = 'auto';
-          
+
           const tableContainer = document.createElement('div');
           tableContainer.className = 'table-container';
           const table = document.createElement('table');
@@ -1773,6 +1778,7 @@
         if (key === 'sessions-table') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
+          document.body.style.overflow = 'hidden'; // Disable page scrolling
           modalChartContainer.innerHTML = '';
           modalChartContainer.style.height = 'auto';
           
@@ -1811,6 +1817,7 @@
         if (key === 'recent-reviews-table') {
           if (!modal || !modalChartContainer) return;
           modal.style.display = 'flex';
+          document.body.style.overflow = 'hidden'; // Disable page scrolling
           modalChartContainer.innerHTML = '';
           modalChartContainer.style.height = 'auto';
 
@@ -1853,11 +1860,12 @@
       });
     });
     
-    closeBtn?.addEventListener('click', () => { 
-      modal.style.display = 'none'; 
-      if (charts.modal) { 
-        charts.modal.destroy(); 
-        charts.modal = null; 
+    closeBtn?.addEventListener('click', () => {
+      modal.style.display = 'none';
+      document.body.style.overflow = ''; // Re-enable page scrolling
+      if (charts.modal) {
+        charts.modal.destroy();
+        charts.modal = null;
       }
       // Reset modal container
       if (modalChartContainer) {
@@ -2064,7 +2072,7 @@
             title: {
               display: true,
               text: 'Session Count',
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
@@ -2179,7 +2187,7 @@
             title: {
               display: true,
               text: 'Timeout Percentage (%)',
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             ticks: {
               color: isDarkMode ? '#94a3b8' : '#64748b'
@@ -2464,7 +2472,7 @@
             title: {
               display: true,
               text: 'Active Days',
-              color: isDarkMode ? '#94a3b8' : '#64748b'
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
             },
             grid: {
               drawOnChartArea: false,
@@ -3828,6 +3836,7 @@
           if (descEl) descEl.textContent = info.description;
           if (formulaEl) formulaEl.textContent = info.formula;
           modal.style.display = 'flex';
+          document.body.style.overflow = 'hidden'; // Disable page scrolling
         }
       });
     });
@@ -3835,6 +3844,7 @@
     // Close modal handlers
     const closeModal = () => {
       modal.style.display = 'none';
+      document.body.style.overflow = ''; // Re-enable page scrolling
     };
 
     closeBtn?.addEventListener('click', closeModal);
