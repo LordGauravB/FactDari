@@ -2,7 +2,6 @@
 Unit tests for analytics_factdari.py module.
 Tests Flask routes, data formatting, and query logic.
 """
-import pytest
 from unittest.mock import patch, MagicMock
 import os
 import sys

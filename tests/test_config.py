@@ -2,7 +2,6 @@
 Unit tests for config.py module.
 Tests configuration loading, environment variable handling, and helper functions.
 """
-import pytest
 import os
 import sys
 

@@ -6,7 +6,6 @@ Tier 1: Timer, Idle, Sessions, Fact logging, Button states
 Tier 2: Questions, Category switching, UI transitions
 Tier 3: TTS, Window management, Edge cases
 """
-import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
 import time

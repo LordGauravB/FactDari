@@ -5,31 +5,17 @@
   --bg-secondary: #f1f5f9;
   --bg-tertiary: #e2e8f0;
   --card: #ffffff;
-  --card-hover: #fafbfc;
-  --card-elevated: #ffffff;
   --text: #0f172a;
   --text-secondary: #475569;
   --muted: #64748b;
   --primary: #3b82f6;
-  --primary-dark: #2563eb;
   --primary-light: #60a5fa;
   --primary-lighter: #93c5fd;
   --primary-gradient: linear-gradient(135deg, #3b82f6, #8b5cf6);
   --success: #10b981;
-  --success-light: #34d399;
   --success-gradient: linear-gradient(135deg, #10b981, #34d399);
   --warning: #f59e0b;
-  --warning-light: #fbbf24;
-  --warning-gradient: linear-gradient(135deg, #f59e0b, #fbbf24);
-  --danger: #ef4444;
-  --danger-light: #f87171;
   --danger-gradient: linear-gradient(135deg, #ef4444, #f87171);
-  --info: #06b6d4;
-  --info-light: #22d3ee;
-  --info-gradient: linear-gradient(135deg, #06b6d4, #22d3ee);
-  --purple: #8b5cf6;
-  --purple-light: #a78bfa;
-  --pink: #ec4899;
   --border: #e2e8f0;
   --border-light: #f1f5f9;
   --radius: 16px;
@@ -56,31 +42,17 @@
     --bg-secondary: #131b2e;
     --bg-tertiary: #1e293b;
     --card: #1a2235;
-    --card-hover: #243049;
-    --card-elevated: #1e2a42;
     --text: #f1f5f9;
     --text-secondary: #cbd5e1;
     --muted: #94a3b8;
     --primary: #60a5fa;
-    --primary-dark: #3b82f6;
     --primary-light: #93c5fd;
     --primary-lighter: #bfdbfe;
     --primary-gradient: linear-gradient(135deg, #60a5fa, #a78bfa);
     --success: #34d399;
-    --success-light: #6ee7b7;
     --success-gradient: linear-gradient(135deg, #34d399, #6ee7b7);
     --warning: #fbbf24;
-    --warning-light: #fcd34d;
-    --warning-gradient: linear-gradient(135deg, #fbbf24, #fcd34d);
-    --danger: #f87171;
-    --danger-light: #fca5a5;
     --danger-gradient: linear-gradient(135deg, #f87171, #fca5a5);
-    --info: #22d3ee;
-    --info-light: #67e8f9;
-    --info-gradient: linear-gradient(135deg, #22d3ee, #67e8f9);
-    --purple: #a78bfa;
-    --purple-light: #c4b5fd;
-    --pink: #f472b6;
     --border: #2d3a52;
     --border-light: #374663;
     --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
@@ -628,23 +600,6 @@ body {
   background: var(--primary-gradient);
   border-radius: 6px;
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-}
-
-.xp-progress-bar::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-  animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
 }
 
 .xp-progress-footer {
@@ -661,16 +616,6 @@ body {
 /* Lifetime Stats Section */
 .lifetime-stats-section {
   margin: 24px 0;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .lifetime-stats-grid {
@@ -1291,18 +1236,6 @@ body {
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
-.badge-yes {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(52, 211, 153, 0.1));
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.1);
-}
-.badge-no {
-  background: rgba(148, 163, 184, 0.1);
-  color: var(--muted);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-}
-
 /* Fact text styling */
 .fact-text {
   display: block;
@@ -1716,46 +1649,6 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-}
-
-/* Skeleton Loading */
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--bg-secondary) 25%,
-    var(--border-light) 50%,
-    var(--bg-secondary) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: var(--radius-sm);
-}
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-.skeleton-metric {
-  height: 80px;
-  margin-bottom: 12px;
-}
-
-.skeleton-chart {
-  height: 320px;
-  margin-bottom: 20px;
-}
-
-.skeleton-text {
-  height: 16px;
-  width: 80%;
-  margin-bottom: 8px;
-}
-
-.skeleton-title {
-  height: 24px;
-  width: 40%;
-  margin-bottom: 16px;
 }
 
 /* Tooltip Styles */
@@ -2198,15 +2091,6 @@ article[title="Questions generated today"] .metric-icon::before {
   #ai-usage-log-table td:nth-child(5) {
     display: none; /* Hide latency column on mobile */
   }
-}
-
-/* Row styling for unlocked achievements */
-.row-unlocked {
-  background: rgba(16, 185, 129, 0.05);
-}
-
-.row-unlocked:hover {
-  background: rgba(16, 185, 129, 0.1) !important;
 }
 
 /* Achievement Badges Styles - Premium design */

@@ -17,8 +17,8 @@ import time
 import re
 from ctypes import wintypes
 from PIL import Image, ImageTk
-from datetime import datetime, timedelta
-from tkinter import ttk, simpledialog, messagebox
+from datetime import datetime
+from tkinter import ttk, messagebox
 from tkinter import font as tkfont
 import gamification
 
@@ -134,7 +134,6 @@ class FactDariApp:
         self.current_fact_is_favorite = False  # Track if current fact is a favorite
         self.current_fact_is_easy = False  # Track if current fact is known/easy
         # Speech state
-        self.speech_engine = None  # not used for playback; preserved for future config
         self.speaking_thread = None
         self.active_tts_engine = None  # engine instance used by the current speech thread
 
@@ -844,21 +843,6 @@ class FactDariApp:
         except Exception as e:
             print(f"Database error in fetch_query: {e}")
             return []
-
-    def table_exists(self, table_name):
-        """Check if a table exists in the database (SQL Server)."""
-        try:
-            rows = self.fetch_query(
-                """
-                SELECT 1
-                FROM sys.tables
-                WHERE Name = ? AND schema_id = SCHEMA_ID('dbo')
-                """,
-                (table_name,)
-            )
-            return bool(rows)
-        except Exception:
-            return False
 
     def column_exists(self, table_name, column_name):
         """Check if a column exists in the given table (SQL Server)."""

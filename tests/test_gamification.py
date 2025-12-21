@@ -2,9 +2,8 @@
 Unit tests for gamification.py module.
 Tests XP system, leveling, achievements, and streak calculations.
 """
-import pytest
 from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 import os
 import sys
 

@@ -492,13 +492,6 @@ class Gamification:
                 cur.execute(q, tuple(codes) + (pid,))
                 conn.commit()
 
-    def mark_all_unnotified_as_notified(self):
-        with pyodbc.connect(self.conn_str) as conn:
-            with conn.cursor() as cur:
-                pid = self._get_or_create_profile_id(cur, conn)
-                cur.execute("UPDATE AchievementUnlocks SET Notified = 1 WHERE Notified = 0 AND ProfileID = ?", (pid,))
-                conn.commit()
-
     # --- Internal helpers ---
     def _level_for_xp(self, xp: int) -> int:
         """Compute level from XP using banded + fitted progression to reach 1,000,000 at Level 100.

@@ -16,6 +16,7 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - **Search & Filter**: Filter facts by category, favorites, or knowledge status
 - **Dark Theme**: Eye-friendly dark interface with customizable transparency
 - **AI Explanations**: Get AI-powered explanations for any fact using Together AI (DeepSeek model)
+- **AI-Generated Questions**: Automatically generate review questions from facts to test your knowledge
 
 ## Key Functionality
 
@@ -28,6 +29,7 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - Automatic review logging
 - Click the level text to view achievements
 - AI-powered fact explanations with usage tracking
+- AI-generated questions for active recall practice
 
 ### Analytics Dashboard
 
@@ -84,6 +86,19 @@ The analytics dashboard provides comprehensive visualizations of your learning p
 | AI Provider Comparison | Table comparing providers by cost, latency, success rate |
 | Most Explained Facts | Table of top 10 facts by AI call count |
 | Recent AI Usage Log | Table of last 50 AI API calls with model details |
+| **Questions Tab** | |
+| Question Metrics | Cards for total questions, shown today, success rate, avg reading time |
+| Questions Generated Timeline | Bar chart of daily question generation - successful vs failed (last 30 days) |
+| Questions by Category | Pie chart of question distribution across categories |
+| Facts Question Coverage | Pie chart showing facts with questions vs without |
+| Question Coverage by Category | Stacked bar chart with percentages per category |
+| Reading Time Distribution | Pie chart of question reading time buckets |
+| Question Reading Time Stats | Avg/Min/Max reading time display |
+| Questions Shown Timeline | Bar chart of daily questions displayed (last 30 days) |
+| Most Questioned Facts | Table of facts with most generated questions (expandable) |
+| Recent Question Activity | Table of recent question views and engagement (expandable) |
+| Recently Refreshed Facts | Top 50 facts with question refresh countdown near 50 |
+| Due for Refresh Facts | Top 50 facts with question refresh countdown near 0 |
 | **Global Features** | |
 | XP Progress Bar | Visual level progression with XP breakdown |
 | Key Metrics | Cards for total facts, viewed today, streak, active categories, favorites, known |
@@ -168,6 +183,7 @@ The app tracks how long you spend reviewing each card. To ensure accurate timing
 | Keyboard Shortcuts (`i`) | Viewing the shortcuts help window |
 | Achievements (`l`) | Viewing achievements and progress |
 | AI Explanation (`x`) | Getting an AI-generated explanation |
+| Question Display | Viewing an AI-generated question for the fact |
 | Add Fact (`a`) | Adding a new fact |
 | Edit Fact (`e`) | Editing an existing fact |
 | Delete Fact (`d`) | Confirming fact deletion |
@@ -276,14 +292,14 @@ util/RunFactDari.vbs
 - **Backend**: SQL Server database for fact storage
 - **Analytics**: Flask web server with Chart.js visualizations
 - **Speech**: pyttsx3 for text-to-speech functionality
-- **AI**: Together AI API with DeepSeek-V3.1 model for fact explanations
+- **AI**: Together AI API with DeepSeek-V3.1 model for fact explanations and question generation
 - **Configuration**: Centralized config.py for all settings
 - **Gamification**: SQL-backed XP/levels, daily streak tracking, and achievements (see `gamification.py`)
 
 ## Database Schema
 
 - **Categories**: Manages categories for facts (active flag + metadata)
-- **Facts**: Stores fact content, category link, global view counts, and computed content key for duplicate prevention
+- **Facts**: Stores fact content, category link, global view counts, `QuestionsRefreshCountdown` for question regeneration scheduling, and computed content key for duplicate prevention
 - **ProfileFacts**: Per-profile fact state (personal review count, favorite flag, known/easy flag, last viewed date, and `KnownSince` timestamp for learning velocity tracking)
 - **ReviewSessions**: Tracks review sessions (start/end, duration, timeout flag, per-session action counters)
 - **FactLogs**: One row per view/action (per-view duration, optional session link, action type, content snapshots for deleted facts)
@@ -291,6 +307,8 @@ util/RunFactDari.vbs
 - **Achievements**: Catalog of unlockable achievements (code, category, threshold, reward XP)
 - **AchievementUnlocks**: Records which achievements have been unlocked (with notification flag)
 - **AIUsageLogs**: Tracks AI explanation requests (tokens, cost, latency, status, model/provider, reading duration)
+- **Questions**: Stores AI-generated questions for facts (question text, generation status, times shown, last shown timestamp)
+- **QuestionLogs**: Tracks when questions are displayed to users (session link, timing metrics, reading duration)
 
 ## Configuration
 
@@ -320,10 +338,11 @@ Edit `config.py` to customize:
 - `FACTDARI_XP_DAILY_CHECKIN` (default: `2`): XP on daily streak check-in
 
 ### AI Configuration
-- `FACTDARI_TOGETHER_API_KEY` or `TOGETHER_API_KEY` or `TOGETHER_API_TOKEN`: Your Together AI API key (required for AI explanations)
+- `FACTDARI_TOGETHER_API_KEY` or `TOGETHER_API_KEY` or `TOGETHER_API_TOKEN`: Your Together AI API key (required for AI explanations and question generation)
 - The AI feature uses the DeepSeek-V3.1 model via Together AI
 - Cost tracking is automatic based on token usage
 - All AI usage is logged to the `AIUsageLogs` table for analytics
+- Questions are cached in the `Questions` table and refresh based on `QuestionsRefreshCountdown`
 
 ### Leveling Configuration
 - `FACTDARI_LEVEL_TOTAL_XP_L100` (default: `1000000`): total XP to reach Level 100

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, Response, request
+from flask import Flask, render_template, jsonify, request
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -25,11 +25,6 @@ limiter = Limiter(
     default_limits=[f"{config.ANALYTICS_CONFIG['rate_limit_per_minute']}/minute"],
     storage_uri="memory://"
 )
-
-# Exempt the API endpoint from CSRF (it's read-only and rate-limited)
-@csrf.exempt
-def csrf_exempt_api():
-    pass
 
 # Get database connection string from config
 CONN_STR = config.get_connection_string()
@@ -1689,27 +1684,6 @@ def format_bar_chart(data, label_field, value_field, legend_label='Total Reviews
             'label': legend_label,
             'data': [row[value_field] for row in data],
             'backgroundColor': '#9C27B0'
-        }]
-    }
-
-def format_single_line_chart(data, label='Series', value_field='Value'):
-    """Format data with Date + single numeric field for a simple line chart."""
-    labels = [str(row.get('Date')) for row in data]
-    series = []
-    for row in data:
-        val = row.get(value_field)
-        try:
-            series.append(0 if val is None else float(val))
-        except (ValueError, TypeError):
-            series.append(0)
-    return {
-        'labels': labels,
-        'datasets': [{
-            'label': label,
-            'data': series,
-            'borderColor': '#f97316',
-            'backgroundColor': 'rgba(249, 115, 22, 0.1)',
-            'fill': True
         }]
     }
 
