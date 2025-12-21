@@ -605,9 +605,9 @@ def chart_data():
                 COALESCE(AVG(LatencyMs), 0) as AvgLatency,
                 SUM(CASE WHEN Status = 'SUCCESS' THEN 1 ELSE 0 END) as SuccessCount,
                 SUM(CASE WHEN Status = 'FAILED' THEN 1 ELSE 0 END) as FailedCount,
-                COALESCE(AVG(ReadingDurationSec), 0) as AvgReadingTime,
-                COALESCE(MIN(ReadingDurationSec), 0) as MinReadingTime,
-                COALESCE(MAX(ReadingDurationSec), 0) as MaxReadingTime
+                COALESCE(AVG(CASE WHEN OperationType = 'EXPLANATION' THEN ReadingDurationSec END), 0) as AvgReadingTime,
+                COALESCE(MIN(CASE WHEN OperationType = 'EXPLANATION' THEN ReadingDurationSec END), 0) as MinReadingTime,
+                COALESCE(MAX(CASE WHEN OperationType = 'EXPLANATION' THEN ReadingDurationSec END), 0) as MaxReadingTime
             FROM AIUsageLogs
             WHERE ProfileID = ?
         """, (profile_id,)),
@@ -640,7 +640,20 @@ def chart_data():
             FROM AIUsageLogs ai
             LEFT JOIN Facts f ON ai.FactID = f.FactID
             LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
-            WHERE ai.ProfileID = ?
+            WHERE ai.ProfileID = ? AND ai.OperationType = 'EXPLANATION'
+            GROUP BY c.CategoryName
+            ORDER BY COUNT(*) DESC
+        """, (profile_id,)),
+
+        'aiQuestionGenByCategory': fetch_query("""
+            SELECT
+                COALESCE(c.CategoryName, 'Unknown') as CategoryName,
+                COUNT(*) as CallCount,
+                COALESCE(SUM(ai.Cost), 0) as TotalCost
+            FROM AIUsageLogs ai
+            LEFT JOIN Facts f ON ai.FactID = f.FactID
+            LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE ai.ProfileID = ? AND ai.OperationType = 'QUESTION_GENERATION'
             GROUP BY c.CategoryName
             ORDER BY COUNT(*) DESC
         """, (profile_id,)),
@@ -677,7 +690,7 @@ def chart_data():
             FROM AIUsageLogs ai
             LEFT JOIN Facts f ON ai.FactID = f.FactID
             LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
-            WHERE ai.ProfileID = ?
+            WHERE ai.ProfileID = ? AND ai.OperationType = 'EXPLANATION'
             GROUP BY f.Content, c.CategoryName
             ORDER BY COUNT(*) DESC
         """, (profile_id,)),
@@ -686,6 +699,7 @@ def chart_data():
             SELECT TOP 50
                 ai.CreatedAt,
                 COALESCE(LEFT(f.Content, 100), 'Deleted Fact') as FactContent,
+                ai.OperationType,
                 ai.TotalTokens,
                 ai.Cost,
                 ai.LatencyMs,
@@ -791,6 +805,182 @@ def chart_data():
             WHERE ProfileID = ?
             GROUP BY Provider
             ORDER BY COUNT(*) DESC
+        """, (profile_id,)),
+
+        # AI Usage by Operation Type (EXPLANATION vs QUESTION_GENERATION)
+        'aiUsageByOperationType': fetch_query("""
+            SELECT
+                COALESCE(OperationType, 'EXPLANATION') as OperationType,
+                COUNT(*) as CallCount,
+                COALESCE(SUM(TotalTokens), 0) as TotalTokens,
+                COALESCE(SUM(Cost), 0) as TotalCost,
+                COALESCE(AVG(Cost), 0) as AvgCost,
+                COALESCE(AVG(LatencyMs), 0) as AvgLatency,
+                SUM(CASE WHEN Status = 'SUCCESS' THEN 1 ELSE 0 END) as SuccessCount,
+                SUM(CASE WHEN Status = 'FAILED' THEN 1 ELSE 0 END) as FailedCount
+            FROM AIUsageLogs
+            WHERE ProfileID = ?
+            GROUP BY OperationType
+            ORDER BY COUNT(*) DESC
+        """, (profile_id,)),
+
+        # AI Cost Timeline by Operation Type
+        'aiCostByOperationTimeline': fetch_query("""
+            SELECT
+                CONVERT(varchar, CreatedAt, 23) as Date,
+                COALESCE(OperationType, 'EXPLANATION') as OperationType,
+                COUNT(*) as Calls,
+                COALESCE(SUM(Cost), 0) as DailyCost,
+                COALESCE(SUM(TotalTokens), 0) as DailyTokens
+            FROM AIUsageLogs
+            WHERE ProfileID = ? AND CreatedAt >= ?
+            GROUP BY CONVERT(varchar, CreatedAt, 23), OperationType
+            ORDER BY CONVERT(varchar, CreatedAt, 23), OperationType
+        """, (profile_id, thirty_days_ago)),
+
+        # ==================== QUESTION ANALYTICS ====================
+
+        # Question Summary Stats
+        'questionSummary': fetch_query("""
+            SELECT
+                COUNT(*) as TotalQuestions,
+                SUM(TimesShown) as TotalTimesShown,
+                COALESCE(AVG(CAST(TimesShown as FLOAT)), 0) as AvgTimesShown,
+                SUM(CASE WHEN Status = 'SUCCESS' THEN 1 ELSE 0 END) as SuccessfulQuestions,
+                SUM(CASE WHEN Status = 'FAILED' THEN 1 ELSE 0 END) as FailedQuestions
+            FROM Questions
+        """),
+
+        # Questions Generated Today
+        'questionsGeneratedToday': fetch_query("""
+            SELECT COUNT(*) as Count
+            FROM Questions
+            WHERE CONVERT(date, GeneratedAt) = CONVERT(date, GETDATE())
+        """),
+
+        # Questions Shown Today
+        'questionsShownToday': fetch_query("""
+            SELECT COUNT(*) as Count
+            FROM QuestionLogs
+            WHERE CONVERT(date, QuestionShownAt) = CONVERT(date, GETDATE())
+              AND ProfileID = ?
+        """, (profile_id,)),
+
+        # Average Question Reading Time (time to reveal answer)
+        'avgQuestionReadingTime': fetch_query("""
+            SELECT
+                COALESCE(AVG(QuestionReadingDurationSec), 0) as AvgReadingTime,
+                COALESCE(MIN(QuestionReadingDurationSec), 0) as MinReadingTime,
+                COALESCE(MAX(QuestionReadingDurationSec), 0) as MaxReadingTime,
+                COUNT(*) as TotalAnswered
+            FROM QuestionLogs
+            WHERE QuestionReadingDurationSec IS NOT NULL
+              AND ProfileID = ?
+        """, (profile_id,)),
+
+        # Questions by Category
+        'questionsByCategory': fetch_query("""
+            SELECT
+                c.CategoryName,
+                COUNT(q.QuestionID) as QuestionCount,
+                SUM(q.TimesShown) as TotalShown
+            FROM Questions q
+            JOIN Facts f ON q.FactID = f.FactID
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            GROUP BY c.CategoryName
+            ORDER BY COUNT(q.QuestionID) DESC
+        """),
+
+        # Question Reading Time Distribution
+        'questionReadingTimeDistribution': fetch_query("""
+            SELECT
+                CASE
+                    WHEN QuestionReadingDurationSec < 5 THEN '< 5s'
+                    WHEN QuestionReadingDurationSec < 15 THEN '5-15s'
+                    WHEN QuestionReadingDurationSec < 30 THEN '15-30s'
+                    WHEN QuestionReadingDurationSec < 60 THEN '30-60s'
+                    ELSE '> 60s'
+                END as TimeRange,
+                COUNT(*) as Count
+            FROM QuestionLogs
+            WHERE QuestionReadingDurationSec IS NOT NULL
+              AND ProfileID = ?
+            GROUP BY
+                CASE
+                    WHEN QuestionReadingDurationSec < 5 THEN '< 5s'
+                    WHEN QuestionReadingDurationSec < 15 THEN '5-15s'
+                    WHEN QuestionReadingDurationSec < 30 THEN '15-30s'
+                    WHEN QuestionReadingDurationSec < 60 THEN '30-60s'
+                    ELSE '> 60s'
+                END
+            ORDER BY MIN(QuestionReadingDurationSec)
+        """, (profile_id,)),
+
+        # Questions Generated Over Time (last 30 days)
+        'questionsGeneratedTimeline': fetch_query("""
+            SELECT
+                CONVERT(varchar, GeneratedAt, 23) as Date,
+                COUNT(*) as QuestionsGenerated,
+                SUM(CASE WHEN Status = 'SUCCESS' THEN 1 ELSE 0 END) as Successful,
+                SUM(CASE WHEN Status = 'FAILED' THEN 1 ELSE 0 END) as Failed
+            FROM Questions
+            WHERE GeneratedAt >= ?
+            GROUP BY CONVERT(varchar, GeneratedAt, 23)
+            ORDER BY CONVERT(varchar, GeneratedAt, 23)
+        """, (thirty_days_ago,)),
+
+        # Questions Shown Timeline (last 30 days)
+        'questionsShownTimeline': fetch_query("""
+            SELECT
+                CONVERT(varchar, QuestionShownAt, 23) as Date,
+                COUNT(*) as QuestionsShown,
+                COALESCE(AVG(QuestionReadingDurationSec), 0) as AvgReadingTime
+            FROM QuestionLogs
+            WHERE QuestionShownAt >= ? AND ProfileID = ?
+            GROUP BY CONVERT(varchar, QuestionShownAt, 23)
+            ORDER BY CONVERT(varchar, QuestionShownAt, 23)
+        """, (thirty_days_ago, profile_id)),
+
+        # Most Questioned Facts (facts with most questions)
+        'mostQuestionedFacts': fetch_query("""
+            SELECT TOP 10
+                LEFT(f.Content, 100) as FactContent,
+                c.CategoryName,
+                COUNT(q.QuestionID) as QuestionCount,
+                SUM(q.TimesShown) as TotalTimesShown
+            FROM Questions q
+            JOIN Facts f ON q.FactID = f.FactID
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            GROUP BY f.Content, c.CategoryName
+            ORDER BY COUNT(q.QuestionID) DESC
+        """),
+
+        # Recent Question Activity
+        'recentQuestionActivity': fetch_query("""
+            SELECT TOP 50
+                ql.QuestionShownAt,
+                LEFT(q.QuestionText, 100) as QuestionText,
+                LEFT(f.Content, 100) as FactContent,
+                c.CategoryName,
+                ql.QuestionReadingDurationSec
+            FROM QuestionLogs ql
+            JOIN Questions q ON ql.QuestionID = q.QuestionID
+            JOIN Facts f ON q.FactID = f.FactID
+            JOIN Categories c ON f.CategoryID = c.CategoryID
+            WHERE ql.ProfileID = ?
+            ORDER BY ql.QuestionShownAt DESC
+        """, (profile_id,)),
+
+        # Question Engagement by Hour
+        'questionEngagementByHour': fetch_query("""
+            SELECT
+                DATEPART(hour, QuestionShownAt) as Hour,
+                COUNT(*) as QuestionsAnswered,
+                COALESCE(AVG(QuestionReadingDurationSec), 0) as AvgReadingTime
+            FROM QuestionLogs
+            WHERE ProfileID = ? AND QuestionReadingDurationSec IS NOT NULL
+            GROUP BY DATEPART(hour, QuestionShownAt)
+            ORDER BY DATEPART(hour, QuestionShownAt)
         """, (profile_id,))
     }
 
@@ -1015,10 +1205,27 @@ def chart_data():
         'ai_cost_timeline': format_ai_cost_timeline(data['aiCostTimeline']),
         'ai_token_distribution': format_ai_token_distribution(data['aiTokenDistribution']),
         'ai_usage_by_category': format_pie_chart(data['aiUsageByCategory'], 'CategoryName', 'CallCount'),
+        'ai_question_gen_by_category': format_pie_chart(data['aiQuestionGenByCategory'], 'CategoryName', 'CallCount'),
         'ai_latency_distribution': format_pie_chart(data['aiLatencyDistribution'], 'LatencyRange', 'CallCount'),
         'ai_most_explained_facts': format_table_data(data['aiMostExplainedFacts']),
         'ai_recent_usage': format_table_data(data['aiRecentUsage']),
         'ai_provider_comparison': format_table_data(data['aiProviderComparison']),
+        # AI Usage by Operation Type
+        'ai_usage_by_operation': format_pie_chart(data['aiUsageByOperationType'], 'OperationType', 'CallCount'),
+        'ai_operation_details': format_table_data(data['aiUsageByOperationType']),
+        'ai_cost_by_operation_timeline': format_ai_cost_by_operation_timeline(data['aiCostByOperationTimeline']),
+        # Question Analytics
+        'question_summary': data['questionSummary'][0] if data['questionSummary'] else {},
+        'questions_generated_today': data['questionsGeneratedToday'][0].get('Count', 0) if data['questionsGeneratedToday'] else 0,
+        'questions_shown_today': data['questionsShownToday'][0].get('Count', 0) if data['questionsShownToday'] else 0,
+        'avg_question_reading_time': data['avgQuestionReadingTime'][0] if data['avgQuestionReadingTime'] else {},
+        'questions_by_category': format_pie_chart(data['questionsByCategory'], 'CategoryName', 'QuestionCount'),
+        'question_reading_time_distribution': format_pie_chart(data['questionReadingTimeDistribution'], 'TimeRange', 'Count'),
+        'questions_generated_timeline': format_questions_timeline(data['questionsGeneratedTimeline']),
+        'questions_shown_timeline': format_questions_shown_timeline(data['questionsShownTimeline']),
+        'most_questioned_facts': format_table_data(data['mostQuestionedFacts']),
+        'recent_question_activity': format_table_data(data['recentQuestionActivity']),
+        'question_engagement_by_hour': format_table_data(data['questionEngagementByHour']),
         # New analytics
         'category_completion_rate': format_table_data(data['categoryCompletionRate']),
         'learning_velocity': format_table_data(data['learningVelocity']),
@@ -1634,6 +1841,122 @@ def format_ai_token_distribution(data):
     return {
         'labels': ['Input Tokens', 'Output Tokens'],
         'data': [row.get('InputTokens', 0), row.get('OutputTokens', 0)]
+    }
+
+def format_ai_cost_by_operation_timeline(data):
+    """Format AI cost timeline split by operation type for stacked chart"""
+    if not data:
+        return {'labels': [], 'datasets': []}
+
+    # Group by date, then by operation type
+    dates = sorted(set(row.get('Date', '') for row in data))
+    operation_types = sorted(set(row.get('OperationType', 'EXPLANATION') for row in data))
+
+    # Create a lookup dict
+    lookup = {}
+    for row in data:
+        key = (row.get('Date', ''), row.get('OperationType', 'EXPLANATION'))
+        lookup[key] = {
+            'cost': float(row.get('DailyCost', 0) or 0),
+            'tokens': row.get('DailyTokens', 0),
+            'calls': row.get('Calls', 0)
+        }
+
+    # Colors for operation types
+    colors = {
+        'EXPLANATION': '#3b82f6',
+        'QUESTION_GENERATION': '#10b981',
+    }
+
+    datasets = []
+    for op_type in operation_types:
+        costs = [round(lookup.get((d, op_type), {}).get('cost', 0), 4) for d in dates]
+        label = 'Explanations' if op_type == 'EXPLANATION' else 'Questions'
+        datasets.append({
+            'label': f'{label} Cost ($)',
+            'data': costs,
+            'backgroundColor': colors.get(op_type, '#9333ea'),
+            'stack': 'cost'
+        })
+
+    return {
+        'labels': dates,
+        'datasets': datasets
+    }
+
+def format_questions_timeline(data):
+    """Format questions generated timeline for chart"""
+    if not data:
+        return {'labels': [], 'datasets': []}
+
+    labels = []
+    generated = []
+    successful = []
+    failed = []
+
+    for row in data:
+        labels.append(row.get('Date', ''))
+        generated.append(row.get('QuestionsGenerated', 0))
+        successful.append(row.get('Successful', 0))
+        failed.append(row.get('Failed', 0))
+
+    return {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'Questions Generated',
+                'data': generated,
+                'borderColor': '#10b981',
+                'backgroundColor': 'rgba(16, 185, 129, 0.1)',
+                'fill': True,
+                'tension': 0.4
+            },
+            {
+                'label': 'Failed',
+                'data': failed,
+                'borderColor': '#ef4444',
+                'backgroundColor': 'rgba(239, 68, 68, 0.1)',
+                'fill': True,
+                'tension': 0.4
+            }
+        ]
+    }
+
+def format_questions_shown_timeline(data):
+    """Format questions shown timeline for chart"""
+    if not data:
+        return {'labels': [], 'datasets': []}
+
+    labels = []
+    shown = []
+    avg_reading_time = []
+
+    for row in data:
+        labels.append(row.get('Date', ''))
+        shown.append(row.get('QuestionsShown', 0))
+        avg_reading_time.append(round(float(row.get('AvgReadingTime', 0) or 0), 1))
+
+    return {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'Questions Shown',
+                'data': shown,
+                'type': 'bar',
+                'backgroundColor': '#8b5cf6',
+                'yAxisID': 'y'
+            },
+            {
+                'label': 'Avg Reading Time (s)',
+                'data': avg_reading_time,
+                'type': 'line',
+                'borderColor': '#f59e0b',
+                'backgroundColor': 'transparent',
+                'borderWidth': 2,
+                'tension': 0.4,
+                'yAxisID': 'y1'
+            }
+        ]
     }
 
 if __name__ == '__main__':

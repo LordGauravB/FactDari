@@ -409,6 +409,37 @@ class TestProgressAnalytics:
             assert key in data, f"Missing progress key: {key}"
 
 
+class TestQuestionAnalytics:
+    """Tests for question analytics data."""
+
+    @patch('analytics_factdari.fetch_query')
+    @patch('analytics_factdari.calculate_review_streak')
+    @patch('analytics_factdari.get_default_profile_id')
+    def test_question_data_in_response(self, mock_profile, mock_streak, mock_fetch):
+        """Test question analytics data is included in chart data."""
+        mock_profile.return_value = 1
+        mock_streak.return_value = {'current_streak': 0}
+        mock_fetch.return_value = []
+
+        from analytics_factdari import app
+        client = app.test_client()
+        response = client.get('/api/chart-data')
+        data = json.loads(response.data)
+
+        question_keys = [
+            'question_summary',
+            'questions_generated_today',
+            'questions_shown_today',
+            'questions_by_category',
+            'questions_generated_timeline',
+            'questions_shown_timeline',
+            'most_questioned_facts',
+            'recent_question_activity',
+        ]
+        for key in question_keys:
+            assert key in data, f"Missing question key: {key}"
+
+
 class TestErrorHandling:
     """Tests for error handling in analytics."""
 

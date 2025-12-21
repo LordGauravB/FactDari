@@ -18,6 +18,8 @@
   // AI usage datasets
   let aiMostExplainedData = [];
   let aiRecentUsageData = [];
+  // Question analytics datasets
+  let questionsRecentData = [];
   // Currency settings
   let currentCurrency = 'USD';
   const USD_TO_GBP_RATE = 0.79; // Approximate conversion rate
@@ -1092,11 +1094,22 @@
         renderAICostTimeline('ai_cost_timeline', 'ai-cost-timeline', data.ai_cost_timeline);
         doughnutChart('ai_token_distribution', 'ai-token-distribution', data.ai_token_distribution);
         pieChart('ai_usage_by_category', 'ai-usage-by-category', data.ai_usage_by_category);
+        pieChart('ai_question_gen_by_category', 'ai-question-gen-by-category', data.ai_question_gen_by_category);
+        pieChart('ai_usage_by_operation', 'ai-usage-by-operation', data.ai_usage_by_operation);
         pieChart('ai_latency_distribution', 'ai-latency-distribution', data.ai_latency_distribution);
         renderAIUsageTrend('ai_usage_trend', 'ai-usage-trend', data.ai_cost_timeline);
         renderAIMostExplainedTable(data.ai_most_explained_facts);
         renderAIRecentUsageTable(data.ai_recent_usage);
         renderAIProviderComparisonTable(data.ai_provider_comparison);
+
+        // Question Analytics
+        renderQuestionMetrics(data.question_summary, data.avg_question_reading_time, data.questions_generated_today);
+        renderQuestionsGeneratedTimeline('questions_generated_timeline', 'questions-generated-timeline', data.questions_generated_timeline);
+        pieChart('questions_by_category', 'questions-by-category', data.questions_by_category);
+        pieChart('reading_time_distribution', 'reading-time-distribution', data.question_reading_time_distribution);
+        lineChart('questions_shown_timeline', 'questions-shown-timeline', data.questions_shown_timeline);
+        renderMostQuestionedTable(data.most_questioned_facts);
+        renderRecentQuestionsTable(data.recent_question_activity);
 
         // New analytics charts
         renderCategoryCompletionRate('category_completion_rate', 'category-completion-rate', data.category_completion_rate);
@@ -1353,7 +1366,7 @@
             table.appendChild(tbody);
 
           } else if (key === 'ai-usage-log-table') {
-            headerRow.innerHTML = '<th>Time</th><th>Fact</th><th>Tokens</th><th>Cost</th><th>Latency</th><th>Status</th><th>Model</th>';
+            headerRow.innerHTML = '<th>Time</th><th>Fact</th><th>Type</th><th>Tokens</th><th>Cost</th><th>Latency</th><th>Status</th><th>Model</th>';
             thead.appendChild(headerRow);
             table.appendChild(thead);
 
@@ -1367,10 +1380,13 @@
               const status = row.Status || 'UNKNOWN';
               const statusClass = status === 'SUCCESS' ? 'status-success' : 'status-failed';
               const model = row.Model || '--';
+              const operationType = row.OperationType || 'EXPLANATION';
+              const typeLabel = operationType === 'QUESTION_GENERATION' ? 'Question' : 'Explain';
 
               tr.innerHTML = `
                 <td>${escapeHtml(time)}</td>
                 <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
+                <td style="text-align: center;">${escapeHtml(typeLabel)}</td>
                 <td style="text-align: center;">${row.TotalTokens || 0}</td>
                 <td style="text-align: center;">$${cost.toFixed(7)}</td>
                 <td style="text-align: center;">${latency}ms</td>
@@ -1523,6 +1539,8 @@
             'ai-cost-timeline': 'ai_cost_timeline',
             'ai-token-distribution': 'ai_token_distribution',
             'ai-usage-by-category': 'ai_usage_by_category',
+            'ai-question-gen-by-category': 'ai_question_gen_by_category',
+            'ai-usage-by-operation': 'ai_usage_by_operation',
             'ai-latency-distribution': 'ai_latency_distribution',
             'ai-usage-trend': 'ai_usage_trend',
             'category-completion-rate': 'category_completion_rate',
@@ -2686,9 +2704,13 @@
 
       const model = row.Model || '--';
 
+      const operationType = row.OperationType || 'EXPLANATION';
+      const typeLabel = operationType === 'QUESTION_GENERATION' ? 'Question' : 'Explain';
+
       tr.innerHTML = `
         <td>${escapeHtml(time)}</td>
         <td>${displayText}</td>
+        <td style="text-align: center;">${escapeHtml(typeLabel)}</td>
         <td style="text-align: center;">${row.TotalTokens || 0}</td>
         <td style="text-align: center;">${currencySymbol}${cost.toFixed(7)}</td>
         <td style="text-align: center;">${latency}ms</td>
@@ -3191,8 +3213,187 @@
       title: 'Success Rate',
       description: 'The percentage of AI API calls that completed successfully. Failed calls may be due to network issues, API errors, or rate limiting.',
       formula: 'SELECT (SUM(CASE WHEN Status = \'SUCCESS\' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) FROM AIUsageLogs'
+    },
+    'total-questions': {
+      icon: '❓',
+      title: 'Total Questions',
+      description: 'The total number of questions that have been generated for facts.',
+      formula: 'SELECT COUNT(*) FROM Questions'
+    },
+    'times-shown': {
+      icon: '👁️',
+      title: 'Times Shown',
+      description: 'The total number of times questions have been displayed to users.',
+      formula: 'SELECT SUM(TimesShown) FROM Questions'
+    },
+    'successful-questions': {
+      icon: '✅',
+      title: 'Successful Generations',
+      description: 'The number of questions that were successfully generated by the AI.',
+      formula: 'SELECT COUNT(*) FROM Questions WHERE Status = \'SUCCESS\''
+    },
+    'failed-questions': {
+      icon: '❌',
+      title: 'Failed Generations',
+      description: 'The number of question generation attempts that failed.',
+      formula: 'SELECT COUNT(*) FROM Questions WHERE Status = \'FAILED\''
+    },
+    'avg-reading-time': {
+      icon: '⏱️',
+      title: 'Average Reading Time',
+      description: 'The average time users spend reading questions before revealing the answer.',
+      formula: 'SELECT AVG(QuestionReadingDurationSec) FROM QuestionLogs'
+    },
+    'questions-today': {
+      icon: '📅',
+      title: 'Generated Today',
+      description: 'The number of questions generated today.',
+      formula: 'SELECT COUNT(*) FROM Questions WHERE CONVERT(date, GeneratedAt) = CONVERT(date, GETDATE())'
     }
   };
+
+  // Question Analytics Functions
+  function renderQuestionMetrics(summary, readingTime, generatedToday) {
+    const total = summary?.TotalQuestions || 0;
+    const timesShown = summary?.TotalTimesShown || 0;
+    const successful = summary?.SuccessfulQuestions || 0;
+    const failed = summary?.FailedQuestions || 0;
+    const avgReading = readingTime?.AvgReadingTime || 0;
+    const today = generatedToday || 0;
+
+    setText('#total-questions', total.toLocaleString());
+    setText('#times-shown', timesShown.toLocaleString());
+    setText('#successful-questions', successful.toLocaleString());
+    setText('#failed-questions', failed.toLocaleString());
+    setText('#avg-reading-time', avgReading > 0 ? `${Math.round(avgReading)}s` : '--');
+    setText('#questions-today', today.toLocaleString());
+  }
+
+  function renderQuestionsGeneratedTimeline(key, elementId, payload) {
+    const canvas = qs(`#${elementId}`);
+    if (!canvas || !payload) return;
+    const ctx = canvas.getContext('2d');
+
+    if (charts[key]) {
+      charts[key].destroy();
+    }
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: payload,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            display: true,
+            stacked: true,
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            }
+          },
+          y: {
+            display: true,
+            stacked: true,
+            title: {
+              display: true,
+              text: 'Questions',
+              color: isDarkMode ? '#e2e8f0' : '#0f172a'
+            },
+            ticks: {
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            },
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              usePointStyle: true
+            }
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            borderWidth: 1
+          }
+        }
+      }
+    });
+  }
+
+  function renderMostQuestionedTable(data) {
+    const tbody = qs('#most-questioned-table tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    (data || []).forEach((row, index) => {
+      const tr = document.createElement('tr');
+      const factContent = row.FactContent || '';
+      const displayText = factContent.length > 80
+        ? `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 80))}...</span>`
+        : `<span class="fact-text">${escapeHtml(factContent)}</span>`;
+
+      let medalClass = '';
+      if (index === 0) medalClass = 'medal-gold';
+      else if (index === 1) medalClass = 'medal-silver';
+      else if (index === 2) medalClass = 'medal-bronze';
+
+      tr.innerHTML = `
+        <td>${displayText}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
+        <td style="text-align: center;" class="${medalClass}">${row.QuestionCount || 0}</td>
+        <td style="text-align: center;">${row.TotalTimesShown || 0}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderRecentQuestionsTable(data) {
+    const tbody = qs('#recent-questions-table tbody');
+    if (!tbody) return;
+
+    questionsRecentData = data || [];
+    tbody.innerHTML = '';
+
+    (data || []).forEach(row => {
+      const tr = document.createElement('tr');
+      const time = row.QuestionShownAt ? new Date(row.QuestionShownAt).toLocaleString() : '';
+      const questionText = row.QuestionText || '';
+      const questionDisplay = questionText.length > 50
+        ? `<span class="fact-text" title="${escapeHtml(questionText)}">${escapeHtml(questionText.substring(0, 50))}...</span>`
+        : `<span class="fact-text">${escapeHtml(questionText)}</span>`;
+      const factContent = row.FactContent || '';
+      const factDisplay = factContent.length > 50
+        ? `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 50))}...</span>`
+        : `<span class="fact-text">${escapeHtml(factContent)}</span>`;
+      const readingTime = row.QuestionReadingDurationSec ? `${row.QuestionReadingDurationSec}s` : '--';
+
+      tr.innerHTML = `
+        <td>${escapeHtml(time)}</td>
+        <td>${questionDisplay}</td>
+        <td>${factDisplay}</td>
+        <td>${escapeHtml(row.CategoryName || '')}</td>
+        <td style="text-align: center;">${readingTime}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
 
   function setupMetricInfoModal() {
     const modal = qs('#metric-info-modal');

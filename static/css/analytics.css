@@ -2026,6 +2026,37 @@ article[title="AI success rate"] .metric-icon::before {
   color: var(--text);
 }
 
+/* Question Analytics Metric Icons */
+article[title="Total questions generated"] .metric-icon::before {
+  content: "\2753"; /* ❓ */
+  color: var(--text);
+}
+
+article[title="Total times questions shown"] .metric-icon::before {
+  content: "\01F441"; /* 👁️ */
+  color: var(--text);
+}
+
+article[title="Successful question generations"] .metric-icon::before {
+  content: "\2705"; /* ✅ */
+  color: var(--text);
+}
+
+article[title="Failed question generations"] .metric-icon::before {
+  content: "\274C"; /* ❌ */
+  color: var(--text);
+}
+
+article[title="Average reading time"] .metric-icon::before {
+  content: "\23F1"; /* ⏱️ */
+  color: var(--text);
+}
+
+article[title="Questions generated today"] .metric-icon::before {
+  content: "\01F4C5"; /* 📅 */
+  color: var(--text);
+}
+
 /* AI table column widths */
 #ai-most-explained-table th:first-child,
 #ai-most-explained-table td:first-child {
