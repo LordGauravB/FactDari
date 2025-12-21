@@ -9,6 +9,19 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+@pytest.fixture(autouse=True)
+def disable_rate_limiting():
+    """Disable rate limiting for all tests."""
+    try:
+        from analytics_factdari import app, limiter
+        # Disable rate limiter for tests
+        limiter.enabled = False
+        app.config['RATELIMIT_ENABLED'] = False
+    except ImportError:
+        pass  # analytics_factdari not available in this test context
+    yield
+
+
 @pytest.fixture
 def mock_env_vars(monkeypatch):
     """Set up mock environment variables for testing."""

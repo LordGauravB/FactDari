@@ -176,7 +176,8 @@ class TestGetDefaultProfileId:
     @patch('analytics_factdari.fetch_query')
     def test_returns_default_on_exception(self, mock_fetch):
         """Test returns 1 on database error."""
-        mock_fetch.side_effect = Exception("DB Error")
+        import pyodbc
+        mock_fetch.side_effect = pyodbc.Error("DB Error")
 
         from analytics_factdari import get_default_profile_id
         result = get_default_profile_id()
@@ -215,17 +216,20 @@ class TestDataFormatting:
         """Test line chart data formatting."""
         from analytics_factdari import format_line_chart
 
+        # format_line_chart expects data with Date, FactsReviewed, TotalReviews keys
         data = [
-            {'Date': '2024-01-01', 'Count': 5},
-            {'Date': '2024-01-02', 'Count': 10},
+            {'Date': '2024-01-01', 'FactsReviewed': 5, 'TotalReviews': 8},
+            {'Date': '2024-01-02', 'FactsReviewed': 10, 'TotalReviews': 15},
         ]
-        result = format_line_chart(data, 'Date', 'Count', 'Reviews')
+        result = format_line_chart(data)
 
         assert 'labels' in result
         assert 'datasets' in result
-        assert len(result['datasets']) == 1
-        assert result['datasets'][0]['label'] == 'Reviews'
+        assert len(result['datasets']) == 2  # Unique Facts Reviewed + Total Reviews
+        assert result['datasets'][0]['label'] == 'Unique Facts Reviewed'
         assert result['datasets'][0]['data'] == [5, 10]
+        assert result['datasets'][1]['label'] == 'Total Reviews'
+        assert result['datasets'][1]['data'] == [8, 15]
 
     def test_format_bar_chart(self):
         """Test bar chart data formatting."""
