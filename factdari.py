@@ -599,6 +599,8 @@ class FactDariApp:
 
     def show_shortcuts_window(self):
         """Show a window listing available keyboard shortcuts."""
+        if self._block_popup_when_questioning("Reveal the answer to view shortcuts"):
+            return
         # Pause timing while shortcuts popup is open
         try:
             self.pause_review_timer()
@@ -657,6 +659,8 @@ class FactDariApp:
 
     def show_achievements_window(self):
         """Display achievements, status, and progress."""
+        if self._block_popup_when_questioning("Reveal the answer to view achievements"):
+            return
         if not getattr(self, 'gamify', None):
             try:
                 self.status_label.config(text="Gamification unavailable", fg=self.STATUS_COLOR)
@@ -1069,7 +1073,7 @@ class FactDariApp:
 
     def explain_fact_with_ai(self):
         """Open a popup and ask Together AI to explain the current fact in simple words."""
-        if not self._is_action_allowed() or not self.current_fact_id:
+        if not self._is_action_allowed("use AI explain") or not self.current_fact_id:
             return
         if getattr(self, "ai_request_inflight", False):
             try:
@@ -1616,12 +1620,13 @@ class FactDariApp:
 
     def _disable_fact_action_buttons(self):
         """Disable action buttons while question is displayed (before answer is revealed).
-        Note: Speaker and Add buttons stay enabled.
+        Note: Speaker stays enabled.
         """
         try:
             self.ai_button.config(state="disabled")
             self.easy_button.config(state="disabled")
             self.star_button.config(state="disabled")
+            self.add_icon_button.config(state="disabled")
             self.edit_icon_button.config(state="disabled")
             self.delete_icon_button.config(state="disabled")
             self.category_dropdown.config(state="disabled")
@@ -1634,19 +1639,33 @@ class FactDariApp:
             self.ai_button.config(state="normal")
             self.easy_button.config(state="normal")
             self.star_button.config(state="normal")
+            self.add_icon_button.config(state="normal")
             self.edit_icon_button.config(state="normal")
             self.delete_icon_button.config(state="normal")
             self.category_dropdown.config(state="readonly")
         except Exception:
             pass
 
-    def _is_action_allowed(self):
+    def _is_action_allowed(self, action_label=None):
         """Check if fact actions are allowed (answer must be revealed)."""
         if self.is_home_page:
             return False
         if not self.answer_revealed:
+            label = action_label or "use this action"
+            self._block_popup_when_questioning(f"Reveal the answer to {label}")
             return False
         return True
+
+    def _block_popup_when_questioning(self, message):
+        """Block popups while a question is shown; keep speaker enabled."""
+        if not self.is_home_page and not self.answer_revealed:
+            try:
+                self.status_label.config(text=message, fg=self.STATUS_COLOR)
+                self.clear_status_after_delay()
+            except Exception:
+                pass
+            return True
+        return False
 
     def _disable_ui_during_generation(self):
         """Disable Home, navigation, and other buttons while questions are being generated."""
@@ -2116,6 +2135,11 @@ class FactDariApp:
             return
         # Stop any ongoing speech when changing facts
         self.stop_speaking()
+        # Finalize the current fact timing before leaving it
+        try:
+            self.finalize_current_fact_view(timed_out=False)
+        except Exception:
+            pass
 
         # Finalize question view if in question mode
         self._finalize_question_view()
@@ -2149,6 +2173,11 @@ class FactDariApp:
             return
         # Stop any ongoing speech when changing facts
         self.stop_speaking()
+        # Finalize the current fact timing before leaving it
+        try:
+            self.finalize_current_fact_view(timed_out=False)
+        except Exception:
+            pass
 
         # Finalize question view if in question mode
         self._finalize_question_view()
@@ -2562,7 +2591,7 @@ class FactDariApp:
     
     def toggle_favorite(self):
         """Toggle the favorite status of the current fact"""
-        if not self._is_action_allowed() or not self.current_fact_id:
+        if not self._is_action_allowed("toggle favorite") or not self.current_fact_id:
             return
         profile_id = self.get_active_profile_id()
 
@@ -2635,7 +2664,7 @@ class FactDariApp:
 
     def toggle_easy(self):
         """Toggle the 'known/easy' status of the current fact"""
-        if not self._is_action_allowed() or not self.current_fact_id:
+        if not self._is_action_allowed("mark as known") or not self.current_fact_id:
             return
         profile_id = self.get_active_profile_id()
         new_status = not self.current_fact_is_easy
@@ -2716,6 +2745,8 @@ class FactDariApp:
     def add_new_fact(self):
         """Add a new fact to the database"""
         if self.is_home_page:
+            return
+        if self._block_popup_when_questioning("Reveal the answer before adding a fact"):
             return
         # Pause review timer while user is adding a card
         self.pause_review_timer()
@@ -2928,7 +2959,7 @@ class FactDariApp:
     
     def edit_current_fact(self):
         """Edit the current fact"""
-        if not self._is_action_allowed() or not self.current_fact_id:
+        if not self._is_action_allowed("edit this fact") or not self.current_fact_id:
             return
         profile_id = self.get_active_profile_id()
         
@@ -3141,7 +3172,7 @@ class FactDariApp:
     
     def delete_current_fact(self):
         """Delete the current fact"""
-        if not self._is_action_allowed() or not self.current_fact_id:
+        if not self._is_action_allowed("delete this fact") or not self.current_fact_id:
             return
         profile_id = self.get_active_profile_id()
 
@@ -3275,6 +3306,8 @@ class FactDariApp:
     
     def manage_categories(self):
         """Open a window to manage categories"""
+        if self._block_popup_when_questioning("Reveal the answer before managing categories"):
+            return
         try:
             self.pause_review_timer()
         except Exception:
