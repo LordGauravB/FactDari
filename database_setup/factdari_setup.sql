@@ -115,7 +115,7 @@ CREATE TABLE FactLogs (
     FactLogID INT IDENTITY(1,1) PRIMARY KEY,
     FactID INT NULL,
     ReviewDate DATETIME NOT NULL,
-    SessionDuration INT, -- seconds
+    FactReadingTime INT, -- seconds
     SessionID INT NULL,
     TimedOut BIT NOT NULL CONSTRAINT DF_FactLogs_TimedOut DEFAULT 0,
     -- Action metadata (view/add/edit/delete) and snapshots to preserve history after deletes

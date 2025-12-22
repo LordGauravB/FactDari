@@ -5,7 +5,8 @@
       "Bash(mkdir:*)",
       "Bash(cp:*)",
       "Bash(ls:*)",
-      "Bash(/mnt/c/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/FactDari/.venv/Scripts/python.exe -m pytest:*)"
+      "Bash(/mnt/c/Users/gaura/OneDrive/PC-Desktop/GitHubDesktop/FactDari/.venv/Scripts/python.exe -m pytest:*)",
+      "Bash(wc:*)"
     ],
     "deny": []
   },

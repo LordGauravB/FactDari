@@ -466,13 +466,13 @@ def chart_data():
         
         'avgReviewTimePerFact': fetch_query("""
             SELECT
-                AVG(SessionDuration) as AvgTimePerReview,
-                MIN(SessionDuration) as MinTimePerReview,
-                MAX(SessionDuration) as MaxTimePerReview,
+                AVG(FactReadingTime) as AvgTimePerReview,
+                MIN(FactReadingTime) as MinTimePerReview,
+                MAX(FactReadingTime) as MaxTimePerReview,
                 COUNT(*) as TotalReviews
             FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
-            WHERE rl.SessionDuration IS NOT NULL AND rl.SessionDuration > 0
+            WHERE rl.FactReadingTime IS NOT NULL AND rl.FactReadingTime > 0
               AND (rl.Action IS NULL OR rl.Action = 'view')
               AND COALESCE(rl.TimedOut, 0) = 0
               AND rs.ProfileID = ?
@@ -481,20 +481,20 @@ def chart_data():
         'categoryReviewTime': fetch_query("""
             SELECT
                 c.CategoryName,
-                AVG(rl.SessionDuration) as AvgReviewTime,
-                SUM(rl.SessionDuration) as TotalReviewTime,
+                AVG(rl.FactReadingTime) as AvgReviewTime,
+                SUM(rl.FactReadingTime) as TotalReviewTime,
                 COUNT(rl.FactLogID) as ReviewCount
             FROM Categories c
             JOIN Facts f ON c.CategoryID = f.CategoryID AND f.CreatedBy = ?
             JOIN FactLogs rl ON f.FactID = rl.FactID
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
-            WHERE rl.SessionDuration IS NOT NULL AND rl.SessionDuration > 0
+            WHERE rl.FactReadingTime IS NOT NULL AND rl.FactReadingTime > 0
               AND (rl.Action IS NULL OR rl.Action = 'view')
               AND COALESCE(rl.TimedOut, 0) = 0
               AND rs.ProfileID = ?
               AND c.CreatedBy = ?
             GROUP BY c.CategoryName
-            ORDER BY AVG(rl.SessionDuration) DESC
+            ORDER BY AVG(rl.FactReadingTime) DESC
         """, (profile_id, profile_id, profile_id)),
         
         'dailySessionDuration': fetch_query("""

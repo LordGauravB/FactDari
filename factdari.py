@@ -2285,7 +2285,7 @@ class FactDariApp:
                 self.execute_update(
                     """
                     UPDATE FactLogs
-                    SET SessionDuration = ?
+                    SET FactReadingTime = ?
                     WHERE FactLogID = ?
                     """,
                     (elapsed, self.current_fact_log_id)
@@ -2441,7 +2441,7 @@ class FactDariApp:
                 updated = self.execute_update(
                     """
                     UPDATE FactLogs
-                    SET SessionDuration = ?, TimedOut = ?
+                    SET FactReadingTime = ?, TimedOut = ?
                     WHERE FactLogID = ?
                     """,
                     (elapsed, 1 if timed_out else 0, self.current_fact_log_id)
@@ -2451,7 +2451,7 @@ class FactDariApp:
                     self.execute_update(
                         """
                         UPDATE FactLogs
-                        SET SessionDuration = ?
+                        SET FactReadingTime = ?
                         WHERE FactLogID = ?
                         """,
                         (elapsed, self.current_fact_log_id)
@@ -2896,7 +2896,7 @@ class FactDariApp:
                         )
                         self.execute_update(
                             """
-                            INSERT INTO FactLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactContentSnapshot, CategoryIDSnapshot)
+                            INSERT INTO FactLogs (FactID, ReviewDate, SessionID, FactReadingTime, Action, FactContentSnapshot, CategoryIDSnapshot)
                             VALUES (?, GETDATE(), ?, 0, 'add', ?, ?)
                             """,
                             (new_fact_id, self.current_session_id, content, category_id)
@@ -3113,7 +3113,7 @@ class FactDariApp:
                         )
                         self.execute_update(
                             """
-                            INSERT INTO FactLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactEdited, FactContentSnapshot, CategoryIDSnapshot)
+                            INSERT INTO FactLogs (FactID, ReviewDate, SessionID, FactReadingTime, Action, FactEdited, FactContentSnapshot, CategoryIDSnapshot)
                             VALUES (?, GETDATE(), ?, 0, 'edit', 1, ?, ?)
                             """,
                             (self.current_fact_id, self.current_session_id, content, category_id)
@@ -3201,7 +3201,7 @@ class FactDariApp:
                     if self.current_session_id:
                         self.execute_update(
                             """
-                            INSERT INTO FactLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactDeleted, FactContentSnapshot, CategoryIDSnapshot)
+                            INSERT INTO FactLogs (FactID, ReviewDate, SessionID, FactReadingTime, Action, FactDeleted, FactContentSnapshot, CategoryIDSnapshot)
                             VALUES (?, GETDATE(), ?, 0, 'delete', 1, ?, ?)
                             """,
                             (self.current_fact_id, self.current_session_id, content_snapshot, category_snapshot)
@@ -3549,7 +3549,7 @@ class FactDariApp:
 
                 IF @SessionID IS NOT NULL
                 BEGIN
-                    INSERT INTO FactLogs (FactID, ReviewDate, SessionID, SessionDuration, Action, FactDeleted, FactContentSnapshot, CategoryIDSnapshot)
+                    INSERT INTO FactLogs (FactID, ReviewDate, SessionID, FactReadingTime, Action, FactDeleted, FactContentSnapshot, CategoryIDSnapshot)
                     SELECT FactID, GETDATE(), @SessionID, 0, 'delete', 1, Content, CategoryID
                     FROM Facts
                     WHERE CategoryID = ? AND CreatedBy = ?;

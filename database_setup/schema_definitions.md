@@ -95,7 +95,7 @@ This is a comprehensive reference guide defining every table and column in your 
 | **`FactLogID`** | `INT (PK)` | **Identity.** |
 | **`FactID`** | `INT (FK)` | **Target.** The fact being interacted with. **ON DELETE SET NULL**: If fact is deleted, the log remains for stats but `FactID` becomes NULL. |
 | **`ReviewDate`** | `DATETIME` | **Timestamp.** Exact moment the card was shown. Used for Heatmap (Hour of Day). |
-| **`SessionDuration`** | `INT` | **Reading Time.** How long the user stared at *this specific card*. The app pauses this timer if a popup opens. |
+| **`FactReadingTime`** | `INT` | **Reading Time.** How long the user stared at *this specific card*. The app pauses this timer if a popup opens. |
 | **`SessionID`** | `INT (FK)` | **Parent Link.** Groups this view into a `ReviewSession`. |
 | **`TimedOut`** | `BIT` | **Idle Flag.** Set to `1` if the view ended because the session timed out (`handle_idle_timeout`). Drives the timeout chart. |
 | **`Action`** | `NVARCHAR` | **Type.** 'view', 'add', 'edit', 'delete'. Allows filtering logs by type. |
