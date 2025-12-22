@@ -4,9 +4,32 @@ Pytest configuration and shared fixtures for FactDari tests.
 import pytest
 import os
 import sys
+from urllib.parse import urlparse
+import requests
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+@pytest.fixture(autouse=True)
+def block_external_http(monkeypatch):
+    """Block outbound HTTP requests during tests (allow localhost only)."""
+    original_request = requests.sessions.Session.request
+
+    def is_localhost(url):
+        try:
+            host = urlparse(str(url)).hostname
+        except Exception:
+            return False
+        return host in ("localhost", "127.0.0.1", "::1")
+
+    def guarded_request(self, method, url, *args, **kwargs):
+        if is_localhost(url):
+            return original_request(self, method, url, *args, **kwargs)
+        raise RuntimeError("External HTTP blocked during tests.")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", guarded_request)
+    yield
 
 
 @pytest.fixture(autouse=True)

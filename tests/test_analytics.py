@@ -457,3 +457,78 @@ class TestErrorHandling:
 
         # Should not crash, should return 200
         assert response.status_code == 200
+
+
+class TestAnalyticsHelpers:
+    """Tests for analytics helper utilities."""
+
+    def test_fill_date_rows_fills_missing_dates(self):
+        from analytics_factdari import _fill_date_rows
+
+        data = [
+            {'Date': '2024-01-01', 'FactsReviewed': 1, 'TotalReviews': 1},
+            {'Date': '2024-01-03', 'FactsReviewed': 2, 'TotalReviews': 2},
+        ]
+        filled = _fill_date_rows(data, start_date='2024-01-01', end_date='2024-01-03')
+
+        assert len(filled) == 3
+        assert filled[1][1] is None
+
+    def test_format_line_chart_fills_gaps(self):
+        from analytics_factdari import format_line_chart
+
+        data = [{'Date': '2024-01-01', 'FactsReviewed': 2, 'TotalReviews': 3}]
+        result = format_line_chart(data, start_date='2024-01-01', end_date='2024-01-03')
+
+        assert result['labels'] == ['2024-01-01', '2024-01-02', '2024-01-03']
+        assert result['datasets'][0]['data'] == [2, 0, 0]
+        assert result['datasets'][1]['data'] == [3, 0, 0]
+
+    def test_format_duration_line_chart_converts_minutes(self):
+        from analytics_factdari import format_duration_line_chart
+
+        data = [{'Date': '2024-01-01', 'AvgDuration': 120, 'TotalDuration': 600, 'SessionCount': 2}]
+        result = format_duration_line_chart(data)
+
+        assert result['datasets'][0]['data'] == [2.0]
+        assert result['datasets'][1]['data'] == [10.0]
+        assert result['datasets'][2]['data'] == [2]
+
+    def test_format_timeout_chart_fills_missing_dates(self):
+        from analytics_factdari import format_timeout_chart
+
+        data = [{'Date': '2024-01-01', 'TimeoutCount': 2, 'TimeoutPercentage': 10.0}]
+        result = format_timeout_chart(data, start_date='2024-01-01', end_date='2024-01-02')
+
+        assert result['labels'] == ['2024-01-01', '2024-01-02']
+        assert result['datasets'][0]['data'] == [2, 0]
+        assert result['datasets'][1]['data'] == [10.0, 0.0]
+
+    def test_format_ai_cost_by_operation_timeline(self):
+        from analytics_factdari import format_ai_cost_by_operation_timeline
+
+        data = [
+            {'Date': '2024-01-01', 'OperationType': 'EXPLANATION', 'DailyCost': 0.1},
+            {'Date': '2024-01-01', 'OperationType': 'QUESTION_GENERATION', 'DailyCost': 0.2},
+        ]
+        result = format_ai_cost_by_operation_timeline(data)
+
+        labels = [ds['label'] for ds in result['datasets']]
+        assert 'Explanations Cost ($)' in labels
+        assert 'Questions Cost ($)' in labels
+
+    def test_calculate_review_streak_old_review_returns_zero(self):
+        from datetime import datetime, timedelta
+        from analytics_factdari import calculate_review_streak
+
+        old_date = (datetime.now().date() - timedelta(days=5)).isoformat()
+        with patch('analytics_factdari.fetch_query') as mock_fetch:
+            mock_fetch.side_effect = [
+                [{'LongestStreak': 7}],
+                [{'ReviewDate': old_date}],
+            ]
+
+            result = calculate_review_streak(1)
+
+        assert result['current_streak'] == 0
+        assert result['last_review'] == old_date

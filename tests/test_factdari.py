@@ -1,1066 +1,705 @@
 """
-Comprehensive unit tests for factdari.py module.
-Tests helper functions, data validation, business logic, timers, sessions, and UI states.
-
-Tier 1: Timer, Idle, Sessions, Fact logging, Button states
-Tier 2: Questions, Category switching, UI transitions
-Tier 3: TTS, Window management, Edge cases
+Unit tests for factdari.py logic.
+These tests use stubs/mocks to avoid GUI and database dependencies.
 """
-from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
+from unittest.mock import MagicMock
 import time
-import sys
-import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
-# =============================================================================
-# TIER 1: CRITICAL TESTS - Timer, Idle, Sessions, Fact Logging, Button States
-# =============================================================================
-
-class TestTimerPauseResume:
-    """Tests for timer pause/resume functionality."""
-
-    def test_pause_timer_sets_paused_state(self):
-        """Test that pause_review_timer sets timer_paused to True."""
-        timer_paused = False
-        current_fact_start_time = datetime.now()
-        pause_started_at = None
-
-        # Simulate pause_review_timer logic
-        if current_fact_start_time and not timer_paused:
-            pause_started_at = datetime.now()
-            timer_paused = True
-
-        assert timer_paused is True
-        assert pause_started_at is not None
-
-    def test_pause_timer_no_effect_when_already_paused(self):
-        """Test that pausing again doesn't reset pause_started_at."""
-        timer_paused = True
-        pause_started_at = datetime.now() - timedelta(seconds=10)
-        original_pause_time = pause_started_at
-        current_fact_start_time = datetime.now() - timedelta(seconds=30)
-
-        # Should not change when already paused
-        if current_fact_start_time and not timer_paused:
-            pause_started_at = datetime.now()
-            timer_paused = True
-
-        assert pause_started_at == original_pause_time
-
-    def test_resume_timer_shifts_start_time(self):
-        """Test that resume_review_timer shifts start time by paused duration."""
-        pause_duration_seconds = 10
-        original_start = datetime.now() - timedelta(seconds=30)
-        pause_started_at = datetime.now() - timedelta(seconds=pause_duration_seconds)
-        timer_paused = True
-        current_fact_start_time = original_start
-
-        # Simulate resume_review_timer logic
-        if timer_paused:
-            if current_fact_start_time and pause_started_at:
-                delta = datetime.now() - pause_started_at
-                current_fact_start_time = current_fact_start_time + delta
-            pause_started_at = None
-            timer_paused = False
-
-        assert timer_paused is False
-        assert pause_started_at is None
-        assert current_fact_start_time > original_start
-
-    def test_resume_timer_no_effect_when_not_paused(self):
-        """Test that resuming when not paused does nothing."""
-        timer_paused = False
-        original_start = datetime.now() - timedelta(seconds=30)
-        current_fact_start_time = original_start
-        pause_started_at = None
-
-        if timer_paused:
-            if current_fact_start_time and pause_started_at:
-                delta = datetime.now() - pause_started_at
-                current_fact_start_time = current_fact_start_time + delta
-            pause_started_at = None
-            timer_paused = False
-
-        assert current_fact_start_time == original_start
-
-
-class TestIdleTimeout:
-    """Tests for idle timeout detection and handling."""
-
-    def test_record_activity_resets_last_activity_time(self):
-        """Test that record_activity updates last_activity_time."""
-        old_time = datetime.now() - timedelta(seconds=300)
-        last_activity_time = old_time
-        idle_triggered = True
-
-        # Simulate record_activity logic
-        last_activity_time = datetime.now()
-        idle_triggered = False
-
-        assert last_activity_time > old_time
-        assert idle_triggered is False
-
-    def test_idle_detection_triggers_after_timeout(self):
-        """Test idle detection triggers after timeout seconds."""
-        idle_timeout_seconds = 300
-        last_activity_time = datetime.now() - timedelta(seconds=301)
-        idle_triggered = False
-        current_session_id = 1
-        timer_paused = False
-
-        if current_session_id and not timer_paused:
-            idle_seconds = int((datetime.now() - last_activity_time).total_seconds())
-            if not idle_triggered and idle_seconds >= idle_timeout_seconds:
-                idle_triggered = True
 
-        assert idle_triggered is True
+import requests
 
-    def test_idle_detection_does_not_trigger_before_timeout(self):
-        """Test idle detection doesn't trigger before timeout."""
-        idle_timeout_seconds = 300
-        last_activity_time = datetime.now() - timedelta(seconds=100)
-        idle_triggered = False
-        current_session_id = 1
-        timer_paused = False
+import config
+import factdari
 
-        if current_session_id and not timer_paused:
-            idle_seconds = int((datetime.now() - last_activity_time).total_seconds())
-            if not idle_triggered and idle_seconds >= idle_timeout_seconds:
-                idle_triggered = True
 
-        assert idle_triggered is False
+class DummyVar:
+    def __init__(self, value=None):
+        self._value = value
 
-    def test_idle_not_triggered_when_timer_paused(self):
-        """Test idle detection skipped when timer is paused."""
-        idle_timeout_seconds = 300
-        last_activity_time = datetime.now() - timedelta(seconds=400)
-        idle_triggered = False
-        current_session_id = 1
-        timer_paused = True
+    def get(self):
+        return self._value
 
-        if current_session_id and not timer_paused:
-            idle_seconds = int((datetime.now() - last_activity_time).total_seconds())
-            if not idle_triggered and idle_seconds >= idle_timeout_seconds:
-                idle_triggered = True
+    def set(self, value):
+        self._value = value
 
-        assert idle_triggered is False
 
-    def test_idle_not_triggered_when_no_session(self):
-        """Test idle detection skipped when no active session."""
-        idle_timeout_seconds = 300
-        last_activity_time = datetime.now() - timedelta(seconds=400)
-        idle_triggered = False
-        current_session_id = None
-        timer_paused = False
+def make_app():
+    return factdari.FactDariApp.__new__(factdari.FactDariApp)
 
-        if current_session_id and not timer_paused:
-            idle_seconds = int((datetime.now() - last_activity_time).total_seconds())
-            if not idle_triggered and idle_seconds >= idle_timeout_seconds:
-                idle_triggered = True
 
-        assert idle_triggered is False
+def make_mock_conn(mock_cursor):
+    mock_conn = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
+    mock_conn.__exit__.return_value = None
+    mock_cursor.__enter__.return_value = mock_cursor
+    mock_cursor.__exit__.return_value = None
+    mock_conn.cursor.return_value = mock_cursor
+    return mock_conn
 
 
-class TestSessionManagement:
-    """Tests for session creation and termination."""
+def test_tooltip_binds_events():
+    widget = MagicMock()
+    tooltip = factdari.ToolTip(widget, "Help text", delay=100)
+    widget.bind.assert_any_call("<Enter>", tooltip._schedule)
+    widget.bind.assert_any_call("<Leave>", tooltip._hide)
+    widget.bind.assert_any_call("<ButtonPress>", tooltip._hide)
 
-    def test_start_new_session_sets_session_id(self):
-        """Test that starting a session assigns a session ID."""
-        current_session_id = None
-        session_start_time = None
 
-        session_start_time = datetime.now()
-        current_session_id = 123
+def test_tooltip_cancel_clears_after_id():
+    widget = MagicMock()
+    widget.after.return_value = "after-id"
+    tooltip = factdari.ToolTip(widget, "Help text", delay=50)
+    tooltip._schedule()
+    assert tooltip._after_id == "after-id"
+    tooltip._cancel()
+    widget.after_cancel.assert_called_once_with("after-id")
+    assert tooltip._after_id is None
 
-        assert current_session_id is not None
-        assert session_start_time is not None
 
-    def test_start_new_session_ends_existing_session_first(self):
-        """Test that starting a new session ends any existing session."""
-        existing_session_id = 100
-        end_session_called = False
+def test_pause_review_timer_sets_pause_state():
+    app = make_app()
+    app.pause_depth = 0
+    app.current_fact_start_time = datetime.now()
+    app.timer_paused = False
+    app.pause_started_at = None
 
-        def end_active_session():
-            nonlocal end_session_called
-            end_session_called = True
+    app.pause_review_timer()
 
-        if existing_session_id:
-            end_active_session()
+    assert app.timer_paused is True
+    assert app.pause_depth == 1
+    assert app.pause_started_at is not None
 
-        assert end_session_called is True
 
-    def test_end_session_calculates_duration(self):
-        """Test that ending a session calculates correct duration."""
-        session_start_time = datetime.now() - timedelta(seconds=120)
+def test_pause_review_timer_nested_does_not_reset_pause_start():
+    app = make_app()
+    app.pause_depth = 1
+    app.current_fact_start_time = datetime.now()
+    app.timer_paused = True
+    original_pause = datetime.now() - timedelta(seconds=5)
+    app.pause_started_at = original_pause
 
-        end_marker = datetime.now()
-        duration_seconds = int((end_marker - session_start_time).total_seconds())
+    app.pause_review_timer()
 
-        assert duration_seconds >= 120
-        assert duration_seconds < 130
+    assert app.pause_depth == 2
+    assert app.pause_started_at == original_pause
 
-    def test_end_session_uses_last_activity_when_timed_out(self):
-        """Test that timeout uses last activity time for duration."""
-        session_start_time = datetime.now() - timedelta(seconds=300)
-        last_activity_time = datetime.now() - timedelta(seconds=100)
-        timed_out = True
 
-        end_marker = last_activity_time if timed_out else datetime.now()
-        duration_seconds = int((end_marker - session_start_time).total_seconds())
+def test_resume_review_timer_decrements_depth_only():
+    app = make_app()
+    app.pause_depth = 2
+    app.timer_paused = True
+    app.pause_started_at = datetime.now() - timedelta(seconds=5)
 
-        assert 195 <= duration_seconds <= 205
+    app.resume_review_timer()
 
-    def test_end_session_clears_session_state(self):
-        """Test that ending session clears session variables."""
-        current_session_id = 123
-        session_start_time = datetime.now()
+    assert app.pause_depth == 1
+    assert app.timer_paused is True
 
-        current_session_id = None
-        session_start_time = None
 
-        assert current_session_id is None
-        assert session_start_time is None
+def test_resume_review_timer_shifts_start_time():
+    app = make_app()
+    app.pause_depth = 1
+    app.timer_paused = True
+    app.current_fact_start_time = datetime.now() - timedelta(seconds=30)
+    original_start = app.current_fact_start_time
+    app.pause_started_at = datetime.now() - timedelta(seconds=5)
+    app.category_dropdown_open = True
 
-    def test_session_duration_calculation(self):
-        """Test session duration is calculated correctly."""
-        start_time = datetime(2024, 1, 1, 10, 0, 0)
-        end_time = datetime(2024, 1, 1, 10, 5, 30)
+    app.resume_review_timer()
+
+    assert app.pause_depth == 0
+    assert app.timer_paused is False
+    assert app.pause_started_at is None
+    assert app.category_dropdown_open is False
+    assert app.current_fact_start_time > original_start
+
+
+def test_record_activity_updates_timestamp_and_resets_idle():
+    app = make_app()
+    old_time = datetime.now() - timedelta(seconds=10)
+    app.last_activity_time = old_time
+    app.idle_triggered = True
+
+    app.record_activity()
+
+    assert app.idle_triggered is False
+    assert app.last_activity_time > old_time
+
 
-        duration_seconds = int((end_time - start_time).total_seconds())
+def test_update_ui_triggers_idle_timeout_when_threshold_exceeded():
+    app = make_app()
+    app.update_coordinates = MagicMock()
+    app.update_fact_count = MagicMock()
+    app.update_review_stats = MagicMock()
+    app.update_level_progress = MagicMock()
+    app.handle_idle_timeout = MagicMock()
+    app.root = MagicMock()
+    app.root.after = MagicMock()
+    app.UI_UPDATE_INTERVAL_MS = 123
+
+    app.is_home_page = False
+    app.current_session_id = 1
+    app.timer_paused = False
+    app.idle_triggered = False
+    app.idle_timeout_seconds = 300
+    app.last_activity_time = datetime.now() - timedelta(seconds=301)
+
+    app.update_ui()
+
+    app.handle_idle_timeout.assert_called_once()
+    args = app.root.after.call_args[0]
+    assert args[0] == 123
+
+
+def test_update_ui_skips_idle_check_when_paused():
+    app = make_app()
+    app.update_coordinates = MagicMock()
+    app.update_fact_count = MagicMock()
+    app.update_review_stats = MagicMock()
+    app.update_level_progress = MagicMock()
+    app.handle_idle_timeout = MagicMock()
+    app.root = MagicMock()
+    app.root.after = MagicMock()
+    app.UI_UPDATE_INTERVAL_MS = 100
+
+    app.is_home_page = False
+    app.current_session_id = 1
+    app.timer_paused = True
+    app.idle_triggered = False
+    app.idle_timeout_seconds = 300
+    app.last_activity_time = datetime.now() - timedelta(seconds=400)
+
+    app.update_ui()
+
+    app.handle_idle_timeout.assert_not_called()
+
+
+def test_update_ui_skips_idle_check_without_session():
+    app = make_app()
+    app.update_coordinates = MagicMock()
+    app.update_fact_count = MagicMock()
+    app.update_review_stats = MagicMock()
+    app.update_level_progress = MagicMock()
+    app.handle_idle_timeout = MagicMock()
+    app.root = MagicMock()
+    app.root.after = MagicMock()
+    app.UI_UPDATE_INTERVAL_MS = 100
 
-        assert duration_seconds == 330
+    app.is_home_page = False
+    app.current_session_id = None
+    app.timer_paused = False
+    app.idle_triggered = False
+    app.idle_timeout_seconds = 300
+    app.last_activity_time = datetime.now() - timedelta(seconds=400)
+
+    app.update_ui()
+
+    app.handle_idle_timeout.assert_not_called()
+
+
+def test_is_action_allowed_false_on_home():
+    app = make_app()
+    app.is_home_page = True
+    app.answer_revealed = True
+    app._block_popup_when_questioning = MagicMock()
+
+    assert app._is_action_allowed() is False
+    app._block_popup_when_questioning.assert_not_called()
+
+
+def test_is_action_allowed_false_when_answer_hidden():
+    app = make_app()
+    app.is_home_page = False
+    app.answer_revealed = False
+    app._block_popup_when_questioning = MagicMock(return_value=True)
+
+    assert app._is_action_allowed("toggle favorite") is False
+    app._block_popup_when_questioning.assert_called_once()
+
+
+def test_is_action_allowed_true_when_reviewing_and_revealed():
+    app = make_app()
+    app.is_home_page = False
+    app.answer_revealed = True
+    app._block_popup_when_questioning = MagicMock()
 
-    def test_session_duration_zero(self):
-        """Test zero duration for same start/end."""
-        start_time = datetime(2024, 1, 1, 10, 0, 0)
-        end_time = start_time
+    assert app._is_action_allowed() is True
 
-        duration_seconds = int((end_time - start_time).total_seconds())
 
-        assert duration_seconds == 0
+def test_award_for_elapsed_awards_expected_xp(monkeypatch):
+    app = make_app()
+    app.gamify = MagicMock()
+    app.status_label = MagicMock()
+    app.clear_status_after_delay = MagicMock()
+    app.update_level_progress = MagicMock()
+    app.GREEN_COLOR = "#00ff00"
+    app.gamify.increment_counter.return_value = 7
+    app.gamify.unlock_achievements_if_needed.return_value = []
 
+    monkeypatch.setattr(
+        config,
+        "XP_CONFIG",
+        {
+            "review_base_xp": 1,
+            "review_bonus_step_seconds": 5,
+            "review_grace_seconds": 2,
+            "review_bonus_cap": 5,
+        },
+    )
 
-class TestFactViewFinalization:
-    """Tests for fact view duration tracking and finalization."""
+    app._award_for_elapsed(12, timed_out=False)
 
-    def test_finalize_calculates_elapsed_time(self):
-        """Test that finalization calculates correct elapsed time."""
-        current_fact_start_time = datetime.now() - timedelta(seconds=30)
+    app.gamify.increment_counter.assert_called_once_with("TotalReviews", 1)
+    app.gamify.award_xp.assert_called_once_with(3)
 
-        end_ts = datetime.now()
-        elapsed = int((end_ts - current_fact_start_time).total_seconds())
 
-        assert elapsed >= 30
-        assert elapsed < 35
+def test_award_for_elapsed_below_grace_skips_award(monkeypatch):
+    app = make_app()
+    app.gamify = MagicMock()
 
-    def test_finalize_caps_at_last_activity_when_timed_out(self):
-        """Test that timeout caps elapsed at last activity time."""
-        current_fact_start_time = datetime.now() - timedelta(seconds=100)
-        last_activity_time = datetime.now() - timedelta(seconds=50)
-        timed_out = True
+    monkeypatch.setattr(
+        config,
+        "XP_CONFIG",
+        {
+            "review_base_xp": 1,
+            "review_bonus_step_seconds": 5,
+            "review_grace_seconds": 3,
+            "review_bonus_cap": 5,
+        },
+    )
 
-        end_ts = last_activity_time if timed_out else datetime.now()
-        elapsed = int((end_ts - current_fact_start_time).total_seconds())
+    app._award_for_elapsed(1, timed_out=False)
 
-        assert 45 <= elapsed <= 55
+    app.gamify.increment_counter.assert_not_called()
+    app.gamify.award_xp.assert_not_called()
 
-    def test_finalize_caps_at_pause_time_when_paused(self):
-        """Test that paused time is excluded from duration."""
-        current_fact_start_time = datetime.now() - timedelta(seconds=60)
-        pause_started_at = datetime.now() - timedelta(seconds=20)
-        timer_paused = True
 
-        end_ts = datetime.now()
-        if timer_paused and pause_started_at:
-            end_ts = min(end_ts, pause_started_at)
-        elapsed = int((end_ts - current_fact_start_time).total_seconds())
+def test_award_for_elapsed_timed_out_skips_award():
+    app = make_app()
+    app.gamify = MagicMock()
 
-        assert 35 <= elapsed <= 45
+    app._award_for_elapsed(10, timed_out=True)
 
-    def test_finalize_clears_state_variables(self):
-        """Test that finalization clears fact tracking state."""
-        current_fact_log_id = 123
-        current_fact_start_time = datetime.now()
+    app.gamify.increment_counter.assert_not_called()
+    app.gamify.award_xp.assert_not_called()
 
-        current_fact_log_id = None
-        current_fact_start_time = None
 
-        assert current_fact_log_id is None
-        assert current_fact_start_time is None
+def test_finalize_current_fact_view_uses_last_activity_on_timeout():
+    app = make_app()
+    app.current_fact_log_id = 123
+    app.current_fact_start_time = datetime(2024, 1, 1, 0, 0, 0)
+    app.last_activity_time = datetime(2024, 1, 1, 0, 1, 0)
+    app.timer_paused = False
+    app.pause_started_at = None
+    app.execute_update = MagicMock(return_value=True)
+    app._award_for_elapsed = MagicMock()
 
-    def test_finalize_handles_negative_elapsed_gracefully(self):
-        """Test that negative elapsed time is clamped to 0."""
-        current_fact_start_time = datetime.now() + timedelta(seconds=10)
+    app.finalize_current_fact_view(timed_out=True)
 
-        end_ts = datetime.now()
-        elapsed = int((end_ts - current_fact_start_time).total_seconds())
-        if elapsed < 0:
-            elapsed = 0
+    query, params = app.execute_update.call_args[0]
+    assert params == (60, 1, 123)
+    app._award_for_elapsed.assert_called_once_with(60, timed_out=True)
+    assert app.current_fact_log_id is None
+    assert app.current_fact_start_time is None
 
-        assert elapsed == 0
 
+def test_adjust_font_size_bounds():
+    app = make_app()
+    assert app.adjust_font_size("Short text") == 11
+    assert app.adjust_font_size("A" * 900) == 8
+    assert app.adjust_font_size("") == 12
 
-class TestButtonStates:
-    """Tests for button enable/disable states."""
 
-    def test_is_action_allowed_false_on_home_page(self):
-        """Test actions are not allowed on home page."""
-        is_home_page = True
-        answer_revealed = True
+def test_estimate_ai_cost_typical():
+    app = make_app()
+    app.ai_prompt_cost_per_1k = 0.0006
+    app.ai_completion_cost_per_1k = 0.0017
 
-        allowed = not is_home_page and answer_revealed
+    cost = app._estimate_ai_cost(150, 200)
 
-        assert allowed is False
+    assert abs(cost - 0.00043) < 0.00001
 
-    def test_is_action_allowed_false_when_answer_not_revealed(self):
-        """Test actions not allowed when answer not revealed."""
-        is_home_page = False
-        answer_revealed = False
 
-        allowed = not is_home_page and answer_revealed
+def test_call_together_ai_timeout_sets_failed(monkeypatch):
+    app = make_app()
+    app.ai_endpoint = "https://example.com"
+    app.ai_timeout_seconds = 5
+    app.ai_explanation_max_tokens = 100
+    app.ai_explanation_temperature = 0.5
 
-        assert allowed is False
+    monkeypatch.setattr(factdari.requests, "post", MagicMock(side_effect=requests.exceptions.Timeout))
 
-    def test_is_action_allowed_true_when_reviewing_and_revealed(self):
-        """Test actions allowed when reviewing and answer revealed."""
-        is_home_page = False
-        answer_revealed = True
+    message, usage = app._call_together_ai("Fact text", "key")
 
-        allowed = not is_home_page and answer_revealed
+    assert "Timed out" in message
+    assert usage["status"] == "FAILED"
 
-        assert allowed is True
 
-    def test_toggle_favorite_requires_current_fact_id(self):
-        """Test toggle_favorite requires a current fact ID."""
-        current_fact_id = None
-        action_blocked = current_fact_id is None
+def test_call_together_ai_connection_error_sets_failed(monkeypatch):
+    app = make_app()
+    app.ai_endpoint = "https://example.com"
+    app.ai_timeout_seconds = 5
+    app.ai_explanation_max_tokens = 100
+    app.ai_explanation_temperature = 0.5
 
-        assert action_blocked is True
+    monkeypatch.setattr(factdari.requests, "post", MagicMock(side_effect=requests.exceptions.ConnectionError))
 
-    def test_toggle_favorite_with_valid_fact_id(self):
-        """Test toggle_favorite works with valid fact ID."""
-        current_fact_id = 123
-        action_blocked = current_fact_id is None
+    message, usage = app._call_together_ai("Fact text", "key")
 
-        assert action_blocked is False
+    assert "Network error" in message
+    assert usage["status"] == "FAILED"
 
-    def test_ai_request_inflight_blocks_duplicate_requests(self):
-        """Test that ai_request_inflight prevents duplicate AI calls."""
-        ai_request_inflight = True
 
-        request_allowed = not ai_request_inflight
+def test_speak_text_returns_early_on_home_page():
+    app = make_app()
+    app.is_home_page = True
+    app.stop_speaking = MagicMock()
 
-        assert request_allowed is False
+    app.speak_text()
 
-    def test_ai_request_not_blocked_when_idle(self):
-        """Test AI request allowed when not in flight."""
-        ai_request_inflight = False
+    app.stop_speaking.assert_not_called()
 
-        request_allowed = not ai_request_inflight
 
-        assert request_allowed is True
+def test_stop_speaking_stops_engine_and_clears_reference():
+    app = make_app()
+    engine = MagicMock()
+    app.active_tts_engine = engine
+    app.speaking_thread = MagicMock()
+    app.speaking_thread.is_alive.return_value = False
 
+    app.stop_speaking()
 
-# =============================================================================
-# TIER 2: SHOULD HAVE TESTS - Questions, Categories, UI Transitions, Analytics
-# =============================================================================
+    engine.stop.assert_called_once()
+    assert app.active_tts_engine is None
 
-class TestQuestionDisplay:
-    """Tests for question display and reveal functionality."""
 
-    def test_answer_revealed_initially_false(self):
-        """Test answer_revealed starts as False."""
-        answer_revealed = False
-        assert answer_revealed is False
+def test_set_static_position_applies_geometry_and_updates_coordinates():
+    app = make_app()
+    app.WINDOW_STATIC_POS = "+100+100"
+    app.root = MagicMock()
+    app.update_coordinates = MagicMock()
 
-    def test_reveal_answer_sets_answer_revealed(self):
-        """Test reveal action sets answer_revealed to True."""
-        answer_revealed = False
-        answer_revealed = True
-        assert answer_revealed is True
+    app.set_static_position()
 
-    def test_question_state_reset_on_next_fact(self):
-        """Test question state resets when navigating to next fact."""
-        answer_revealed = True
-        current_question_id = 123
+    app.root.geometry.assert_called_once_with("+100+100")
+    app.update_coordinates.assert_called_once()
 
-        answer_revealed = False
-        current_question_id = None
 
-        assert answer_revealed is False
-        assert current_question_id is None
+def test_update_category_dropdown_preserves_selection():
+    app = make_app()
+    app.load_categories = MagicMock(return_value=["All Categories", "Science"])
+    app.category_dropdown = {}
+    app.category_var = DummyVar("Science")
 
-    def test_question_request_inflight_prevents_duplicate(self):
-        """Test question generation blocked when already in progress."""
-        question_request_inflight = True
-        question_generation_fact_id = 100
-        current_fact_id = 100
+    app.update_category_dropdown()
 
-        blocked = question_request_inflight and question_generation_fact_id == current_fact_id
+    assert app.category_dropdown["values"] == ["All Categories", "Science"]
+    assert app.category_var.get() == "Science"
 
-        assert blocked is True
 
-    def test_question_cooldown_prevents_rapid_retries(self):
-        """Test cooldown prevents rapid question generation retries."""
-        cooldown_seconds = 60
-        last_attempt = time.time() - 30
-        now = time.time()
+def test_update_category_dropdown_defaults_when_missing():
+    app = make_app()
+    app.load_categories = MagicMock(return_value=["All Categories", "Science"])
+    app.category_dropdown = {}
+    app.category_var = DummyVar("History")
 
-        in_cooldown = (now - last_attempt) < cooldown_seconds
+    app.update_category_dropdown()
 
-        assert in_cooldown is True
+    assert app.category_var.get() == "All Categories"
 
 
-class TestCategorySwitching:
-    """Tests for category dropdown and switching functionality."""
+def test_get_or_generate_question_blocks_duplicate_inflight(monkeypatch):
+    app = make_app()
+    app.fetch_query = MagicMock(return_value=[])
+    app.question_request_inflight = True
+    app.question_generation_fact_id = 42
+    app.question_generation_last_attempt = {}
+    app.question_generation_cooldown_seconds = 60
+    app.root = MagicMock()
 
-    def test_category_change_finalizes_current_view(self):
-        """Test category change triggers fact view finalization."""
-        finalize_called = False
+    monkeypatch.setattr(config, "get_together_api_key", lambda: "key")
 
-        def finalize_current_fact_view():
-            nonlocal finalize_called
-            finalize_called = True
+    question, q_id = app._get_or_generate_question(42, "Fact text")
 
-        finalize_current_fact_view()
+    assert question is None
+    assert q_id is None
 
-        assert finalize_called is True
 
-    def test_category_change_resets_question_state(self):
-        """Test category change resets question state."""
-        answer_revealed = True
-        current_question_id = 123
+def test_get_or_generate_question_respects_cooldown(monkeypatch):
+    app = make_app()
+    app.fetch_query = MagicMock(return_value=[])
+    app.question_request_inflight = False
+    app.question_generation_fact_id = None
+    app.question_generation_last_attempt = {42: time.time() - 10}
+    app.question_generation_cooldown_seconds = 60
+    app.root = MagicMock()
 
-        answer_revealed = False
-        current_question_id = None
+    monkeypatch.setattr(config, "get_together_api_key", lambda: "key")
 
-        assert answer_revealed is False
-        assert current_question_id is None
+    question, q_id = app._get_or_generate_question(42, "Fact text")
 
-    def test_category_filter_all_categories(self):
-        """Test 'All Categories' filter returns all facts."""
-        category_var = "All Categories"
-        should_filter = category_var != "All Categories"
-        assert should_filter is False
+    assert question == "What does this fact say?"
+    assert q_id is None
 
-    def test_category_filter_specific_category(self):
-        """Test specific category filter is applied."""
-        category_var = "Science"
-        should_filter = category_var != "All Categories"
-        assert should_filter is True
 
-    def test_category_filter_favorites(self):
-        """Test Favorites filter."""
-        category_var = "Favorites"
-        is_special_filter = category_var in ["Favorites", "Known", "Not Known", "Not Favorite"]
-        assert is_special_filter is True
+def test_show_next_fact_advances_index():
+    app = make_app()
+    app.is_home_page = False
+    app.answer_revealed = True
+    app.all_facts = [(1, "Fact 1"), (2, "Fact 2"), (3, "Fact 3")]
+    app.current_fact_index = 0
+    app.stop_speaking = MagicMock()
+    app.finalize_current_fact_view = MagicMock()
+    app._finalize_question_view = MagicMock()
+    app.load_all_facts = MagicMock()
+    app.display_current_fact = MagicMock()
 
-    def test_specific_category_filtering(self):
-        """Test specific category filtering logic."""
-        selected = "Science"
-        all_facts = [
-            (1, 'Fact 1', 'Science'),
-            (2, 'Fact 2', 'History'),
-            (3, 'Fact 3', 'Science'),
-        ]
+    app.show_next_fact()
 
-        filtered = [f for f in all_facts if f[2] == selected]
+    assert app.current_fact_index == 1
+    app.display_current_fact.assert_called_once()
+    assert app.answer_revealed is False
+    assert app.current_question_id is None
 
-        assert len(filtered) == 2
-        assert all(f[2] == 'Science' for f in filtered)
 
+def test_show_previous_fact_wraps_index():
+    app = make_app()
+    app.is_home_page = False
+    app.answer_revealed = True
+    app.all_facts = [(1, "Fact 1"), (2, "Fact 2"), (3, "Fact 3")]
+    app.current_fact_index = 0
+    app.stop_speaking = MagicMock()
+    app.finalize_current_fact_view = MagicMock()
+    app._finalize_question_view = MagicMock()
+    app.load_all_facts = MagicMock()
+    app.display_current_fact = MagicMock()
 
-class TestUITransitions:
-    """Tests for home page and review mode transitions."""
+    app.show_previous_fact()
 
-    def test_show_home_page_sets_is_home_page(self):
-        """Test show_home_page sets is_home_page to True."""
-        is_home_page = False
-        is_home_page = True
-        assert is_home_page is True
+    assert app.current_fact_index == 2
+    app.display_current_fact.assert_called_once()
+    assert app.answer_revealed is False
+    assert app.current_question_id is None
 
-    def test_show_home_page_ends_session(self):
-        """Test show_home_page ends active session."""
-        session_ended = False
 
-        def end_active_session():
-            nonlocal session_ended
-            session_ended = True
+def test_display_current_fact_handles_empty_list():
+    app = make_app()
+    app.all_facts = []
+    app.stop_speaking = MagicMock()
+    app.fact_label = MagicMock()
+    app.NORMAL_FONT = ("Trebuchet MS", 10)
+    app.white_star_icon = object()
+    app.easy_icon = object()
+    app.star_button = MagicMock()
+    app.easy_button = MagicMock()
+    app.prev_button = MagicMock()
+    app.next_button = MagicMock()
+    app.single_card_label = MagicMock()
+    app.GRAY_COLOR = "#888888"
+    app.BLUE_COLOR = "#0000ff"
 
-        end_active_session()
+    app.display_current_fact()
 
-        assert session_ended is True
+    assert app.current_fact_id is None
+    app.prev_button.config.assert_called_with(state="disabled", bg=app.GRAY_COLOR)
+    app.next_button.config.assert_called_with(state="disabled", bg=app.GRAY_COLOR)
 
-    def test_show_home_page_resets_question_state(self):
-        """Test show_home_page resets question state."""
-        answer_revealed = True
-        current_question_id = 123
 
-        answer_revealed = False
-        current_question_id = None
+def test_fetch_query_passes_params(monkeypatch):
+    app = make_app()
+    app.CONN_STR = "conn"
+    mock_cursor = MagicMock()
+    mock_cursor.fetchall.return_value = [("row1",)]
+    mock_conn = make_mock_conn(mock_cursor)
+    monkeypatch.setattr(factdari.pyodbc, "connect", MagicMock(return_value=mock_conn))
 
-        assert answer_revealed is False
-        assert current_question_id is None
+    result = app.fetch_query("SELECT * FROM table WHERE id = ?", (1,))
 
-    def test_start_reviewing_sets_is_home_page_false(self):
-        """Test start_reviewing clears is_home_page."""
-        is_home_page = True
-        is_home_page = False
-        assert is_home_page is False
+    mock_cursor.execute.assert_called_once_with("SELECT * FROM table WHERE id = ?", (1,))
+    assert result == [("row1",)]
 
-    def test_start_reviewing_creates_session(self):
-        """Test start_reviewing starts a new session."""
-        current_session_id = None
-        current_session_id = 123
-        assert current_session_id is not None
 
-    def test_start_reviewing_records_activity(self):
-        """Test start_reviewing records user activity."""
-        activity_recorded = False
+def test_fetch_query_returns_empty_on_error(monkeypatch):
+    app = make_app()
+    app.CONN_STR = "conn"
+    monkeypatch.setattr(factdari.pyodbc, "connect", MagicMock(side_effect=Exception("boom")))
 
-        def record_activity():
-            nonlocal activity_recorded
-            activity_recorded = True
+    assert app.fetch_query("SELECT 1") == []
 
-        record_activity()
 
-        assert activity_recorded is True
+def test_execute_update_returns_false_on_error(monkeypatch):
+    app = make_app()
+    app.CONN_STR = "conn"
+    monkeypatch.setattr(factdari.pyodbc, "connect", MagicMock(side_effect=Exception("boom")))
 
-    def test_start_reviewing_skipped_if_already_reviewing(self):
-        """Test start_reviewing does nothing if already reviewing."""
-        is_home_page = False
-        current_session_id = 123
-        start_skipped = False
+    assert app.execute_update("UPDATE table SET col = 1") is False
 
-        if not is_home_page and current_session_id:
-            start_skipped = True
 
-        assert start_skipped is True
+def test_execute_insert_return_id_returns_none_on_error(monkeypatch):
+    app = make_app()
+    app.CONN_STR = "conn"
+    monkeypatch.setattr(factdari.pyodbc, "connect", MagicMock(side_effect=Exception("boom")))
 
-    def test_home_to_review_state(self):
-        """Test transitioning from home to review state."""
-        is_home_page = True
-        is_home_page = False
-        assert is_home_page is False
+    assert app.execute_insert_return_id("INSERT INTO table OUTPUT INSERTED.ID VALUES (1)") is None
 
-    def test_review_to_home_state(self):
-        """Test transitioning from review to home state."""
-        is_home_page = False
-        is_home_page = True
-        assert is_home_page is True
 
-    def test_session_starts_on_review(self):
-        """Test session starts when entering review mode."""
-        current_session_id = None
-        is_home_page = False
+def test_execute_insert_return_id_returns_new_id(monkeypatch):
+    app = make_app()
+    app.CONN_STR = "conn"
+    mock_cursor = MagicMock()
+    mock_cursor.fetchone.return_value = (99,)
+    mock_conn = make_mock_conn(mock_cursor)
+    monkeypatch.setattr(factdari.pyodbc, "connect", MagicMock(return_value=mock_conn))
 
-        if not is_home_page and current_session_id is None:
-            current_session_id = 1
+    assert app.execute_insert_return_id("INSERT INTO table OUTPUT INSERTED.ID VALUES (1)") == 99
 
-        assert current_session_id is not None
 
+def test_get_or_generate_question_returns_cached_question(monkeypatch):
+    app = make_app()
+    app.fetch_query = MagicMock(return_value=[(10, "Cached question", 1)])
+    app.question_request_inflight = False
+    app.question_generation_fact_id = None
+    app.question_generation_last_attempt = {}
+    app.question_generation_cooldown_seconds = 60
 
-class TestAnalyticsQueryAccuracy:
-    """Tests for analytics data formatting and calculations."""
+    monkeypatch.setattr(config, "get_together_api_key", lambda: "key")
 
-    def test_format_pie_chart_structure(self):
-        """Test pie chart formatting returns correct structure."""
-        data = [
-            {'CategoryName': 'Science', 'FactCount': 10},
-            {'CategoryName': 'History', 'FactCount': 5},
-        ]
+    question, q_id = app._get_or_generate_question(42, "Fact text")
 
-        result = {
-            'labels': [row['CategoryName'] for row in data],
-            'data': [row['FactCount'] for row in data]
-        }
+    assert question == "Cached question"
+    assert q_id == 10
 
-        assert result['labels'] == ['Science', 'History']
-        assert result['data'] == [10, 5]
 
-    def test_format_pie_chart_empty_data(self):
-        """Test pie chart with empty data."""
-        data = []
+def test_get_or_generate_question_falls_back_without_api_key(monkeypatch):
+    app = make_app()
+    app.fetch_query = MagicMock(return_value=[])
+    app.question_request_inflight = False
+    app.question_generation_fact_id = None
+    app.question_generation_last_attempt = {}
+    app.question_generation_cooldown_seconds = 60
 
-        result = {
-            'labels': [row.get('label') for row in data],
-            'data': [row.get('value') for row in data]
-        }
+    monkeypatch.setattr(config, "get_together_api_key", lambda: None)
 
-        assert result['labels'] == []
-        assert result['data'] == []
+    question, q_id = app._get_or_generate_question(42, "Fact text")
 
-    def test_review_streak_calculation_consecutive_days(self):
-        """Test streak calculation for consecutive days."""
-        from datetime import date
+    assert question == "What does this fact say?"
+    assert q_id is None
 
-        today = date.today()
-        yesterday = today - timedelta(days=1)
-        day_before = today - timedelta(days=2)
 
-        review_dates = [today, yesterday, day_before]
+def test_disable_ui_during_generation_disables_controls():
+    app = make_app()
+    app.home_button = MagicMock()
+    app.prev_button = MagicMock()
+    app.next_button = MagicMock()
+    app._disable_fact_action_buttons = MagicMock()
 
-        streak = 0
-        if review_dates:
-            first = review_dates[0]
-            if first in (today, yesterday):
-                streak = 1
-                for i, d in enumerate(review_dates[1:], 1):
-                    expected = first - timedelta(days=i)
-                    if d == expected:
-                        streak += 1
-                    else:
-                        break
+    app._disable_ui_during_generation()
 
-        assert streak == 3
+    app.home_button.config.assert_called_once_with(state="disabled")
+    app.prev_button.config.assert_called_once_with(state="disabled")
+    app.next_button.config.assert_called_once_with(state="disabled")
+    app._disable_fact_action_buttons.assert_called_once()
 
-    def test_review_streak_broken_by_gap(self):
-        """Test streak resets when there's a gap."""
-        from datetime import date
 
-        today = date.today()
-        review_dates = [today, today - timedelta(days=3)]
+def test_enable_ui_after_generation_enables_controls():
+    app = make_app()
+    app.home_button = MagicMock()
+    app.prev_button = MagicMock()
+    app.next_button = MagicMock()
 
-        streak = 1 if review_dates and review_dates[0] in (today, today - timedelta(days=1)) else 0
+    app._enable_ui_after_generation()
 
-        assert streak == 1
+    app.home_button.config.assert_called_once_with(state="normal")
+    app.prev_button.config.assert_called_once_with(state="normal")
+    app.next_button.config.assert_called_once_with(state="normal")
 
 
-# =============================================================================
-# TIER 3: NICE TO HAVE TESTS - TTS, Window, Edge Cases, Errors
-# =============================================================================
+def test_show_next_fact_noop_with_single_fact():
+    app = make_app()
+    app.is_home_page = False
+    app.answer_revealed = True
+    app.all_facts = [(1, "Fact 1")]
+    app.current_fact_index = 0
+    app.stop_speaking = MagicMock()
+    app.finalize_current_fact_view = MagicMock()
+    app._finalize_question_view = MagicMock()
+    app.load_all_facts = MagicMock()
+    app.display_current_fact = MagicMock()
 
-class TestTTSFunctionality:
-    """Tests for text-to-speech functionality."""
+    app.show_next_fact()
 
-    def test_speak_text_blocked_on_home_page(self):
-        """Test speak_text does nothing on home page."""
-        is_home_page = True
-        speak_called = False
+    assert app.current_fact_index == 0
+    app.display_current_fact.assert_not_called()
 
-        if not is_home_page:
-            speak_called = True
 
-        assert speak_called is False
+def test_display_current_fact_single_fact_shows_warning_label():
+    app = make_app()
+    app.all_facts = [(1, "Fact 1", False, False)]
+    app.current_fact_index = 0
+    app.answer_revealed = True
+    app.stop_speaking = MagicMock()
+    app.fact_label = MagicMock()
+    app.NORMAL_FONT = ("Trebuchet MS", 10)
+    app.white_star_icon = object()
+    app.gold_star_icon = object()
+    app.easy_icon = object()
+    app.easy_gold_icon = object()
+    app.star_button = MagicMock()
+    app.easy_button = MagicMock()
+    app.prev_button = MagicMock()
+    app.next_button = MagicMock()
+    app.single_card_label = MagicMock()
+    app.GRAY_COLOR = "#888888"
+    app.BLUE_COLOR = "#0000ff"
+    app.status_label = MagicMock()
+    app.STATUS_COLOR = "#111111"
+    app.clear_status_after_delay = MagicMock()
+    app.adjust_font_size = MagicMock(return_value=10)
+    app.track_fact_view = MagicMock()
 
-    def test_speak_text_gets_fact_label_text(self):
-        """Test speak_text reads from fact label."""
-        fact_label_text = "This is a test fact."
-        is_home_page = False
+    app.display_current_fact()
 
-        text_to_speak = fact_label_text if not is_home_page else None
+    app.single_card_label.pack.assert_called_once()
+    app.prev_button.config.assert_called_with(state="disabled", bg=app.GRAY_COLOR)
+    app.next_button.config.assert_called_with(state="disabled", bg=app.GRAY_COLOR)
+    app.track_fact_view.assert_called_once_with(1)
 
-        assert text_to_speak == "This is a test fact."
 
-    def test_stop_speaking_clears_active_engine(self):
-        """Test stop_speaking clears active TTS engine reference."""
-        active_tts_engine = MagicMock()
-        active_tts_engine = None
-        assert active_tts_engine is None
+def test_show_home_page_resets_state_and_calls_session_end():
+    app = make_app()
+    app.end_active_session = MagicMock()
+    app._finalize_question_view = MagicMock()
+    app.stop_speaking = MagicMock()
+    app.clear_status_after_delay = MagicMock()
+    app.apply_rounded_corners = MagicMock()
+    app.root = MagicMock()
+    app.root.update_idletasks = MagicMock()
 
+    app.stats_frame = MagicMock()
+    app.icon_buttons_frame = MagicMock()
+    app.nav_frame = MagicMock()
+    app.category_frame = MagicMock()
+    app.single_card_label = MagicMock()
+    app.star_button = MagicMock()
+    app.easy_button = MagicMock()
+    app.ai_button = MagicMock()
+    app.reveal_button = MagicMock()
+    app.level_label = MagicMock()
+    app.info_button = MagicMock()
+    app.speaker_button = MagicMock()
+    app.brand_frame = MagicMock()
+    app.fact_label = MagicMock()
+    app.slogan_label = MagicMock()
+    app.start_button = MagicMock()
+    app.status_label = MagicMock()
+    app.STATUS_COLOR = "#222222"
+    app.is_home_page = False
+    app.answer_revealed = True
+    app.current_question_id = 12
 
-class TestWindowManagement:
-    """Tests for window positioning and management."""
+    app.show_home_page()
 
-    def test_set_static_position_applies_geometry(self):
-        """Test static position sets window geometry."""
-        window_static_pos = "+100+100"
-        geometry_set = window_static_pos
-        assert geometry_set == "+100+100"
-
-    def test_on_drag_updates_coordinates(self):
-        """Test dragging updates window coordinates."""
-        x_window, y_window = 50, 50
-        event_x_root, event_y_root = 150, 200
-
-        new_x = event_x_root - x_window
-        new_y = event_y_root - y_window
-
-        assert new_x == 100
-        assert new_y == 150
-
-    def test_window_transparency_on_focus(self):
-        """Test window alpha changes on focus."""
-        focused_alpha = 1.0
-        unfocused_alpha = 0.7
-
-        assert focused_alpha == 1.0
-        assert unfocused_alpha == 0.7
-
-
-class TestEdgeCases:
-    """Tests for edge cases and error handling."""
-
-    def test_empty_facts_list_handled(self):
-        """Test empty facts list shows appropriate message."""
-        all_facts = []
-        has_facts = len(all_facts) > 0
-        assert has_facts is False
-
-    def test_single_fact_navigation_wraps(self):
-        """Test navigation with single fact wraps correctly."""
-        all_facts = [("Fact 1", 1)]
-        current_index = 0
-        next_index = (current_index + 1) % len(all_facts)
-        assert next_index == 0
-
-    def test_previous_fact_wraps_from_first(self):
-        """Test previous from first fact wraps to last."""
-        all_facts = [("Fact 1", 1), ("Fact 2", 2), ("Fact 3", 3)]
-        current_index = 0
-        prev_index = (current_index - 1) % len(all_facts)
-        assert prev_index == 2
-
-    def test_next_fact_wraps_from_last(self):
-        """Test next from last fact wraps to first."""
-        all_facts = [("Fact 1", 1), ("Fact 2", 2), ("Fact 3", 3)]
-        current_index = 2
-        next_index = (current_index + 1) % len(all_facts)
-        assert next_index == 0
-
-    def test_invalid_fact_index_clamped(self):
-        """Test invalid fact index is clamped to valid range."""
-        all_facts = [("Fact 1", 1), ("Fact 2", 2)]
-        current_index = 10
-
-        if all_facts:
-            current_index = max(0, min(current_index, len(all_facts) - 1))
-
-        assert current_index == 1
-
-    def test_none_category_handled(self):
-        """Test None category is handled gracefully."""
-        category = None
-        safe_category = category or "All Categories"
-        assert safe_category == "All Categories"
-
-    def test_rapid_navigation_preserves_state(self):
-        """Test rapid navigation doesn't corrupt state."""
-        all_facts = [("Fact 1", 1), ("Fact 2", 2), ("Fact 3", 3)]
-        current_index = 0
-
-        for _ in range(10):
-            current_index = (current_index + 1) % len(all_facts)
-
-        assert current_index == 1
-
-    def test_zero_duration_handled(self):
-        """Test zero duration is handled correctly."""
-        duration_seconds = 0
-
-        if duration_seconds > 0:
-            rate = 10 / duration_seconds
-        else:
-            rate = 0
-
-        assert rate == 0
-
-    def test_negative_xp_prevented(self):
-        """Test negative XP values are prevented."""
-        xp_to_award = -10
-        safe_xp = max(0, xp_to_award)
-        assert safe_xp == 0
-
-
-class TestFactNavigation:
-    """Tests for fact navigation logic."""
-
-    def test_next_fact_wraps_around(self):
-        """Test next fact wraps to beginning."""
-        all_facts = [(1, 'Fact 1'), (2, 'Fact 2'), (3, 'Fact 3')]
-        current_index = 2
-
-        next_index = (current_index + 1) % len(all_facts)
-
-        assert next_index == 0
-
-    def test_previous_fact_wraps_around(self):
-        """Test previous fact wraps to end."""
-        all_facts = [(1, 'Fact 1'), (2, 'Fact 2'), (3, 'Fact 3')]
-        current_index = 0
-
-        prev_index = (current_index - 1) % len(all_facts)
-
-        assert prev_index == 2
-
-    def test_single_fact_navigation(self):
-        """Test navigation with single fact stays on same fact."""
-        all_facts = [(1, 'Only Fact')]
-        current_index = 0
-
-        next_index = (current_index + 1) % len(all_facts)
-        prev_index = (current_index - 1) % len(all_facts)
-
-        assert next_index == 0
-        assert prev_index == 0
-
-
-class TestDatabaseErrorHandling:
-    """Tests for database error handling."""
-
-    def test_fetch_query_returns_empty_on_error(self):
-        """Test fetch_query returns empty list on error."""
-        result = []
-        assert result == []
-
-    def test_execute_update_returns_false_on_error(self):
-        """Test execute_update returns False on error."""
-        success = False
-        assert success is False
-
-    def test_execute_insert_return_id_returns_none_on_error(self):
-        """Test execute_insert_return_id returns None on error."""
-        new_id = None
-        assert new_id is None
-
-    def test_parameterized_query_format(self):
-        """Test parameterized queries use ? placeholder."""
-        sample_queries = [
-            "SELECT * FROM Facts WHERE FactID = ?",
-            "UPDATE Facts SET TotalViews = TotalViews + 1 WHERE FactID = ?",
-            "INSERT INTO FactLogs (FactID, ReviewDate) VALUES (?, GETDATE())",
-        ]
-
-        for query in sample_queries:
-            assert '?' in query
-            assert '%s' not in query
-
-
-class TestAPIErrorHandling:
-    """Tests for external API error handling."""
-
-    def test_ai_api_timeout_handled(self):
-        """Test AI API timeout is handled gracefully."""
-        usage_info = {"status": "FAILED"}
-        result_text = "Timed out contacting AI. Please try again."
-
-        assert usage_info["status"] == "FAILED"
-        assert "Timed out" in result_text
-
-    def test_ai_api_connection_error_handled(self):
-        """Test AI API connection error is handled."""
-        usage_info = {"status": "FAILED"}
-        result_text = "Network error reaching AI service."
-
-        assert usage_info["status"] == "FAILED"
-        assert "Network error" in result_text
-
-    def test_missing_api_key_blocks_request(self):
-        """Test missing API key blocks AI requests."""
-        api_key = None
-        should_proceed = api_key is not None
-        assert should_proceed is False
-
-    def test_payload_structure(self):
-        """Test AI API payload has required fields."""
-        payload = {
-            "model": "deepseek-ai/DeepSeek-V3.1",
-            "messages": [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "Explain this fact."}
-            ],
-            "max_tokens": 320,
-            "temperature": 0.35
-        }
-
-        assert "model" in payload
-        assert "messages" in payload
-        assert "max_tokens" in payload
-        assert isinstance(payload["messages"], list)
-
-    def test_payload_message_roles(self):
-        """Test message roles are valid."""
-        valid_roles = ["system", "user", "assistant"]
-        messages = [
-            {"role": "system", "content": "System prompt"},
-            {"role": "user", "content": "User message"},
-        ]
-
-        for msg in messages:
-            assert msg["role"] in valid_roles
-
-
-class TestXPCalculation:
-    """Tests for XP award calculations."""
-
-    def test_xp_award_respects_grace_period(self):
-        """Test XP not awarded below grace period."""
-        elapsed_seconds = 1
-        grace_seconds = 3
-        should_award = elapsed_seconds >= grace_seconds
-        assert should_award is False
-
-    def test_xp_award_at_grace_period(self):
-        """Test XP awarded at exactly grace period."""
-        elapsed_seconds = 3
-        grace_seconds = 3
-        should_award = elapsed_seconds >= grace_seconds
-        assert should_award is True
-
-    def test_xp_time_bonus_calculation(self):
-        """Test XP time bonus calculation."""
-        elapsed_seconds = 10
-        grace_seconds = 3
-        max_bonus = 5
-
-        bonus = min(elapsed_seconds - grace_seconds, max_bonus)
-
-        assert bonus == 5
-
-    def test_xp_bonus_capped_at_max(self):
-        """Test XP bonus doesn't exceed maximum."""
-        elapsed_seconds = 100
-        grace_seconds = 3
-        max_bonus = 5
-
-        bonus = min(elapsed_seconds - grace_seconds, max_bonus)
-
-        assert bonus == 5
-
-    def test_xp_below_grace_period(self):
-        """Test no XP awarded below grace period."""
-        elapsed = 1
-        grace = 2
-
-        if elapsed < grace:
-            xp = 0
-        else:
-            base_xp = 1
-            step = 5
-            cap = 5
-            extra = (max(0, elapsed - grace)) // step
-            xp = base_xp + min(cap, int(extra))
-
-        assert xp == 0
-
-    def test_xp_with_time_bonus(self):
-        """Test XP with time bonus."""
-        elapsed = 12
-        grace = 2
-        base_xp = 1
-        step = 5
-        cap = 5
-
-        extra = (max(0, elapsed - grace)) // step
-        xp = base_xp + min(cap, int(extra))
-
-        assert xp == 3
-
-    def test_xp_capped_bonus(self):
-        """Test XP bonus is capped."""
-        elapsed = 60
-        grace = 2
-        base_xp = 1
-        step = 5
-        cap = 5
-
-        extra = (max(0, elapsed - grace)) // step
-        xp = base_xp + min(cap, int(extra))
-
-        assert xp == 6
-
-
-class TestAICostEstimation:
-    """Tests for AI cost estimation logic."""
-
-    def test_estimate_cost_zero_tokens(self):
-        """Test cost estimation with zero tokens."""
-        prompt_tokens = 0
-        completion_tokens = 0
-        prompt_cost_per_1k = 0.0006
-        completion_cost_per_1k = 0.0017
-
-        cost = (prompt_tokens / 1000 * prompt_cost_per_1k) + \
-               (completion_tokens / 1000 * completion_cost_per_1k)
-
-        assert cost == 0.0
-
-    def test_estimate_cost_typical_usage(self):
-        """Test cost estimation with typical token counts."""
-        prompt_tokens = 150
-        completion_tokens = 200
-        prompt_cost_per_1k = 0.0006
-        completion_cost_per_1k = 0.0017
-
-        cost = (prompt_tokens / 1000 * prompt_cost_per_1k) + \
-               (completion_tokens / 1000 * completion_cost_per_1k)
-
-        assert abs(cost - 0.00043) < 0.00001
-
-    def test_estimate_cost_large_usage(self):
-        """Test cost estimation with large token counts."""
-        prompt_tokens = 1000
-        completion_tokens = 500
-        prompt_cost_per_1k = 0.0006
-        completion_cost_per_1k = 0.0017
-
-        cost = (prompt_tokens / 1000 * prompt_cost_per_1k) + \
-               (completion_tokens / 1000 * completion_cost_per_1k)
-
-        assert abs(cost - 0.00145) < 0.00001
-
-
-class TestFontSizeAdjustment:
-    """Tests for dynamic font size adjustment."""
-
-    def test_adjust_font_size_short_text(self):
-        """Test font size for short text."""
-        text = "Short text"
-        size = max(8, min(12, int(12 - (len(text) / 150))))
-        assert size == 11
-
-    def test_adjust_font_size_medium_text(self):
-        """Test font size for medium text."""
-        text = "A" * 300
-        size = max(8, min(12, int(12 - (len(text) / 150))))
-        assert size == 10
-
-    def test_adjust_font_size_long_text(self):
-        """Test font size for long text."""
-        text = "A" * 900
-        size = max(8, min(12, int(12 - (len(text) / 150))))
-        assert size == 8
-
-    def test_adjust_font_size_empty_text(self):
-        """Test font size for empty text."""
-        text = ""
-        size = max(8, min(12, int(12 - (len(text) / 150))))
-        assert size == 12
-
-
-class TestContentDuplication:
-    """Tests for content duplication detection logic."""
-
-    def test_content_key_normalization(self):
-        """Test content key normalization logic."""
-        content1 = "  Hello World  "
-        content2 = "Hello World"
-        content3 = "hello world"
-
-        def normalize(s):
-            return s.lower().strip().replace('\r', ' ').replace('\n', ' ').replace('\t', ' ')
-
-        assert normalize(content1) == normalize(content2)
-        assert normalize(content2) == normalize(content3)
-
-    def test_content_key_different_content(self):
-        """Test different content produces different keys."""
-        content1 = "Fact about science"
-        content2 = "Fact about history"
-
-        def normalize(s):
-            return s.lower().strip()
-
-        assert normalize(content1) != normalize(content2)
-
-
-class TestToolTip:
-    """Tests for ToolTip class."""
-
-    def test_tooltip_class_exists(self):
-        """Test ToolTip class is defined."""
-        with patch.dict('sys.modules', {'tkinter': MagicMock(), 'tkinter.ttk': MagicMock()}):
-            pass
+    app.end_active_session.assert_called_once()
+    assert app.is_home_page is True
+    assert app.answer_revealed is False
+    assert app.current_question_id is None
