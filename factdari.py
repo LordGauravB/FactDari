@@ -3631,6 +3631,10 @@ class FactDariApp:
     def on_category_dropdown_open(self, event=None):
         """Pause timing while the category dropdown is open."""
         try:
+            if self._block_popup_when_questioning("Reveal the answer before changing category"):
+                return
+            if str(self.category_dropdown.cget("state")) == "disabled":
+                return
             if getattr(self, "category_dropdown_open", False):
                 return
             self.pause_review_timer()
@@ -3673,6 +3677,7 @@ class FactDariApp:
                 return
             # Haven't seen it open yet; keep polling briefly
             self.root.after(120, self._poll_category_dropdown_close)
+            return
         except Exception:
             # If detection fails, keep polling a bit instead of resuming immediately
             try:
@@ -3680,11 +3685,6 @@ class FactDariApp:
                     self.root.after(150, self._poll_category_dropdown_close)
             except Exception:
                 pass
-        # Still open; poll again shortly
-        try:
-            self.root.after(150, self._poll_category_dropdown_close)
-        except Exception:
-            pass
 
     def on_category_change(self, event=None):
         """Handle category dropdown change"""

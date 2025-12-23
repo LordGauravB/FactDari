@@ -738,23 +738,29 @@ def chart_data():
             ORDER BY CompletionRate DESC
         """, (profile_id, profile_id, profile_id)),
 
-        # Learning Velocity - Time from fact creation to first marked as known
+        # Learning Velocity - Time from first view to first marked as known
         'learningVelocity': fetch_query("""
             SELECT
                 c.CategoryName,
-                AVG(DATEDIFF(day, f.DateAdded, pf.KnownSince)) AS AvgDaysToKnow,
-                MIN(DATEDIFF(day, f.DateAdded, pf.KnownSince)) AS MinDaysToKnow,
-                MAX(DATEDIFF(day, f.DateAdded, pf.KnownSince)) AS MaxDaysToKnow,
+                AVG(CAST(DATEDIFF(day, first_view.FirstSeen, pf.KnownSince) AS FLOAT)) AS AvgDaysToKnow,
+                MIN(DATEDIFF(day, first_view.FirstSeen, pf.KnownSince)) AS MinDaysToKnow,
+                MAX(DATEDIFF(day, first_view.FirstSeen, pf.KnownSince)) AS MaxDaysToKnow,
                 COUNT(*) AS KnownFactsCount
             FROM ProfileFacts pf
             JOIN Facts f ON pf.FactID = f.FactID
             JOIN Categories c ON f.CategoryID = c.CategoryID
+            JOIN (
+                SELECT FactID, MIN(ReviewDate) AS FirstSeen
+                FROM FactLogs
+                WHERE Action = 'view'
+                GROUP BY FactID
+            ) first_view ON f.FactID = first_view.FactID
             WHERE pf.ProfileID = ? AND pf.IsEasy = 1 AND pf.KnownSince IS NOT NULL
               AND f.CreatedBy = ?
               AND c.CreatedBy = ?
             GROUP BY c.CategoryName
             HAVING COUNT(*) > 0
-            ORDER BY AVG(DATEDIFF(day, f.DateAdded, pf.KnownSince)) ASC
+            ORDER BY AVG(DATEDIFF(day, first_view.FirstSeen, pf.KnownSince)) ASC
         """, (profile_id, profile_id, profile_id)),
 
         # Peak Productivity Times - Session efficiency by hour of day
@@ -983,7 +989,7 @@ def chart_data():
             ORDER BY CONVERT(varchar, QuestionShownAt, 23)
         """, (thirty_days_ago, profile_id)),
 
-        # Most Questioned Facts (facts with most questions)
+        # Most Questioned Facts (facts with most questions shown)
         'mostQuestionedFacts': fetch_query(f"""
             SELECT TOP {TOP_N_DEFAULT}
                 LEFT(f.Content, 100) as FactContent,
@@ -995,7 +1001,7 @@ def chart_data():
             JOIN Categories c ON f.CategoryID = c.CategoryID
             WHERE f.CreatedBy = ?
             GROUP BY f.Content, c.CategoryName
-            ORDER BY COUNT(q.QuestionID) DESC
+            ORDER BY SUM(q.TimesShown) DESC
         """, (profile_id,)),
 
         # Recent Question Activity

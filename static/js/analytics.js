@@ -1650,8 +1650,8 @@
               tr.innerHTML = `
                 <td><span class="fact-text">${escapeHtml(factContent)}</span></td>
                 <td>${escapeHtml(row.CategoryName || '')}</td>
-                <td style="text-align: center;" class="${medalClass}">${row.QuestionCount || 0}</td>
-                <td style="text-align: center;">${row.TotalTimesShown || 0}</td>
+                <td style="text-align: center;">${row.QuestionCount || 0}</td>
+                <td style="text-align: center;" class="${medalClass}">${row.TotalTimesShown || 0}</td>
               `;
               tbody.appendChild(tr);
             });
@@ -3826,8 +3826,8 @@
       tr.innerHTML = `
         <td>${displayText}</td>
         <td>${escapeHtml(row.CategoryName || '')}</td>
-        <td style="text-align: center;" class="${medalClass}">${row.QuestionCount || 0}</td>
-        <td style="text-align: center;">${row.TotalTimesShown || 0}</td>
+        <td style="text-align: center;">${row.QuestionCount || 0}</td>
+        <td style="text-align: center;" class="${medalClass}">${row.TotalTimesShown || 0}</td>
       `;
       tbody.appendChild(tr);
     });
