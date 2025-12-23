@@ -1106,6 +1106,52 @@ body {
   white-space: nowrap;
 }
 
+/* Column widths for AI usage log table */
+#ai-usage-log-table {
+  min-width: 950px;
+  table-layout: auto;
+}
+
+.table-container:has(#ai-usage-log-table) {
+  overflow-x: auto;
+}
+
+#ai-usage-log-table th:nth-child(1),
+#ai-usage-log-table td:nth-child(1) {
+  width: 140px;
+  min-width: 140px;
+  white-space: nowrap;
+}
+
+#ai-usage-log-table th:nth-child(2),
+#ai-usage-log-table td:nth-child(2) {
+  width: auto;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+#ai-usage-log-table th:nth-child(3),
+#ai-usage-log-table td:nth-child(3),
+#ai-usage-log-table th:nth-child(4),
+#ai-usage-log-table td:nth-child(4),
+#ai-usage-log-table th:nth-child(5),
+#ai-usage-log-table td:nth-child(5),
+#ai-usage-log-table th:nth-child(6),
+#ai-usage-log-table td:nth-child(6),
+#ai-usage-log-table th:nth-child(7),
+#ai-usage-log-table td:nth-child(7) {
+  width: 70px;
+  min-width: 70px;
+  white-space: nowrap;
+}
+
+#ai-usage-log-table th:nth-child(8),
+#ai-usage-log-table td:nth-child(8) {
+  width: 200px;
+  min-width: 200px;
+  white-space: nowrap;
+}
+
 .data-table tbody tr {
   transition: var(--transition-fast);
 }
