@@ -550,7 +550,44 @@ def chart_data():
             GROUP BY CONVERT(varchar, rl.ReviewDate, 23)
             ORDER BY CONVERT(varchar, rl.ReviewDate, 23)
         """, (thirty_days_ago, profile_id)),
-        
+
+        # Daily Learning Progress (last 30 days) - facts reviewed not known vs facts marked as known
+        'dailyLearningProgress': fetch_query("""
+            WITH ReviewedNotKnown AS (
+                SELECT
+                    CONVERT(varchar, rl.ReviewDate, 23) AS Date,
+                    COUNT(DISTINCT rl.FactID) AS FactsReviewedNotKnown
+                FROM FactLogs rl
+                JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+                LEFT JOIN ProfileFacts pf ON pf.FactID = rl.FactID AND pf.ProfileID = rs.ProfileID
+                WHERE rl.ReviewDate >= ?
+                  AND (rl.Action IS NULL OR rl.Action = 'view')
+                  AND COALESCE(rl.TimedOut, 0) = 0
+                  AND rs.ProfileID = ?
+                  AND (pf.IsEasy IS NULL OR pf.IsEasy = 0)
+                GROUP BY CONVERT(varchar, rl.ReviewDate, 23)
+            ),
+            MarkedKnown AS (
+                SELECT
+                    CONVERT(varchar, pf.KnownSince, 23) AS Date,
+                    COUNT(*) AS FactsMarkedKnown
+                FROM ProfileFacts pf
+                JOIN Facts f ON f.FactID = pf.FactID
+                WHERE pf.KnownSince >= ?
+                  AND pf.IsEasy = 1
+                  AND pf.ProfileID = ?
+                  AND f.CreatedBy = ?
+                GROUP BY CONVERT(varchar, pf.KnownSince, 23)
+            )
+            SELECT
+                COALESCE(rn.Date, mk.Date) AS Date,
+                COALESCE(rn.FactsReviewedNotKnown, 0) AS FactsReviewedNotKnown,
+                COALESCE(mk.FactsMarkedKnown, 0) AS FactsMarkedKnown
+            FROM ReviewedNotKnown rn
+            FULL OUTER JOIN MarkedKnown mk ON rn.Date = mk.Date
+            ORDER BY Date
+        """, (thirty_days_ago, profile_id, thirty_days_ago, profile_id, profile_id)),
+
         # New analytics for Overview tab
         'knownVsUnknownRatio': fetch_query("""
             SELECT
@@ -1263,6 +1300,7 @@ def chart_data():
         'daily_session_duration': format_duration_line_chart(data['dailySessionDuration'], start_date=thirty_days_ago, end_date=today_str),
         'session_efficiency': format_table_data(data['sessionEfficiency']),
         'timeout_analysis': format_timeout_chart(data['timeoutAnalysis'], start_date=thirty_days_ago, end_date=today_str),
+        'daily_learning_progress': format_daily_learning_progress(data['dailyLearningProgress'], start_date=thirty_days_ago, end_date=today_str),
         # New Overview charts
         'known_vs_unknown': format_known_unknown_chart(data['knownVsUnknownRatio']),
         'weekly_review_pattern': format_weekly_pattern(data['weeklyReviewPattern']),
@@ -1644,6 +1682,47 @@ def format_line_chart(data, start_date=None, end_date=None):
                 'borderColor': '#2196F3',
                 'backgroundColor': 'rgba(33, 150, 243, 0.1)',
                 'fill': True
+            }
+        ]
+    }
+
+def format_daily_learning_progress(data, start_date=None, end_date=None):
+    """Format data for daily learning progress dual line chart"""
+    labels = []
+    facts_reviewed_not_known = []
+    facts_marked_known = []
+
+    filled_rows = _fill_date_rows(data, start_date, end_date)
+    if filled_rows:
+        for day, row in filled_rows:
+            row = row or {}
+            labels.append(day.isoformat())
+            facts_reviewed_not_known.append(row.get('FactsReviewedNotKnown', 0) or 0)
+            facts_marked_known.append(row.get('FactsMarkedKnown', 0) or 0)
+    else:
+        for row in (data or []):
+            labels.append(row.get('Date', ''))
+            facts_reviewed_not_known.append(row.get('FactsReviewedNotKnown', 0) or 0)
+            facts_marked_known.append(row.get('FactsMarkedKnown', 0) or 0)
+
+    return {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'Reviewed (Not Known)',
+                'data': facts_reviewed_not_known,
+                'borderColor': '#f59e0b',
+                'backgroundColor': 'rgba(245, 158, 11, 0.1)',
+                'fill': False,
+                'tension': 0.3
+            },
+            {
+                'label': 'Marked as Known',
+                'data': facts_marked_known,
+                'borderColor': '#10b981',
+                'backgroundColor': 'rgba(16, 185, 129, 0.1)',
+                'fill': False,
+                'tension': 0.3
             }
         ]
     }

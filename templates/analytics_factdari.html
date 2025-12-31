@@ -561,19 +561,25 @@
                         <article class="chart-card span-2">
                             <header class="chart-header">
                                 <h3>Learning Velocity (Lifetime)</h3>
-                                <div class="chart-actions">
-                                    <button class="btn-icon expand-btn" data-chart="learning-velocity" aria-label="Expand chart">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
-                                        </svg>
-                                    </button>
-                                </div>
                             </header>
-                            <div class="chart-container">
-                                <canvas id="learning-velocity"></canvas>
+                            <div class="chart-container table-chart">
+                                <div class="table-container">
+                                    <table id="learning-velocity-table" class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Category</th>
+                                                <th>Avg Days</th>
+                                                <th>Min Days</th>
+                                                <th>Max Days</th>
+                                                <th>Facts Known</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
                             </div>
                             <div class="chart-description">
-                                Average days from fact creation to marked as "known" by category
+                                Days from first view to marked as "known" by category
                             </div>
                         </article>
 
@@ -786,6 +792,26 @@
                             </div>
                             <div class="chart-description">
                                 Daily review activity
+                            </div>
+                        </article>
+
+                        <!-- Daily Learning Progress -->
+                        <article class="chart-card span-2">
+                            <header class="chart-header">
+                                <h3>Daily Learning Progress (last 30 days)</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon expand-btn" data-chart="daily-learning-progress" aria-label="Expand chart">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </header>
+                            <div class="chart-container full-width">
+                                <canvas id="daily-learning-progress"></canvas>
+                            </div>
+                            <div class="chart-description">
+                                Facts reviewed (still learning) vs facts marked as known each day
                             </div>
                         </article>
                     </div>

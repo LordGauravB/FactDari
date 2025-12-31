@@ -351,25 +351,46 @@
     destroyChart(key);
 
     const axisTitles = {
-      reviews_per_day: { x: 'Date', y: 'Reviews' }
+      reviews_per_day: { x: 'Date', y: 'Reviews' },
+      daily_learning_progress: { x: 'Date', y: 'Facts' }
     };
     const titles = axisTitles[key] || {};
-    
+
+    // Charts that should preserve their custom colors
+    const preserveColors = ['daily_learning_progress'];
+
     // Enhanced dataset styling
     if (payload.datasets) {
-      payload.datasets = payload.datasets.map(dataset => ({
-        ...dataset,
-        borderColor: isDarkMode ? '#60a5fa' : '#3b82f6',
-        backgroundColor: isDarkMode ? 'rgba(96, 165, 250, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-        borderWidth: 2,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        pointBackgroundColor: isDarkMode ? '#60a5fa' : '#3b82f6',
-        pointBorderColor: isDarkMode ? '#1e293b' : '#ffffff',
-        pointBorderWidth: 2,
-        tension: 0.3,
-        fill: true
-      }));
+      payload.datasets = payload.datasets.map(dataset => {
+        // Preserve custom colors for specific charts
+        if (preserveColors.includes(key) && dataset.borderColor) {
+          return {
+            ...dataset,
+            borderWidth: 2,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            pointBackgroundColor: dataset.borderColor,
+            pointBorderColor: isDarkMode ? '#1e293b' : '#ffffff',
+            pointBorderWidth: 2,
+            tension: dataset.tension || 0.3,
+            fill: dataset.fill !== undefined ? dataset.fill : false
+          };
+        }
+        // Default styling for other charts
+        return {
+          ...dataset,
+          borderColor: isDarkMode ? '#60a5fa' : '#3b82f6',
+          backgroundColor: isDarkMode ? 'rgba(96, 165, 250, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: isDarkMode ? '#60a5fa' : '#3b82f6',
+          pointBorderColor: isDarkMode ? '#1e293b' : '#ffffff',
+          pointBorderWidth: 2,
+          tension: 0.3,
+          fill: true
+        };
+      });
     }
     
     charts[key] = new Chart(ctx, {
@@ -1085,6 +1106,7 @@
         renderHorizontalBarChart('top_hours', 'top-hours', data.top_review_hours);
 
         lineChart('reviews_per_day', 'reviews-per-day', data.reviews_per_day);
+        lineChart('daily_learning_progress', 'daily-learning-progress', data.daily_learning_progress);
         // removed avg view duration chart
         barChart('facts_timeline', 'facts-timeline', data.facts_added_timeline);
         barChart('category_reviews', 'category-reviews', data.category_reviews, true);
@@ -1136,7 +1158,7 @@
 
         // New analytics charts
         renderCategoryCompletionRate('category_completion_rate', 'category-completion-rate', data.category_completion_rate);
-        renderLearningVelocity('learning_velocity', 'learning-velocity', data.learning_velocity);
+        renderLearningVelocityTable(data.learning_velocity);
         renderPeakProductivity('peak_productivity', 'peak-productivity', data.peak_productivity_times);
         pieChart('action_breakdown', 'action-breakdown', data.action_breakdown);
 
@@ -1249,6 +1271,7 @@
       'known-categories': () => 'Known Facts by Category',
       'categories-viewed-today': () => 'Categories Viewed Today',
       'reviews-per-day': () => 'Reviews Per Day (Last 30 Days)',
+      'daily-learning-progress': () => 'Daily Learning Progress (Last 30 Days)',
       'facts-timeline': () => 'Facts Added Over Time',
       'category-reviews': () => 'Reviews by Category',
       'session-duration-distribution': () => 'Session Duration Distribution',
@@ -1268,7 +1291,6 @@
       'ai-latency-distribution': () => 'AI Response Latency Distribution',
       'ai-usage-trend': () => 'AI Usage Trend (Last 30 Days)',
       'category-completion-rate': () => 'Category Completion Rate',
-      'learning-velocity': () => 'Learning Velocity Trend',
       'peak-productivity': () => 'Peak Productivity Hours',
       'action-breakdown': () => 'Action Breakdown',
       'questions-generated-timeline': () => 'Questions Generated Over Time (Last 30 Days)',
@@ -1292,7 +1314,6 @@
       'category-reviews': 'Total reviews per category',
       'monthly-progress': 'Monthly reviews, unique facts, and active days',
       'category-completion-rate': 'Percentage of facts marked as "known" per category',
-      'learning-velocity': 'Average days from fact creation to marked as "known" by category',
       'action-breakdown': 'Distribution of actions (view, add, edit, delete)',
       'peak-productivity': 'Session efficiency (facts/min) by hour of day',
       'most-reviewed-table': 'Top most frequently reviewed facts',
@@ -1301,6 +1322,7 @@
       'known-facts-table': 'Random known facts',
       'review-heatmap-chart': 'Your review patterns heatmap per day per hour',
       'reviews-per-day': 'Daily review activity',
+      'daily-learning-progress': 'Facts reviewed (still learning) vs facts marked as known each day',
       'session-duration-distribution': 'How long your sessions typically last',
       'category-review-time': 'Which categories take longer to review',
       'daily-session-duration': 'Session duration patterns',
@@ -1749,6 +1771,7 @@
             'known-categories': 'known_categories',
             'categories-viewed-today': 'categories_viewed_today',
             'reviews-per-day': 'reviews_per_day',
+            'daily-learning-progress': 'daily_learning_progress',
             'facts-timeline': 'facts_timeline',
             'category-reviews': 'category_reviews',
             'session-duration-distribution': 'session_duration_distribution',
@@ -1768,7 +1791,6 @@
             'ai-latency-distribution': 'ai_latency_distribution',
             'ai-usage-trend': 'ai_usage_trend',
             'category-completion-rate': 'category_completion_rate',
-            'learning-velocity': 'learning_velocity',
             'peak-productivity': 'peak_productivity',
             'action-breakdown': 'action_breakdown',
             'questions-generated-timeline': 'questions_generated_timeline',
@@ -3058,73 +3080,39 @@
     });
   }
 
-  // Learning Velocity Chart
-  function renderLearningVelocity(key, canvasId, data) {
-    const ctx = qs(`#${canvasId}`)?.getContext('2d');
-    if (!ctx || !data || data.length === 0) return;
-    destroyChart(key);
+  // Learning Velocity Table
+  function renderLearningVelocityTable(data) {
+    const tbody = qs('#learning-velocity-table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
 
-    const labels = data.map(d => d.CategoryName || 'Unknown');
-    const avgDays = data.map(d => parseInt(d.AvgDaysToKnow || 0));
-    const minDays = data.map(d => parseInt(d.MinDaysToKnow || 0));
-    const maxDays = data.map(d => parseInt(d.MaxDaysToKnow || 0));
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">No data available</td></tr>';
+      return;
+    }
 
-    charts[key] = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: 'Avg Days',
-            data: avgDays,
-            backgroundColor: isDarkMode ? '#60a5fa' : '#3b82f6',
-            borderRadius: 6,
-          },
-          {
-            label: 'Min Days',
-            data: minDays,
-            backgroundColor: isDarkMode ? '#34d399' : '#10b981',
-            borderRadius: 6,
-          },
-          {
-            label: 'Max Days',
-            data: maxDays,
-            backgroundColor: isDarkMode ? '#f87171' : '#ef4444',
-            borderRadius: 6,
-          }
-        ]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          x: {
-            beginAtZero: true,
-            grid: { color: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)' },
-            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b' },
-            title: { display: true, text: 'Days', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
-          },
-          y: {
-            grid: { display: false },
-            ticks: { color: isDarkMode ? '#94a3b8' : '#64748b' },
-            title: { display: true, text: 'Category', color: isDarkMode ? '#e2e8f0' : '#0f172a' }
-          }
-        },
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { color: isDarkMode ? '#cbd5e1' : '#475569', padding: 15 }
-          },
-          tooltip: {
-            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-            titleColor: isDarkMode ? '#f1f5f9' : '#0f172a',
-            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
-            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
-            borderWidth: 1,
-          }
-        }
-      }
+    // Sort by AvgDaysToKnow ascending (fastest learners first)
+    const sortedData = [...data].sort((a, b) => {
+      const avgA = parseFloat(a.AvgDaysToKnow) || 0;
+      const avgB = parseFloat(b.AvgDaysToKnow) || 0;
+      return avgA - avgB;
+    });
+
+    sortedData.forEach(row => {
+      const tr = document.createElement('tr');
+      const avgDays = parseFloat(row.AvgDaysToKnow) || 0;
+      const minDays = parseInt(row.MinDaysToKnow) || 0;
+      const maxDays = parseInt(row.MaxDaysToKnow) || 0;
+      const knownCount = parseInt(row.KnownFactsCount) || 0;
+
+      tr.innerHTML = `
+        <td>${escapeHtml(row.CategoryName || 'Unknown')}</td>
+        <td>${avgDays.toFixed(1)}</td>
+        <td>${minDays}</td>
+        <td>${maxDays}</td>
+        <td>${knownCount}</td>
+      `;
+      tbody.appendChild(tr);
     });
   }
 
