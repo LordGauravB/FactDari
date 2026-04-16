@@ -1573,7 +1573,14 @@ def calculate_review_streak(profile_id: int):
 
     ordered_dates = [to_date(row['ReviewDate']) for row in review_dates]
 
-    today = datetime.now().date()
+    # Use SQL's Europe/London date so "today" matches LastCheckinDate / FactLogs.ReviewDate
+    # (both populated from dbo.LondonNow()). Falls back to local date if the query fails.
+    try:
+        today_rows = fetch_query("SELECT CAST(dbo.LondonNow() AS DATE) AS today")
+        today = to_date(today_rows[0]['today']) if today_rows else datetime.now().date()
+    except Exception as e:
+        logger.warning(f"Could not fetch London date, falling back to local: {e}")
+        today = datetime.now().date()
     yesterday = today - timedelta(days=1)
 
     # Determine starting day for streak (today or yesterday)

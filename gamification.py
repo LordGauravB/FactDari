@@ -208,6 +208,27 @@ class Gamification:
         return unlocked
 
     # --- Daily streaks & progress ---
+    def _london_today(self, cur) -> date:
+        """Return the current Europe/London date via SQL's dbo.LondonNow().
+
+        Python's date.today() follows the OS local timezone, which can diverge from
+        the London-timed values stored in GamificationProfile.LastCheckinDate and
+        FactLogs.ReviewDate. Falls back to date.today() if the SQL function is
+        unavailable (e.g., DB not yet migrated).
+        """
+        try:
+            cur.execute("SELECT CAST(dbo.LondonNow() AS DATE)")
+            row = cur.fetchone()
+            if row and row[0]:
+                val = row[0]
+                if isinstance(val, datetime):
+                    return val.date()
+                if isinstance(val, date):
+                    return val
+        except Exception as e:
+            logger.warning(f"Could not fetch London date from SQL, falling back to date.today(): {e}")
+        return date.today()
+
     def daily_checkin(self) -> dict:
         """Update streak based on last check-in date.
         Returns dict with 'profile' and 'unlocked' keys.
@@ -231,7 +252,7 @@ class Gamification:
                 cols = [d[0] for d in cur.description]
                 prof = dict(zip(cols, row)) if row else {'ProfileID': pid}
 
-                today = date.today()
+                today = self._london_today(cur)
                 last = prof.get('LastCheckinDate')
                 # Normalize to date
                 if isinstance(last, datetime):
@@ -314,7 +335,7 @@ class Gamification:
         if not dates:
             return 0, 0, None
 
-        today = date.today()
+        today = self._london_today(cur)
         longest = 1
         run = 1
         for i in range(1, len(dates)):
