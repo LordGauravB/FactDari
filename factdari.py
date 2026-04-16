@@ -1235,11 +1235,16 @@ class FactDariApp:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "Explain facts simply in 2 short paragraphs. Include a relatable analogy."
+                        "content": (
+                            "You explain facts for a curious learner who wants to understand, not just memorize. "
+                            "Write exactly 2 short paragraphs with no preamble, headings, or lists. "
+                            "Paragraph 1: explain the fact in plain everyday language and include the 'why' or 'how' behind it. "
+                            "Paragraph 2: give one concrete, relatable analogy."
+                        )
                     },
                     {
                         "role": "user",
-                        "content": f"Explain simply and wit an analogy in the second short paragraph:\n\n{fact_text}"
+                        "content": f"Fact: {fact_text}"
                     }
                 ],
                 "max_tokens": self.ai_explanation_max_tokens,
@@ -1334,10 +1339,14 @@ class FactDariApp:
                     {
                         "role": "system",
                         "content": (
-                            "Generate exactly 3 short, distinct questions that test knowledge of the following fact. "
-                            "Each question should be answerable by the fact provided. "
-                            "Output ONLY a valid JSON array with exactly 3 strings, no other text. "
-                            "Example format: [\"Question 1?\", \"Question 2?\", \"Question 3?\"]"
+                            "Generate 3 distinct questions that test understanding of the fact. "
+                            "Vary the angles - for example: one recall question (what/who/when), one reasoning question (why/how), "
+                            "and one about implication, consequence, or comparison. "
+                            "Keep each question under 20 words. "
+                            "Each question must be fully answerable using only the fact provided, but do NOT restate or reveal "
+                            "the answer inside the question. "
+                            "Output ONLY a valid JSON array of exactly 3 strings, nothing else. "
+                            "Example: [\"Question 1?\", \"Question 2?\", \"Question 3?\"]"
                         )
                     },
                     {
@@ -1463,7 +1472,7 @@ class FactDariApp:
                     """
                     INSERT INTO Questions (FactID, QuestionText, Status, GeneratedAt)
                     OUTPUT INSERTED.QuestionID
-                    VALUES (?, ?, ?, GETDATE())
+                    VALUES (?, ?, ?, dbo.LondonNow())
                     """,
                     (fact_id, q_text, status)
                 )
@@ -1546,7 +1555,7 @@ class FactDariApp:
             self.execute_update(
                 """
                 UPDATE Questions
-                SET TimesShown = TimesShown + 1, LastShownAt = GETDATE()
+                SET TimesShown = TimesShown + 1, LastShownAt = dbo.LondonNow()
                 WHERE QuestionID = ?
                 """,
                 (question_id,)
@@ -1562,7 +1571,7 @@ class FactDariApp:
                 INSERT INTO QuestionLogs
                     (QuestionID, SessionID, ProfileID, QuestionShownAt, CreatedAt)
                 OUTPUT INSERTED.QuestionLogID
-                VALUES (?, ?, ?, GETDATE(), GETDATE())
+                VALUES (?, ?, ?, dbo.LondonNow(), dbo.LondonNow())
                 """,
                 (question_id, self.current_session_id, self.get_active_profile_id())
             )
@@ -1580,7 +1589,7 @@ class FactDariApp:
             self.execute_update(
                 """
                 UPDATE QuestionLogs
-                SET QuestionViewEndedAt = GETDATE(), QuestionReadingDurationSec = ?
+                SET QuestionViewEndedAt = dbo.LondonNow(), QuestionReadingDurationSec = ?
                 WHERE QuestionLogID = ?
                 """,
                 (elapsed_int, self.current_question_log_id)
@@ -1905,10 +1914,12 @@ class FactDariApp:
 
         if total_tokens is None and (input_tokens is not None or output_tokens is not None):
             total_tokens = (input_tokens or 0) + (output_tokens or 0)
-        # If the API only returned total tokens, preserve them in InputTokens for analytics
+        # If the API returned only total_tokens with no granular split, leave both NULL
+        # rather than attributing everything to InputTokens (would undercharge at input rate).
         if total_tokens is not None and input_tokens is None and output_tokens is None:
-            input_tokens = total_tokens
-            output_tokens = 0
+            print(f"_record_ai_usage: API returned total_tokens={total_tokens} without granular split; storing tokens and cost as NULL")
+            input_tokens = None
+            output_tokens = None
 
         cost = usage_info.get("cost")
         if cost is None and (input_tokens is not None or output_tokens is not None):
@@ -1961,10 +1972,11 @@ class FactDariApp:
         it = input_tokens if input_tokens is None else int(input_tokens)
         ot = output_tokens if output_tokens is None else int(output_tokens)
         total_for_profile = total_tokens
-        # If only total tokens were available, map them to input tokens so analytics still reflect usage
+        # If only total_tokens was returned without a granular split, leave both NULL
+        # rather than attributing everything to InputTokens (would undercharge at input rate).
         if total_for_profile is not None and it is None and ot is None:
-            it = int(total_for_profile)
-            ot = 0
+            print(f"_log_ai_usage: API returned total_tokens={total_for_profile} without granular split; storing tokens and cost as NULL")
+            total_for_profile = None
         if total_for_profile is None:
             total_for_profile = (0 if it is None else it) + (0 if ot is None else ot)
             if total_for_profile == 0:
@@ -1980,9 +1992,9 @@ class FactDariApp:
         try:
             ai_usage_id = self.execute_insert_return_id(
                 """
-                INSERT INTO AIUsageLogs (FactID, SessionID, ProfileID, OperationType, Status, ModelName, Provider, InputTokens, OutputTokens, Cost, CurrencyCode, LatencyMs, ReadingDurationSec)
+                INSERT INTO AIUsageLogs (FactID, SessionID, ProfileID, OperationType, Status, ModelName, Provider, InputTokens, OutputTokens, Cost, CurrencyCode, LatencyMs, ReadingDurationSec, FactContentSnapshot)
                 OUTPUT INSERTED.AIUsageID
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT TOP 1 Content FROM Facts WHERE FactID = ?))
                 """,
                 (
                     fact_id,
@@ -1998,6 +2010,7 @@ class FactDariApp:
                     getattr(self, 'ai_currency', 'USD'),
                     latency_ms,
                     reading_duration_sec,
+                    fact_id,
                 ),
             )
         except Exception as exc:
@@ -2314,10 +2327,10 @@ class FactDariApp:
                 ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
                 WHEN MATCHED THEN
                     UPDATE SET PersonalReviewCount = ISNULL(target.PersonalReviewCount,0) + 1,
-                               LastViewedByUser = GETDATE()
+                               LastViewedByUser = dbo.LondonNow()
                 WHEN NOT MATCHED THEN
                     INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
-                    VALUES (src.ProfileID, src.FactID, 1, 0, 0, GETDATE());
+                    VALUES (src.ProfileID, src.FactID, 1, 0, 0, dbo.LondonNow());
                 """,
                 (pid, fact_id)
             )
@@ -2334,7 +2347,7 @@ class FactDariApp:
                 """
                 INSERT INTO FactLogs (FactID, ReviewDate, SessionID)
                 OUTPUT INSERTED.FactLogID
-                VALUES (?, GETDATE(), ?)
+                VALUES (?, dbo.LondonNow(), ?)
                 """,
                 (fact_id, self.current_session_id)
             )
@@ -2345,7 +2358,7 @@ class FactDariApp:
             self.execute_update(
                 """
                 INSERT INTO FactLogs (FactID, ReviewDate)
-                VALUES (?, GETDATE())
+                VALUES (?, dbo.LondonNow())
                 """,
                 (fact_id,)
             )
@@ -2482,7 +2495,7 @@ class FactDariApp:
             """
             INSERT INTO ReviewSessions (ProfileID, StartTime)
             OUTPUT INSERTED.SessionID
-            VALUES (?, GETDATE())
+            VALUES (?, dbo.LondonNow())
             """,
             (profile_id,)
         )
@@ -2605,10 +2618,10 @@ class FactDariApp:
             USING (SELECT ? AS ProfileID, ? AS FactID) AS src
             ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
             WHEN MATCHED THEN
-                UPDATE SET IsFavorite = ?, LastViewedByUser = COALESCE(target.LastViewedByUser, GETDATE())
+                UPDATE SET IsFavorite = ?, LastViewedByUser = COALESCE(target.LastViewedByUser, dbo.LondonNow())
             WHEN NOT MATCHED THEN
                 INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
-                VALUES (src.ProfileID, src.FactID, 0, ?, 0, GETDATE());
+                VALUES (src.ProfileID, src.FactID, 0, ?, 0, dbo.LondonNow());
             """,
             (profile_id, self.current_fact_id, 1 if new_status else 0, 1 if new_status else 0)
         )
@@ -2676,11 +2689,11 @@ class FactDariApp:
                 USING (SELECT ? AS ProfileID, ? AS FactID) AS src
                 ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
                 WHEN MATCHED THEN
-                    UPDATE SET IsEasy = 1, LastViewedByUser = COALESCE(target.LastViewedByUser, GETDATE()),
-                               KnownSince = COALESCE(target.KnownSince, GETDATE())
+                    UPDATE SET IsEasy = 1, LastViewedByUser = COALESCE(target.LastViewedByUser, dbo.LondonNow()),
+                               KnownSince = COALESCE(target.KnownSince, dbo.LondonNow())
                 WHEN NOT MATCHED THEN
                     INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser, KnownSince)
-                    VALUES (src.ProfileID, src.FactID, 0, 0, 1, GETDATE(), GETDATE());
+                    VALUES (src.ProfileID, src.FactID, 0, 0, 1, dbo.LondonNow(), dbo.LondonNow());
                 """,
                 (profile_id, self.current_fact_id)
             )
@@ -2692,10 +2705,10 @@ class FactDariApp:
                 USING (SELECT ? AS ProfileID, ? AS FactID) AS src
                 ON target.ProfileID = src.ProfileID AND target.FactID = src.FactID
                 WHEN MATCHED THEN
-                    UPDATE SET IsEasy = 0, LastViewedByUser = COALESCE(target.LastViewedByUser, GETDATE())
+                    UPDATE SET IsEasy = 0, LastViewedByUser = COALESCE(target.LastViewedByUser, dbo.LondonNow())
                 WHEN NOT MATCHED THEN
                     INSERT (ProfileID, FactID, PersonalReviewCount, IsFavorite, IsEasy, LastViewedByUser)
-                    VALUES (src.ProfileID, src.FactID, 0, 0, 0, GETDATE());
+                    VALUES (src.ProfileID, src.FactID, 0, 0, 0, dbo.LondonNow());
                 """,
                 (profile_id, self.current_fact_id)
             )
@@ -2860,7 +2873,7 @@ class FactDariApp:
                 """
                 INSERT INTO Facts (CategoryID, Content, DateAdded, TotalViews, CreatedBy)
                 OUTPUT INSERTED.FactID
-                VALUES (?, ?, GETDATE(), 0, ?)
+                VALUES (?, ?, dbo.LondonNow(), 0, ?)
                 """,
                 (category_id, content, profile_id)
             )
@@ -2897,7 +2910,7 @@ class FactDariApp:
                         self.execute_update(
                             """
                             INSERT INTO FactLogs (FactID, ReviewDate, SessionID, FactReadingTime, Action, FactContentSnapshot, CategoryIDSnapshot)
-                            VALUES (?, GETDATE(), ?, 0, 'add', ?, ?)
+                            VALUES (?, dbo.LondonNow(), ?, 0, 'add', ?, ?)
                             """,
                             (new_fact_id, self.current_session_id, content, category_id)
                         )
@@ -3114,7 +3127,7 @@ class FactDariApp:
                         self.execute_update(
                             """
                             INSERT INTO FactLogs (FactID, ReviewDate, SessionID, FactReadingTime, Action, FactEdited, FactContentSnapshot, CategoryIDSnapshot)
-                            VALUES (?, GETDATE(), ?, 0, 'edit', 1, ?, ?)
+                            VALUES (?, dbo.LondonNow(), ?, 0, 'edit', 1, ?, ?)
                             """,
                             (self.current_fact_id, self.current_session_id, content, category_id)
                         )
@@ -3202,7 +3215,7 @@ class FactDariApp:
                         self.execute_update(
                             """
                             INSERT INTO FactLogs (FactID, ReviewDate, SessionID, FactReadingTime, Action, FactDeleted, FactContentSnapshot, CategoryIDSnapshot)
-                            VALUES (?, GETDATE(), ?, 0, 'delete', 1, ?, ?)
+                            VALUES (?, dbo.LondonNow(), ?, 0, 'delete', 1, ?, ?)
                             """,
                             (self.current_fact_id, self.current_session_id, content_snapshot, category_snapshot)
                         )
@@ -3550,7 +3563,7 @@ class FactDariApp:
                 IF @SessionID IS NOT NULL
                 BEGIN
                     INSERT INTO FactLogs (FactID, ReviewDate, SessionID, FactReadingTime, Action, FactDeleted, FactContentSnapshot, CategoryIDSnapshot)
-                    SELECT FactID, GETDATE(), @SessionID, 0, 'delete', 1, Content, CategoryID
+                    SELECT FactID, dbo.LondonNow(), @SessionID, 0, 'delete', 1, Content, CategoryID
                     FROM Facts
                     WHERE CategoryID = ? AND CreatedBy = ?;
 

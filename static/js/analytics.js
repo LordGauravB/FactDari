@@ -3314,7 +3314,7 @@
       icon: '👁️',
       title: 'Viewed Today',
       description: 'The total number of distinct facts you have reviewed today. Each fact is only counted once, even if you\'ve viewed it multiple times today.',
-      formula: 'SELECT COUNT(DISTINCT rl.FactID) FROM FactLogs rl JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE()) AND (rl.Action IS NULL OR rl.Action = \'view\') AND COALESCE(rl.TimedOut, 0) = 0 AND rs.ProfileID = ?'
+      formula: 'SELECT COUNT(DISTINCT rl.FactID) FROM FactLogs rl JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, dbo.LondonNow()) AND (rl.Action IS NULL OR rl.Action = \'view\') AND COALESCE(rl.TimedOut, 0) = 0 AND rs.ProfileID = ?'
     },
     'review-streak': {
       icon: '🔥',
@@ -3476,7 +3476,7 @@
       icon: '📅',
       title: 'Generated Today',
       description: 'The number of questions generated today.',
-      formula: 'SELECT COUNT(*) FROM Questions q JOIN Facts f ON q.FactID = f.FactID WHERE CONVERT(date, q.GeneratedAt) = CONVERT(date, GETDATE()) AND f.CreatedBy = ?'
+      formula: 'SELECT COUNT(*) FROM Questions q JOIN Facts f ON q.FactID = f.FactID WHERE CONVERT(date, q.GeneratedAt) = CONVERT(date, dbo.LondonNow()) AND f.CreatedBy = ?'
     }
   };
 

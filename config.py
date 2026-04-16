@@ -149,9 +149,9 @@ AI_PRICING = {
 AI_REQUEST_CONFIG = {
     'endpoint': os.environ.get('FACTDARI_AI_ENDPOINT', 'https://api.together.xyz/v1/chat/completions'),
     'timeout_seconds': int(os.environ.get('FACTDARI_AI_TIMEOUT_SECONDS', '30')),
-    'explanation_max_tokens': int(os.environ.get('FACTDARI_AI_EXPLANATION_MAX_TOKENS', '500')),
+    'explanation_max_tokens': int(os.environ.get('FACTDARI_AI_EXPLANATION_MAX_TOKENS', '800')),
     'explanation_temperature': _get_float_env('FACTDARI_AI_EXPLANATION_TEMPERATURE', '0.35'),
-    'question_max_tokens': int(os.environ.get('FACTDARI_AI_QUESTION_MAX_TOKENS', '300')),
+    'question_max_tokens': int(os.environ.get('FACTDARI_AI_QUESTION_MAX_TOKENS', '400')),
     'question_temperature': _get_float_env('FACTDARI_AI_QUESTION_TEMPERATURE', '0.7'),
     'question_cooldown_seconds': int(os.environ.get('FACTDARI_AI_QUESTION_COOLDOWN_SECONDS', '60')),
 }

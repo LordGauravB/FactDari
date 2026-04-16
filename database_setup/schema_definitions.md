@@ -66,7 +66,7 @@ This is a comprehensive reference guide defining every table and column in your 
 | **`IsFavorite`** | `BIT` | **UI State.** `1` = Gold Star icon, `0` = White Star icon. Filter used when "Favorites" is selected in dropdown. |
 | **`IsEasy`** | `BIT` | **UI State.** `1` = Gold checkmark (Known), `0` = Gray checkmark. Filter used when "Known" is selected in dropdown. |
 | **`LastViewedByUser`** | `DATETIME` | **Sorting.** Used by analytics to determine "Least Reviewed" or "Neglected" cards. |
-| **`KnownSince`** | `DATETIME` | **Learning Velocity.** Timestamp of when the fact was first marked as "Known". Set only once via `COALESCE(KnownSince, GETDATE())` when toggling to known. Used in analytics to calculate "days to know" for the Learning Velocity chart. |
+| **`KnownSince`** | `DATETIME` | **Learning Velocity.** Timestamp of when the fact was first marked as "Known". Set only once via `COALESCE(KnownSince, dbo.LondonNow())` when toggling to known. Used in analytics to calculate "days to know" for the Learning Velocity chart. |
 
 ---
 
@@ -128,6 +128,7 @@ This is a comprehensive reference guide defining every table and column in your 
 | **`ReadingDurationSec`** | `INT` | **Engagement.** How long the user kept the AI explanation popup open. |
 | **`LatencyMs`** | `INT` | **Performance.** Time taken for the API to respond. |
 | **`CreatedAt`** | `DATETIME` | **Timestamp.** When the AI call was logged. Used for daily cost/timeline charts. |
+| **`FactContentSnapshot`** | `NVARCHAR(MAX)` | **History.** Copy of `Facts.Content` captured at insert time. Lets the Recent AI Usage audit table still render the fact text after the Fact is deleted (the FK is `ON DELETE SET NULL`). |
 
 ---
 

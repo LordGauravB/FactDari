@@ -1,0 +1,60 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+6 0 obj
+<< /Length 2403 >>
+stream
+BT /F2 18 Tf 54 754 Td (FactDari - One-Page App Summary) Tj ET
+BT /F2 12 Tf 54 724 Td (What it is) Tj ET
+BT /F1 10 Tf 54 708 Td (FactDari is a Windows desktop fact-review widget with a companion web analytics dashboard.) Tj ET
+BT /F1 10 Tf 54 694 Td (It helps users capture facts, review them, and track learning activity over time.) Tj ET
+BT /F2 12 Tf 54 668 Td (Who it's for) Tj ET
+BT /F1 10 Tf 54 652 Td (Primary persona: individual learners or students who want lightweight daily active recall practice.) Tj ET
+BT /F2 12 Tf 54 626 Td (What it does) Tj ET
+BT /F1 10 Tf 60 610 Td (- Create, edit, delete, and browse facts from an always-accessible desktop widget.) Tj ET
+BT /F1 10 Tf 60 596 Td (- Organize facts by category and filter review sessions by category.) Tj ET
+BT /F1 10 Tf 60 582 Td (- Mark facts as Favorite or Known and track per-user review counts.) Tj ET
+BT /F1 10 Tf 60 568 Td (- Use text-to-speech playback for hands-free review.) Tj ET
+BT /F1 10 Tf 60 554 Td (- Generate AI explanations and AI questions with usage and cost logging.) Tj ET
+BT /F1 10 Tf 60 540 Td (- View analytics charts plus XP, streaks, levels, and achievements.) Tj ET
+BT /F2 12 Tf 54 514 Td (How it works \(repo evidence\)) Tj ET
+BT /F1 10 Tf 60 498 Td (- Desktop app \(`factdari.py`, tkinter\) handles UI events, review flow, and local controls.) Tj ET
+BT /F1 10 Tf 60 484 Td (- The app reads and writes SQL Server via `pyodbc` using settings in `config.py`.) Tj ET
+BT /F1 10 Tf 60 470 Td (- `gamification.py` updates XP, levels, streaks, and achievement unlock state in DB tables.) Tj ET
+BT /F1 10 Tf 60 456 Td (- `analytics_factdari.py` \(Flask\) queries DB and serves `/api/chart-data` to the dashboard.) Tj ET
+BT /F1 10 Tf 60 442 Td (- Data flow: user action -> widget -> SQL tables -> Flask API -> `analytics.js` + Chart.js.) Tj ET
+BT /F2 12 Tf 54 416 Td (How to run \(minimal\)) Tj ET
+BT /F1 10 Tf 60 400 Td (1. Install deps: `pip install -r util/requirements_factdari.txt`.) Tj ET
+BT /F1 10 Tf 60 386 Td (2. Run `database_setup/factdari_setup.sql` on SQL Server to create schema and objects.) Tj ET
+BT /F1 10 Tf 60 372 Td (3. Configure DB settings in `config.py` \(and optional Together API key env var\).) Tj ET
+BT /F1 10 Tf 60 358 Td (4. Start widget: `python factdari.py`.) Tj ET
+BT /F1 10 Tf 60 344 Td (5. Optional analytics: `python analytics_factdari.py`, then open `http://localhost:5000`.) Tj ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000321 00000 n 
+0000000396 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+2850
+%%EOF

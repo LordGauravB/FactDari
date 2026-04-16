@@ -45,7 +45,6 @@ The analytics dashboard provides comprehensive visualizations of your learning p
 | Knowledge Progress | Doughnut showing known vs unknown ratio |
 | Weekly Review Pattern | Radar chart of reviews by day of week (lifetime) |
 | Peak Review Hours | Horizontal bar of top 5 active hours (lifetime) |
-| Category Growth Trend | Bar chart of lifetime facts per category |
 | **Progress Tab** | |
 | Facts Added Timeline | Bar + cumulative line of last 10 dates |
 | Category Reviews | Horizontal bar of total reviews per category (lifetime) |
@@ -87,7 +86,7 @@ The analytics dashboard provides comprehensive visualizations of your learning p
 | Most Explained Facts | Table of top 10 facts by AI call count |
 | Recent AI Usage Log | Table of last 50 AI API calls with model details |
 | **Questions Tab** | |
-| Question Metrics | Cards for total questions, shown today, success rate, avg reading time |
+| Question Metrics | Cards for total questions, shown today, successful/failed question counts, avg reading time |
 | Questions Generated Timeline | Bar chart of daily question generation - successful vs failed (last 30 days) |
 | Questions by Category | Pie chart of question distribution across categories |
 | Facts Question Coverage | Pie chart showing facts with questions vs without |
@@ -254,7 +253,7 @@ Below are sample screenshots of the desktop widget and the analytics dashboard. 
   
   ![Analytics Insights](Resources/application_images/Analytics_Page_Insights.png)
   
-  Deeper patterns: weekly review radar, top review hours, known vs. unknown ratio, and category growth to spot trends.
+  Deeper patterns: weekly review radar, top review hours, known vs. unknown ratio to spot trends.
 
 - Session
   
@@ -439,12 +438,14 @@ pytest -m "not slow and not integration"
 
 ```
 tests/
-├── __init__.py           # Test package init
-├── conftest.py           # Shared fixtures and configuration
-├── test_config.py        # Tests for config.py
-├── test_gamification.py  # Tests for gamification.py
-├── test_analytics.py     # Tests for analytics_factdari.py
-└── test_factdari.py      # Tests for factdari.py helpers
+├── __init__.py              # Test package init
+├── conftest.py              # Shared fixtures and configuration
+├── test_config.py           # Tests for config.py
+├── test_gamification.py     # Tests for gamification.py
+├── test_analytics.py        # Tests for analytics_factdari.py
+├── test_factdari.py         # Tests for factdari.py helpers
+├── test_integration_db.py   # DB-backed tests (marked @pytest.mark.integration)
+└── test_ui_smoke.py         # tkinter smoke tests (marked @pytest.mark.ui)
 ```
 
 ### Test Categories

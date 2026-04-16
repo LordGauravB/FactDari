@@ -1,4 +1,5 @@
 from flask import Flask, render_template, jsonify, request
+from flask.json.provider import DefaultJSONProvider
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -10,7 +11,23 @@ import config  # Import the config module
 # Set up logging
 logger = config.setup_logging('factdari.analytics')
 
+
+class NaiveDatetimeJSONProvider(DefaultJSONProvider):
+    """Emit datetimes as naive ISO strings (no timezone suffix).
+
+    DB values are already Europe/London wall clock via dbo.LondonNow(). Flask's default
+    http_date() formatter would tag them as GMT, causing the browser to apply a second
+    offset and display BST times an hour off.
+    """
+
+    def default(self, o):
+        if isinstance(o, (datetime, date)):
+            return o.isoformat()
+        return super().default(o)
+
+
 app = Flask(__name__)
+app.json = NaiveDatetimeJSONProvider(app)
 
 # Secret key for CSRF protection (use environment variable in production)
 app.config['SECRET_KEY'] = config.ANALYTICS_SECRET_KEY
@@ -186,7 +203,7 @@ def chart_data():
                 c.CategoryName,
                 CASE 
                     WHEN pf.LastViewedByUser IS NULL THEN NULL
-                    ELSE DATEDIFF(day, pf.LastViewedByUser, GETDATE())
+                    ELSE DATEDIFF(day, pf.LastViewedByUser, dbo.LondonNow())
                 END as DaysSinceReview,
                 COALESCE(pf.IsFavorite, 0) AS IsFavorite,
                 COALESCE(pf.IsEasy, 0) AS IsEasy
@@ -266,7 +283,7 @@ def chart_data():
                 COALESCE(pf.IsEasy, 0) AS IsEasy,
                 CASE 
                     WHEN pf.LastViewedByUser IS NULL THEN NULL
-                    ELSE DATEDIFF(day, pf.LastViewedByUser, GETDATE())
+                    ELSE DATEDIFF(day, pf.LastViewedByUser, dbo.LondonNow())
                 END as DaysSinceReview
             FROM Facts f
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
@@ -284,7 +301,7 @@ def chart_data():
                 COALESCE(pf.IsEasy, 0) AS IsEasy,
                 CASE 
                     WHEN pf.LastViewedByUser IS NULL THEN NULL
-                    ELSE DATEDIFF(day, pf.LastViewedByUser, GETDATE())
+                    ELSE DATEDIFF(day, pf.LastViewedByUser, dbo.LondonNow())
                 END as DaysSinceReview
             FROM Facts f
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
@@ -305,7 +322,7 @@ def chart_data():
                 COALESCE(pf.IsEasy, 0) AS IsEasy,
                 CASE 
                     WHEN pf.LastViewedByUser IS NULL THEN NULL
-                    ELSE DATEDIFF(day, pf.LastViewedByUser, GETDATE())
+                    ELSE DATEDIFF(day, pf.LastViewedByUser, dbo.LondonNow())
                 END as DaysSinceReview
             FROM Facts f
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
@@ -323,7 +340,7 @@ def chart_data():
                 COALESCE(pf.IsEasy, 0) AS IsEasy,
                 CASE 
                     WHEN pf.LastViewedByUser IS NULL THEN NULL
-                    ELSE DATEDIFF(day, pf.LastViewedByUser, GETDATE())
+                    ELSE DATEDIFF(day, pf.LastViewedByUser, dbo.LondonNow())
                 END as DaysSinceReview
             FROM Facts f
             LEFT JOIN ProfileFacts pf ON pf.FactID = f.FactID AND pf.ProfileID = ?
@@ -341,7 +358,7 @@ def chart_data():
             INNER JOIN Facts f ON c.CategoryID = f.CategoryID
             INNER JOIN FactLogs rl ON f.FactID = rl.FactID
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
-            WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE())
+            WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, dbo.LondonNow())
               AND (rl.Action IS NULL OR rl.Action = 'view')
               AND COALESCE(rl.TimedOut, 0) = 0
               AND rs.ProfileID = ?
@@ -387,7 +404,7 @@ def chart_data():
             SELECT COUNT(DISTINCT rl.FactID) as ViewedTodayCount
             FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
-            WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, GETDATE())
+            WHERE CONVERT(date, rl.ReviewDate) = CONVERT(date, dbo.LondonNow())
               AND (rl.Action IS NULL OR rl.Action = 'view')
               AND COALESCE(rl.TimedOut, 0) = 0
               AND rs.ProfileID = ?
@@ -643,7 +660,7 @@ def chart_data():
                 COUNT(DISTINCT CONVERT(date, ReviewDate)) as ActiveDays
             FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
-            WHERE rl.ReviewDate >= DATEADD(month, -{MONTHLY_PROGRESS_MONTHS}, GETDATE())
+            WHERE rl.ReviewDate >= DATEADD(month, -{MONTHLY_PROGRESS_MONTHS}, dbo.LondonNow())
               AND (rl.Action IS NULL OR rl.Action = 'view') AND rs.ProfileID = ?
               AND COALESCE(rl.TimedOut, 0) = 0
             GROUP BY YEAR(ReviewDate), MONTH(ReviewDate)
@@ -727,13 +744,13 @@ def chart_data():
 
         'aiMostExplainedFacts': fetch_query(f"""
             SELECT TOP {TOP_N_DEFAULT}
-                COALESCE(f.Content, 'Deleted Fact') as Content,
-                COALESCE(c.CategoryName, 'Unknown') as CategoryName,
+                f.Content as Content,
+                c.CategoryName as CategoryName,
                 COUNT(*) as CallCount,
                 COALESCE(SUM(ai.Cost), 0) as TotalCost
             FROM AIUsageLogs ai
-            LEFT JOIN Facts f ON ai.FactID = f.FactID
-            LEFT JOIN Categories c ON f.CategoryID = c.CategoryID
+            INNER JOIN Facts f ON ai.FactID = f.FactID
+            INNER JOIN Categories c ON f.CategoryID = c.CategoryID
             WHERE ai.ProfileID = ? AND ai.OperationType = 'EXPLANATION'
             GROUP BY f.Content, c.CategoryName
             ORDER BY COUNT(*) DESC
@@ -742,7 +759,7 @@ def chart_data():
         'aiRecentUsage': fetch_query(f"""
             SELECT TOP {TOP_N_REVIEWS}
                 ai.CreatedAt,
-                COALESCE(LEFT(f.Content, 100), 'Deleted Fact') as FactContent,
+                COALESCE(LEFT(f.Content, 100), LEFT(ai.FactContentSnapshot, 100), 'Deleted Fact') as FactContent,
                 ai.OperationType,
                 ai.TotalTokens,
                 ai.Cost,
@@ -787,10 +804,11 @@ def chart_data():
             JOIN Facts f ON pf.FactID = f.FactID
             JOIN Categories c ON f.CategoryID = c.CategoryID
             JOIN (
-                SELECT FactID, MIN(ReviewDate) AS FirstSeen
-                FROM FactLogs
-                WHERE Action = 'view'
-                GROUP BY FactID
+                SELECT rl.FactID, MIN(rl.ReviewDate) AS FirstSeen
+                FROM FactLogs rl
+                JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+                WHERE rl.Action = 'view' AND rs.ProfileID = ?
+                GROUP BY rl.FactID
             ) first_view ON f.FactID = first_view.FactID
             WHERE pf.ProfileID = ? AND pf.IsEasy = 1 AND pf.KnownSince IS NOT NULL
               AND f.CreatedBy = ?
@@ -798,7 +816,7 @@ def chart_data():
             GROUP BY c.CategoryName
             HAVING COUNT(*) > 0
             ORDER BY AVG(DATEDIFF(day, first_view.FirstSeen, pf.KnownSince)) ASC
-        """, (profile_id, profile_id, profile_id)),
+        """, (profile_id, profile_id, profile_id, profile_id)),
 
         # Peak Productivity Times - Session efficiency by hour of day
         'peakProductivityTimes': fetch_query("""
@@ -911,7 +929,7 @@ def chart_data():
             SELECT COUNT(*) as Count
             FROM Questions q
             JOIN Facts f ON q.FactID = f.FactID
-            WHERE CONVERT(date, q.GeneratedAt) = CONVERT(date, GETDATE())
+            WHERE CONVERT(date, q.GeneratedAt) = CONVERT(date, dbo.LondonNow())
               AND f.CreatedBy = ?
         """, (profile_id,)),
 
@@ -919,7 +937,7 @@ def chart_data():
         'questionsShownToday': fetch_query("""
             SELECT COUNT(*) as Count
             FROM QuestionLogs
-            WHERE CONVERT(date, QuestionShownAt) = CONVERT(date, GETDATE())
+            WHERE CONVERT(date, QuestionShownAt) = CONVERT(date, dbo.LondonNow())
               AND ProfileID = ?
         """, (profile_id,)),
 
@@ -1384,7 +1402,7 @@ def chart_data():
                 c.CategoryName,
                 CASE 
                     WHEN pf.LastViewedByUser IS NULL THEN NULL
-                    ELSE DATEDIFF(day, pf.LastViewedByUser, GETDATE())
+                    ELSE DATEDIFF(day, pf.LastViewedByUser, dbo.LondonNow())
                 END as DaysSinceReview,
                 COALESCE(pf.IsFavorite, 0) AS IsFavorite,
                 COALESCE(pf.IsEasy, 0) AS IsEasy
