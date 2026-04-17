@@ -59,6 +59,25 @@
   function qs(sel) { return document.querySelector(sel); }
   function qsa(sel) { return Array.from(document.querySelectorAll(sel)); }
 
+  // UK-style datetime formatters. Server sends naive ISO strings (Europe/London wall
+  // clock via dbo.LondonNow()); we render as DD-MM-YYYY HH:MM:SS (24h) throughout.
+  function formatDateTime(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ` +
+           `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function formatDate(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+  }
+
   // HTML escape function to prevent XSS attacks
   function escapeHtml(text) {
     if (text == null) return '';
@@ -681,7 +700,7 @@
     (rows || []).forEach(row => {
       if (!row) return;  // Null check for row
       const tr = document.createElement('tr');
-      const start = (row && row.StartTime) ? new Date(row.StartTime).toLocaleString() : '';
+      const start = (row && row.StartTime) ? formatDateTime(row.StartTime) : '';
       const duration = (row && row.DurationSeconds) ?? '';
       const views = (row && row.Views) ?? 0;
       const distinct = (row && row.DistinctFacts) ?? 0;
@@ -702,7 +721,7 @@
     (rows || []).forEach(row => {
       if (!row) return;  // Null check for row
       const tr = document.createElement('tr');
-      const when = (row && row.UnlockDate) ? new Date(row.UnlockDate).toLocaleString() : '';
+      const when = (row && row.UnlockDate) ? formatDateTime(row.UnlockDate) : '';
       tr.innerHTML = `
         <td>${escapeHtml(when)}</td>
         <td>${escapeHtml((row && row.Name) || '')}</td>
@@ -719,7 +738,7 @@
     (rows || []).forEach(r => {
       if (!r) return;  // Null check for row
       const tr = document.createElement('tr');
-      const start = (r && r.StartTime) ? new Date(r.StartTime).toLocaleString() : '';
+      const start = (r && r.StartTime) ? formatDateTime(r.StartTime) : '';
       tr.innerHTML = `
         <td>${escapeHtml(start)}</td>
         <td style="text-align:center;">${escapeHtml(String((r && r.FactsAdded) ?? 0))}</td>
@@ -737,8 +756,8 @@
     (rows || []).forEach(row => {
       if (!row) return;  // Null check for row
       const tr = document.createElement('tr');
-      const sessionStart = (row && row.StartTime) ? new Date(row.StartTime).toLocaleString() : '';
-      const reviewTime = (row && row.ReviewDate) ? new Date(row.ReviewDate).toLocaleString() : '';
+      const sessionStart = (row && row.StartTime) ? formatDateTime(row.StartTime) : '';
+      const reviewTime = (row && row.ReviewDate) ? formatDateTime(row.ReviewDate) : '';
       const factContent = (row && row.Content) || '';
       const displayText = factContent.length > 150 ?
         `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 150))}...</span>` :
@@ -845,7 +864,7 @@
       const progressCurrent = Math.min((r && r.ProgressCurrent) || 0, (r && r.Threshold) || 0);
       const threshold = (r && r.Threshold) || 0;
       const progressPercent = threshold > 0 ? Math.round((progressCurrent / threshold) * 100) : 0;
-      const unlockDate = (r && r.UnlockDate) ? new Date(r.UnlockDate).toLocaleDateString() : '';
+      const unlockDate = (r && r.UnlockDate) ? formatDate(r.UnlockDate) : '';
       const rewardXP = (r && r.RewardXP) || 0;
       const name = escapeHtml((r && r.Name) || 'Achievement');
       const category = escapeHtml((r && r.Category) || '');
@@ -1544,7 +1563,7 @@
             const tbody = document.createElement('tbody');
             aiRecentUsageData.forEach(row => {
               const tr = document.createElement('tr');
-              const time = row.CreatedAt ? new Date(row.CreatedAt).toLocaleString() : '';
+              const time = row.CreatedAt ? formatDateTime(row.CreatedAt) : '';
               const factContent = row.FactContent || '';
               const cost = parseFloat(row.Cost || 0);
               const latency = row.LatencyMs || 0;
@@ -1687,7 +1706,7 @@
             const tbody = document.createElement('tbody');
             questionsRecentData.forEach(row => {
               const tr = document.createElement('tr');
-              const time = row.QuestionShownAt ? new Date(row.QuestionShownAt).toLocaleString() : '';
+              const time = row.QuestionShownAt ? formatDateTime(row.QuestionShownAt) : '';
               const questionText = row.QuestionText || '';
               const factContent = row.FactContent || '';
               const readingTime = row.QuestionReadingDurationSec ? `${row.QuestionReadingDurationSec}s` : '--';
@@ -1751,7 +1770,7 @@
           const tbody = document.createElement('tbody');
           (sessionsData || []).forEach(row => {
             const tr = document.createElement('tr');
-            const start = row.StartTime ? new Date(row.StartTime).toLocaleString() : '';
+            const start = row.StartTime ? formatDateTime(row.StartTime) : '';
             tr.innerHTML = `
               <td>${start}</td>
               <td style="text-align:center;">${row.DurationSeconds ?? ''}</td>
@@ -1928,7 +1947,7 @@
           const tbody = document.createElement('tbody');
           (sessionsData || []).forEach(row => {
             const tr = document.createElement('tr');
-            const start = row.StartTime ? new Date(row.StartTime).toLocaleString() : '';
+            const start = row.StartTime ? formatDateTime(row.StartTime) : '';
             tr.innerHTML = `
               <td>${start}</td>
               <td style="text-align:center;">${row.DurationSeconds ?? ''}</td>
@@ -1968,8 +1987,8 @@
           const tbody = document.createElement('tbody');
           (rows || []).forEach(row => {
             const tr = document.createElement('tr');
-            const sessionStart = row.StartTime ? new Date(row.StartTime).toLocaleString() : '';
-            const reviewTime = row.ReviewDate ? new Date(row.ReviewDate).toLocaleString() : '';
+            const sessionStart = row.StartTime ? formatDateTime(row.StartTime) : '';
+            const reviewTime = row.ReviewDate ? formatDateTime(row.ReviewDate) : '';
             const factContent = row.Content || '';
             const displayText = factContent.length > 200 ?
               `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 200))}...</span>` :
@@ -2244,7 +2263,7 @@
     tbody.innerHTML = '';
     sessions.forEach(session => {
       const tr = document.createElement('tr');
-      const startTime = session.StartTime ? new Date(session.StartTime).toLocaleString() : '';
+      const startTime = session.StartTime ? formatDateTime(session.StartTime) : '';
       const duration = session.DurationSeconds ? Math.round(session.DurationSeconds / 60) : 0;
       
       tr.innerHTML = `
@@ -2953,7 +2972,7 @@
 
     (data || []).forEach(row => {
       const tr = document.createElement('tr');
-      const time = row.CreatedAt ? new Date(row.CreatedAt).toLocaleString() : '';
+      const time = row.CreatedAt ? formatDateTime(row.CreatedAt) : '';
       const factContent = row.FactContent || '';
       const displayText = factContent.length > 60
         ? `<span class="fact-text" title="${escapeHtml(factContent)}">${escapeHtml(factContent.substring(0, 60))}...</span>`
@@ -3830,7 +3849,7 @@
 
     (data || []).forEach(row => {
       const tr = document.createElement('tr');
-      const time = row.QuestionShownAt ? new Date(row.QuestionShownAt).toLocaleString() : '';
+      const time = row.QuestionShownAt ? formatDateTime(row.QuestionShownAt) : '';
       const questionText = row.QuestionText || '';
       const questionDisplay = questionText.length > 50
         ? `<span class="fact-text" title="${escapeHtml(questionText)}">${escapeHtml(questionText.substring(0, 50))}...</span>`

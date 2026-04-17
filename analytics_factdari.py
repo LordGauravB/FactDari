@@ -74,6 +74,23 @@ def _build_latency_case_expr(edges_ms) -> str:
     case_expr = "CASE\n                " + "\n                ".join(parts) + f"\n                ELSE '{else_label}'\n            END"
     return case_expr
 
+
+def _to_uk_date_label(val):
+    """Normalise a date-ish value (date, datetime, or 'YYYY-MM-DD' string) to 'DD-MM-YYYY'.
+
+    Used wherever a chart label is built from a SQL-returned date value so that axes
+    display UK-format dates consistently with the rest of the dashboard.
+    """
+    if val is None or val == '':
+        return ''
+    if hasattr(val, 'strftime'):
+        return val.strftime('%d-%m-%Y')
+    try:
+        return datetime.strptime(str(val), '%Y-%m-%d').strftime('%d-%m-%Y')
+    except (ValueError, TypeError):
+        return str(val)
+
+
 LATENCY_CASE_EXPR = _build_latency_case_expr(
     config.ANALYTICS_CONFIG.get('latency_bucket_edges_ms', [500, 1000, 2000, 5000])
 )
@@ -1437,6 +1454,9 @@ def chart_data():
     formatted_data['recent_sessions'] = recent_sessions
 
     # Last card reviews (top 50 by latest session start time, then review time)
+    # rl.FactID IS NOT NULL excludes view rows whose fact has since been deleted
+    # (FK is ON DELETE SET NULL) — matches the filter-deleted approach used for
+    # ranking tables like Most Explained Facts.
     recent_card_reviews = fetch_query(f"""
         SELECT TOP {TOP_N_REVIEWS}
             rl.FactLogID,
@@ -1451,6 +1471,7 @@ def chart_data():
         LEFT JOIN Categories c2 ON rl.CategoryIDSnapshot = c2.CategoryID
         WHERE (rl.Action IS NULL OR rl.Action = 'view')
           AND COALESCE(rl.TimedOut, 0) = 0
+          AND rl.FactID IS NOT NULL
           AND s.ProfileID = ?
         ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.FactLogID DESC
     """, (profile_id,))
@@ -1472,6 +1493,7 @@ def chart_data():
             LEFT JOIN Categories c2 ON rl.CategoryIDSnapshot = c2.CategoryID
             WHERE (rl.Action IS NULL OR rl.Action = 'view')
               AND COALESCE(rl.TimedOut, 0) = 0
+              AND rl.FactID IS NOT NULL
               AND s.ProfileID = ?
             ORDER BY ISNULL(s.StartTime, rl.ReviewDate) DESC, rl.ReviewDate DESC, rl.FactLogID DESC
         """, (profile_id,))
@@ -1499,7 +1521,7 @@ def chart_data():
         # Label with short datetime or session id fallback
         st = r.get('StartTime')
         try:
-            lbl = st.strftime('%m-%d %H:%M') if isinstance(st, datetime) else str(st)
+            lbl = st.strftime('%d-%m-%Y %H:%M') if isinstance(st, datetime) else str(st)
         except (AttributeError, ValueError, TypeError):
             lbl = f"#{r.get('SessionID')}"
         labels.append(lbl)
@@ -1682,7 +1704,7 @@ def format_line_chart(data, start_date=None, end_date=None):
     if filled_rows:
         for day, row in filled_rows:
             row = row or {}
-            labels.append(day.isoformat())
+            labels.append(day.strftime('%d-%m-%Y'))
             facts_reviewed.append(row.get('FactsReviewed', 0) or 0)
             total_reviews.append(row.get('TotalReviews', 0) or 0)
     else:
@@ -1721,12 +1743,12 @@ def format_daily_learning_progress(data, start_date=None, end_date=None):
     if filled_rows:
         for day, row in filled_rows:
             row = row or {}
-            labels.append(day.isoformat())
+            labels.append(day.strftime('%d-%m-%Y'))
             facts_reviewed_not_known.append(row.get('FactsReviewedNotKnown', 0) or 0)
             facts_marked_known.append(row.get('FactsMarkedKnown', 0) or 0)
     else:
         for row in (data or []):
-            labels.append(row.get('Date', ''))
+            labels.append(_to_uk_date_label(row.get('Date', '')))
             facts_reviewed_not_known.append(row.get('FactsReviewedNotKnown', 0) or 0)
             facts_marked_known.append(row.get('FactsMarkedKnown', 0) or 0)
 
@@ -1758,7 +1780,7 @@ def format_table_data(data):
 
 def format_timeline(data):
     """Format data for timeline chart"""
-    labels = [row['Date'] for row in data]
+    labels = [_to_uk_date_label(row.get('Date', '')) for row in data]
     values = [row['FactsAdded'] for row in data]
     
     # Calculate cumulative
@@ -1830,7 +1852,7 @@ def format_duration_line_chart(data, start_date=None, end_date=None):
     if filled_rows:
         for day, row in filled_rows:
             row = row or {}
-            labels.append(day.isoformat())
+            labels.append(day.strftime('%d-%m-%Y'))
             avg_val = row.get('AvgDuration', 0) or 0
             total_val = row.get('TotalDuration', 0) or 0
             avg_duration.append(round(avg_val / 60, 2) if avg_val else 0)
@@ -1838,7 +1860,7 @@ def format_duration_line_chart(data, start_date=None, end_date=None):
             session_count.append(row.get('SessionCount', 0) or 0)
     else:
         for row in data:
-            labels.append(row['Date'])
+            labels.append(_to_uk_date_label(row.get('Date', '')))
             avg_duration.append(round(row['AvgDuration'] / 60, 2) if row['AvgDuration'] else 0)
             total_duration.append(round(row['TotalDuration'] / 60, 2) if row['TotalDuration'] else 0)
             session_count.append(row['SessionCount'])
@@ -1883,7 +1905,7 @@ def format_timeout_chart(data, start_date=None, end_date=None):
     if filled_rows:
         for day, row in filled_rows:
             row = row or {}
-            labels.append(day.isoformat())
+            labels.append(day.strftime('%d-%m-%Y'))
             timeout_count.append(row.get('TimeoutCount', 0) or 0)
             timeout_percentage.append(float(row.get('TimeoutPercentage') or 0))
     else:
@@ -2027,7 +2049,7 @@ def format_ai_cost_timeline(data, start_date=None, end_date=None):
     if filled_rows:
         for day, row in filled_rows:
             row = row or {}
-            labels.append(day.isoformat())
+            labels.append(day.strftime('%d-%m-%Y'))
             cost = float(row.get('DailyCost', 0) or 0)
             costs.append(round(cost, 4))
             tokens.append(row.get('DailyTokens', 0) or 0)
@@ -2036,7 +2058,7 @@ def format_ai_cost_timeline(data, start_date=None, end_date=None):
             cumulative_cost.append(round(running_total, 4))
     else:
         for row in data:
-            labels.append(row.get('Date', ''))
+            labels.append(_to_uk_date_label(row.get('Date', '')))
             cost = float(row.get('DailyCost', 0) or 0)
             costs.append(round(cost, 4))
             tokens.append(row.get('DailyTokens', 0))
@@ -2088,20 +2110,21 @@ def format_ai_cost_by_operation_timeline(data, start_date=None, end_date=None):
 
     start = _parse_date_value(start_date) if start_date else None
     end = _parse_date_value(end_date) if end_date else None
+
     if start and end:
-        dates = [d.isoformat() for d in _date_range(start, end)]
+        dates = [d.strftime('%d-%m-%Y') for d in _date_range(start, end)]
     else:
-        dates = sorted(set(row.get('Date', '') for row in data))
+        dates = sorted({_to_uk_date_label(row.get('Date', '')) for row in data if row.get('Date', '')})
 
     # Group by date, then by operation type
     operation_types = sorted(set(row.get('OperationType', 'EXPLANATION') for row in data))
     if not operation_types:
         return {'labels': dates, 'datasets': []}
 
-    # Create a lookup dict
+    # Create a lookup dict keyed by the same DD-MM-YYYY labels so it matches `dates`
     lookup = {}
     for row in data:
-        key = (row.get('Date', ''), row.get('OperationType', 'EXPLANATION'))
+        key = (_to_uk_date_label(row.get('Date', '')), row.get('OperationType', 'EXPLANATION'))
         lookup[key] = {
             'cost': float(row.get('DailyCost', 0) or 0),
             'tokens': row.get('DailyTokens', 0),
@@ -2144,13 +2167,13 @@ def format_questions_timeline(data, start_date=None, end_date=None):
     if filled_rows:
         for day, row in filled_rows:
             row = row or {}
-            labels.append(day.isoformat())
+            labels.append(day.strftime('%d-%m-%Y'))
             generated.append(row.get('QuestionsGenerated', 0) or 0)
             successful.append(row.get('Successful', 0) or 0)
             failed.append(row.get('Failed', 0) or 0)
     else:
         for row in data:
-            labels.append(row.get('Date', ''))
+            labels.append(_to_uk_date_label(row.get('Date', '')))
             generated.append(row.get('QuestionsGenerated', 0))
             successful.append(row.get('Successful', 0))
             failed.append(row.get('Failed', 0))
@@ -2184,12 +2207,12 @@ def format_questions_shown_timeline(data, start_date=None, end_date=None):
     if filled_rows:
         for day, row in filled_rows:
             row = row or {}
-            labels.append(day.isoformat())
+            labels.append(day.strftime('%d-%m-%Y'))
             shown.append(row.get('QuestionsShown', 0) or 0)
             avg_reading_time.append(round(float(row.get('AvgReadingTime', 0) or 0), 1))
     else:
         for row in data:
-            labels.append(row.get('Date', ''))
+            labels.append(_to_uk_date_label(row.get('Date', '')))
             shown.append(row.get('QuestionsShown', 0))
             avg_reading_time.append(round(float(row.get('AvgReadingTime', 0) or 0), 1))
 

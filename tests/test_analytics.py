@@ -480,7 +480,7 @@ class TestAnalyticsHelpers:
         data = [{'Date': '2024-01-01', 'FactsReviewed': 2, 'TotalReviews': 3}]
         result = format_line_chart(data, start_date='2024-01-01', end_date='2024-01-03')
 
-        assert result['labels'] == ['2024-01-01', '2024-01-02', '2024-01-03']
+        assert result['labels'] == ['01-01-2024', '02-01-2024', '03-01-2024']
         assert result['datasets'][0]['data'] == [2, 0, 0]
         assert result['datasets'][1]['data'] == [3, 0, 0]
 
@@ -500,7 +500,7 @@ class TestAnalyticsHelpers:
         data = [{'Date': '2024-01-01', 'TimeoutCount': 2, 'TimeoutPercentage': 10.0}]
         result = format_timeout_chart(data, start_date='2024-01-01', end_date='2024-01-02')
 
-        assert result['labels'] == ['2024-01-01', '2024-01-02']
+        assert result['labels'] == ['01-01-2024', '02-01-2024']
         assert result['datasets'][0]['data'] == [2, 0]
         assert result['datasets'][1]['data'] == [10.0, 0.0]
 
