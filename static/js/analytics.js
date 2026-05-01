@@ -294,6 +294,7 @@
     const ctx = qs(`#${canvasId}`).getContext('2d');
     destroyChart(key);
     const showCenterTotal = ['favorite_categories', 'known_categories', 'categories_viewed_today'].includes(key);
+    const showKnownPercent = key === 'known_vs_unknown';
     
     const colors = isDarkMode ? [
       '#f87171','#fbbf24','#34d399','#60a5fa','#a78bfa'
@@ -304,19 +305,37 @@
     const centerTotalPlugin = {
       id: `centerTotal-${key}`,
       beforeDraw(chart) {
-        if (!showCenterTotal) return;
+        if (!showCenterTotal && !showKnownPercent) return;
         const meta = chart.getDatasetMeta(0);
         if (!meta || !meta.data || !meta.data.length) return;
-        const total = chart.data.datasets?.[0]?.data?.reduce((a, b) => a + (Number(b) || 0), 0) || 0;
         const { ctx } = chart;
         const { x, y } = meta.data[0];
         ctx.save();
-        const fontSize = Math.max(14, Math.min(chart.width, chart.height) / 10);
-        ctx.font = `600 ${fontSize}px "Inter", sans-serif`;
-        ctx.fillStyle = isDarkMode ? '#e2e8f0' : '#0f172a';
+        const primaryColor = isDarkMode ? '#e2e8f0' : '#0f172a';
+        const mutedColor = isDarkMode ? '#94a3b8' : '#475569';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(total, x, y);
+        if (showKnownPercent) {
+          const values = chart.data.datasets?.[0]?.data || [];
+          const known = Number(values[0]) || 0;
+          const unknown = Number(values[1]) || 0;
+          const total = known + unknown;
+          const pct = total > 0 ? Math.round((known / total) * 100) : 0;
+          const pctSize = Math.max(14, Math.min(chart.width, chart.height) / 10);
+          const labelSize = Math.max(10, pctSize * 0.55);
+          ctx.font = `600 ${pctSize}px "Inter", sans-serif`;
+          ctx.fillStyle = primaryColor;
+          ctx.fillText(`${pct}%`, x, y - labelSize * 0.7);
+          ctx.font = `500 ${labelSize}px "Inter", sans-serif`;
+          ctx.fillStyle = mutedColor;
+          ctx.fillText('Known', x, y + pctSize * 0.6);
+        } else {
+          const total = chart.data.labels?.length || 0;
+          const fontSize = Math.max(14, Math.min(chart.width, chart.height) / 10);
+          ctx.font = `600 ${fontSize}px "Inter", sans-serif`;
+          ctx.fillStyle = primaryColor;
+          ctx.fillText(total, x, y);
+        }
         ctx.restore();
       }
     };
@@ -483,6 +502,7 @@
 
     const axisTitles = {
       facts_timeline: { x: 'Date Added', y: 'Facts Added' },
+      facts_known_timeline: { x: 'Date Learned', y: 'Facts' },
       category_reviews: { x: 'Total Reviews', y: 'Category' },
       category_review_time: { x: 'Avg Review Time (seconds)', y: 'Category' }
     };
@@ -1128,6 +1148,11 @@
         lineChart('daily_learning_progress', 'daily-learning-progress', data.daily_learning_progress);
         // removed avg view duration chart
         barChart('facts_timeline', 'facts-timeline', data.facts_added_timeline);
+        if (data.facts_known_timeline) {
+          barChart('facts_known_timeline', 'facts-known-timeline', data.facts_known_timeline);
+        } else {
+          console.warn('[FactDari] facts_known_timeline missing from /api/chart-data payload');
+        }
         barChart('category_reviews', 'category-reviews', data.category_reviews, true);
         
         // New Progress chart
@@ -1292,6 +1317,7 @@
       'reviews-per-day': () => 'Reviews Per Day (Last 30 Days)',
       'daily-learning-progress': () => 'Daily Learning Progress (Last 30 Days)',
       'facts-timeline': () => 'Facts Added Over Time',
+      'facts-known-timeline': () => 'Facts Known Over Time',
       'category-reviews': () => 'Reviews by Category',
       'session-duration-distribution': () => 'Session Duration Distribution',
       'daily-session-duration': () => 'Daily Session Duration Trend (Last 30 Days)',
@@ -1330,6 +1356,7 @@
       'weekly-pattern': 'Review activity by day of week',
       'top-hours': 'Your top 5 most active hours',
       'facts-timeline': 'Timeline of when facts were added',
+      'facts-known-timeline': "Currently-known facts, grouped by the date each was first marked known. Deleted facts aren't shown.",
       'category-reviews': 'Total reviews per category',
       'monthly-progress': 'Monthly reviews, unique facts, and active days',
       'category-completion-rate': 'Percentage of facts marked as "known" per category',
@@ -1792,6 +1819,7 @@
             'reviews-per-day': 'reviews_per_day',
             'daily-learning-progress': 'daily_learning_progress',
             'facts-timeline': 'facts_timeline',
+            'facts-known-timeline': 'facts_known_timeline',
             'category-reviews': 'category_reviews',
             'session-duration-distribution': 'session_duration_distribution',
             'daily-session-duration': 'daily_session_duration',

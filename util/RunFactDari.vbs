@@ -4,12 +4,14 @@ Option Explicit
 Dim WshShell
 Set WshShell = CreateObject("WScript.Shell")
 
-' Wait for 2 minutes (120 seconds = 120000 milliseconds)
+' Set the project working directory
+WshShell.CurrentDirectory = "C:\Users\gaura\OneDrive\PC-Desktop\GitHubDesktop\FactDari"
+
+' Wait for 2 minutes after startup
 WScript.Sleep 120000
 
-' Run the Python script using the full path to Python and the script
-' Format: "PythonPath" "ScriptPath"
-WshShell.Run """C:\Program Files\Python312\python.exe"" ""Exact File Path\factdari.py""", 0, False
+' Run the Python script using the FactDari virtual environment Python
+WshShell.Run """C:\Users\gaura\OneDrive\PC-Desktop\GitHubDesktop\FactDari\FactDari-venv\Scripts\python.exe"" ""C:\Users\gaura\OneDrive\PC-Desktop\GitHubDesktop\FactDari\factdari.py""", 0, False
 
 ' Clean up
 Set WshShell = Nothing

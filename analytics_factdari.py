@@ -239,7 +239,7 @@ def chart_data():
         'factsAddedOverTime': fetch_query(f"""
             SELECT Date, FactsAdded
             FROM (
-                SELECT TOP {TOP_N_DEFAULT} 
+                SELECT TOP {TOP_N_DEFAULT}
                     CONVERT(varchar, DateAdded, 23) as Date,
                     COUNT(FactID) as FactsAdded
                 FROM Facts
@@ -249,6 +249,24 @@ def chart_data():
             ) as RecentDates
             ORDER BY Date ASC
         """, (profile_id,)),
+
+        # Facts known over time (by KnownSince of surviving ProfileFacts)
+        'factsKnownOverTime': fetch_query(f"""
+            SELECT Date, FactsLearned
+            FROM (
+                SELECT TOP {TOP_N_DEFAULT}
+                    CONVERT(varchar, pf.KnownSince, 23) as Date,
+                    COUNT(*) as FactsLearned
+                FROM ProfileFacts pf
+                INNER JOIN Facts f ON f.FactID = pf.FactID
+                WHERE pf.ProfileID = ?
+                  AND f.CreatedBy = ?
+                  AND pf.KnownSince IS NOT NULL
+                GROUP BY CONVERT(varchar, pf.KnownSince, 23)
+                ORDER BY CONVERT(varchar, pf.KnownSince, 23) DESC
+            ) as RecentDates
+            ORDER BY Date ASC
+        """, (profile_id, profile_id)),
         
         # Review frequency heatmap data (last 30 days, by hour)
         'reviewHeatmap': fetch_query("""
@@ -1313,6 +1331,7 @@ def chart_data():
         'most_reviewed_facts': format_table_data(data['mostReviewedFacts']),
         'least_reviewed_facts': format_table_data(data['leastReviewedFacts']),
         'facts_added_timeline': format_timeline(data['factsAddedOverTime']),
+        'facts_known_timeline': format_facts_known_timeline(data['factsKnownOverTime']),
         'review_heatmap': format_heatmap(data['reviewHeatmap']),
         'favorite_category_distribution': format_pie_chart(data['favoriteCategoryDistribution'], 'CategoryName', 'FavoriteCount'),
         'known_category_distribution': format_pie_chart(data['knownCategoryDistribution'], 'CategoryName', 'KnownCount'),
@@ -1782,14 +1801,14 @@ def format_timeline(data):
     """Format data for timeline chart"""
     labels = [_to_uk_date_label(row.get('Date', '')) for row in data]
     values = [row['FactsAdded'] for row in data]
-    
+
     # Calculate cumulative
     cumulative = []
     total = 0
     for value in values:
         total += value
         cumulative.append(total)
-    
+
     return {
         'labels': labels,
         'datasets': [
@@ -1804,6 +1823,37 @@ def format_timeline(data):
                 'data': cumulative,
                 'type': 'line',
                 'borderColor': '#4CAF50',
+                'backgroundColor': 'transparent',
+                'borderWidth': 2
+            }
+        ]
+    }
+
+def format_facts_known_timeline(data):
+    """Daily bars + cumulative line of facts whose KnownSince falls on each date."""
+    labels = [_to_uk_date_label(row.get('Date', '')) for row in data]
+    values = [row['FactsLearned'] for row in data]
+
+    cumulative = []
+    total = 0
+    for value in values:
+        total += value
+        cumulative.append(total)
+
+    return {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'Facts Learned',
+                'data': values,
+                'type': 'bar',
+                'backgroundColor': '#10b981'
+            },
+            {
+                'label': 'Cumulative Known',
+                'data': cumulative,
+                'type': 'line',
+                'borderColor': '#3b82f6',
                 'backgroundColor': 'transparent',
                 'borderWidth': 2
             }
