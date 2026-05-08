@@ -150,10 +150,19 @@ def chart_data():
     # Use config constants instead of hardcoded values
     recent_days = config.ANALYTICS_CONFIG['recent_days_window']
     history_days = config.ANALYTICS_CONFIG['history_days_window']
-    now = datetime.now()
-    seven_days_ago = (now - timedelta(days=recent_days)).strftime('%Y-%m-%d')
-    thirty_days_ago = (now - timedelta(days=history_days)).strftime('%Y-%m-%d')
-    today_str = now.strftime('%Y-%m-%d')
+    # Anchor windows to SQL London date so the leftmost/rightmost bar lands on the
+    # same day as FactLogs.ReviewDate (which is written via dbo.LondonNow()).
+    try:
+        today_rows = fetch_query("SELECT CAST(dbo.LondonNow() AS DATE) AS today")
+        today = today_rows[0]['today'] if today_rows else datetime.now().date()
+    except Exception as e:
+        logger.warning(f"Could not fetch London date for window anchors, falling back to local: {e}")
+        today = datetime.now().date()
+    if isinstance(today, datetime):
+        today = today.date()
+    seven_days_ago = (today - timedelta(days=recent_days)).strftime('%Y-%m-%d')
+    thirty_days_ago = (today - timedelta(days=history_days)).strftime('%Y-%m-%d')
+    today_str = today.strftime('%Y-%m-%d')
     profile_id = get_default_profile_id()
 
     # Check if we need to return all facts (explicit whitelist validation)
@@ -884,7 +893,9 @@ def chart_data():
             ORDER BY session_stats.Hour
         """, (profile_id,)),
 
-        # Action Breakdown - Distribution of action types
+        # Action Breakdown - Distribution of action types.
+        # Excludes timed-out view rows so the 'view' slice agrees with factsViewedPerDay,
+        # which also filters TimedOut = 0. Add/edit/delete logs are unaffected.
         'actionBreakdown': fetch_query("""
             SELECT
                 COALESCE(rl.Action, 'view') as ActionType,
@@ -892,6 +903,7 @@ def chart_data():
             FROM FactLogs rl
             JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
             WHERE rs.ProfileID = ?
+              AND COALESCE(rl.TimedOut, 0) = 0
             GROUP BY COALESCE(rl.Action, 'view')
             ORDER BY COUNT(*) DESC
         """, (profile_id,)),
@@ -1170,6 +1182,20 @@ def chart_data():
         ORDER BY ProfileID
     """, (profile_id,))
 
+    # Derive total_reviews directly from FactLogs so the KPI agrees with the
+    # Reviews-Per-Day chart. GamificationProfile.TotalReviews only counts views
+    # past the XP grace period, which would undercount sub-grace glances that
+    # the chart does include.
+    total_reviews_row = safe_fetch_one("""
+        SELECT COUNT(*) as TotalReviews
+        FROM FactLogs rl
+        JOIN ReviewSessions rs ON rs.SessionID = rl.SessionID
+        WHERE (rl.Action IS NULL OR rl.Action = 'view')
+          AND COALESCE(rl.TimedOut, 0) = 0
+          AND rs.ProfileID = ?
+    """, (profile_id,))
+    total_reviews_from_logs = int((total_reviews_row or {}).get('TotalReviews', 0) or 0)
+
     # Compute level progression aligned with stored Level (gated at 99 unless all achievements unlocked)
     def level_progress(xp_val: int, stored_level: int):
         try:
@@ -1406,7 +1432,7 @@ def chart_data():
             'total_adds': int((profile or {}).get('TotalAdds', 0) or 0),
             'total_edits': int((profile or {}).get('TotalEdits', 0) or 0),
             'total_deletes': int((profile or {}).get('TotalDeletes', 0) or 0),
-            'total_reviews': int((profile or {}).get('TotalReviews', 0) or 0),
+            'total_reviews': total_reviews_from_logs,
             'current_streak': int((profile or {}).get('CurrentStreak', 0) or 0),
             'longest_streak': int((profile or {}).get('LongestStreak', 0) or 0),
         }
@@ -2087,7 +2113,12 @@ def format_monthly_progress(data):
     }
 
 def format_ai_cost_timeline(data, start_date=None, end_date=None):
-    """Format AI cost timeline data for chart"""
+    """Format AI cost timeline data for chart.
+
+    The returned payload also feeds the AI Usage Trend chart, which reads the
+    `calls` and `tokens` arrays directly (see renderAIUsageTrend in static/js/analytics.js).
+    Any change to the upstream aiCostTimeline query needs to keep those fields populated.
+    """
     labels = []
     costs = []
     tokens = []

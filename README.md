@@ -56,8 +56,8 @@ The analytics dashboard provides comprehensive visualizations of your learning p
 | **Insights Tab** | |
 | Most Reviewed Facts | Table with medals for top 10 (expandable to all) |
 | Least Reviewed Facts | Table with days since last review (expandable) |
-| All Favorite Facts | Random 10 favorites table (expandable) |
-| All Known Facts | Random 10 known facts table (expandable) |
+| Favorite Facts &mdash; Random 10 | Random 10 favorites table (expandable to all) |
+| Known Facts &mdash; Random 10 | Random 10 known facts table (expandable to all) |
 | Review Activity Heatmap | Hour × Day grid for last 30 days |
 | Reviews Per Day | Line chart with unique facts and total reviews (last 30 days) |
 | **Session Analytics Tab** | |
