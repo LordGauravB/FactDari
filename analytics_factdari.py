@@ -158,8 +158,16 @@ def chart_data():
     except Exception as e:
         logger.warning(f"Could not fetch London date for window anchors, falling back to local: {e}")
         today = datetime.now().date()
+    # pyodbc/ODBC may return DATE columns as datetime, date, or string depending on driver.
     if isinstance(today, datetime):
         today = today.date()
+    elif isinstance(today, str):
+        try:
+            today = datetime.strptime(today, '%Y-%m-%d').date()
+        except ValueError:
+            today = datetime.now().date()
+    elif not isinstance(today, date):
+        today = datetime.now().date()
     seven_days_ago = (today - timedelta(days=recent_days)).strftime('%Y-%m-%d')
     thirty_days_ago = (today - timedelta(days=history_days)).strftime('%Y-%m-%d')
     today_str = today.strftime('%Y-%m-%d')
