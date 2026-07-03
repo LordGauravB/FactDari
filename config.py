@@ -16,6 +16,10 @@ def _get_float_env(var_name: str, default: str = "0") -> float:
         except (ValueError, TypeError):
             return 0.0
 
+def _get_bool_env(var_name: str, default: str = "false") -> bool:
+    """Parse a boolean from environment variables (1/true/yes/on are truthy)."""
+    return os.environ.get(var_name, default).strip().lower() in ("1", "true", "yes", "on")
+
 def _get_int_list_env(var_name: str, default_csv: str) -> list:
     """Parse a comma-separated list of ints from env, with a safe fallback."""
     raw = os.environ.get(var_name, default_csv)
@@ -139,10 +143,10 @@ UI_CONFIG = {
 # AI pricing/configuration (used for cost estimation and logging)
 AI_PRICING = {
     'provider': os.environ.get('FACTDARI_AI_PROVIDER', 'together'),
-    'model': os.environ.get('FACTDARI_AI_MODEL', 'deepseek-ai/DeepSeek-V3.1'),
-    # Defaults derived from provided pricing per 1M tokens: $0.60 input, $1.70 output
-    'prompt_cost_per_1k': _get_float_env('FACTDARI_AI_PROMPT_COST_PER_1K', '0.0006'),
-    'completion_cost_per_1k': _get_float_env('FACTDARI_AI_COMPLETION_COST_PER_1K', '0.0017'),
+    'model': os.environ.get('FACTDARI_AI_MODEL', 'deepseek-ai/DeepSeek-V4-Pro'),
+    # Defaults per 1M tokens (DeepSeek V4 Pro on Together AI): $2.10 input, $4.40 output
+    'prompt_cost_per_1k': _get_float_env('FACTDARI_AI_PROMPT_COST_PER_1K', '0.0021'),
+    'completion_cost_per_1k': _get_float_env('FACTDARI_AI_COMPLETION_COST_PER_1K', '0.0044'),
     'currency': os.environ.get('FACTDARI_AI_CURRENCY', 'USD'),
 }
 
@@ -154,6 +158,9 @@ AI_REQUEST_CONFIG = {
     'question_max_tokens': int(os.environ.get('FACTDARI_AI_QUESTION_MAX_TOKENS', '400')),
     'question_temperature': _get_float_env('FACTDARI_AI_QUESTION_TEMPERATURE', '0.7'),
     'question_cooldown_seconds': int(os.environ.get('FACTDARI_AI_QUESTION_COOLDOWN_SECONDS', '60')),
+    # DeepSeek V4 Pro reasoning toggle. Default off = Non-Think mode (fast, direct,
+    # no chain-of-thought). Set FACTDARI_AI_REASONING_ENABLED=true for Think mode.
+    'reasoning_enabled': _get_bool_env('FACTDARI_AI_REASONING_ENABLED', 'false'),
 }
 
 

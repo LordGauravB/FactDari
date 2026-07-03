@@ -15,7 +15,7 @@ A lightweight desktop widget application for displaying and managing facts, desi
 - **Navigation Controls**: Easy navigation through facts with previous/next buttons
 - **Search & Filter**: Filter facts by category, favorites, or knowledge status
 - **Dark Theme**: Eye-friendly dark interface with customizable transparency
-- **AI Explanations**: Get AI-powered explanations for any fact using Together AI (DeepSeek model)
+- **AI Explanations**: Get AI-powered explanations for any fact using Together AI (DeepSeek V4 Pro, Non-Think mode)
 - **AI-Generated Questions**: Automatically generate review questions from facts to test your knowledge
 
 ## Key Functionality
@@ -291,7 +291,7 @@ util/RunFactDari.vbs
 - **Backend**: SQL Server database for fact storage
 - **Analytics**: Flask web server with Chart.js visualizations
 - **Speech**: pyttsx3 for text-to-speech functionality
-- **AI**: Together AI API with DeepSeek-V3.1 model for fact explanations and question generation
+- **AI**: Together AI API with DeepSeek V4 Pro model (Non-Think mode) for fact explanations and question generation
 - **Configuration**: Centralized config.py for all settings
 - **Gamification**: SQL-backed XP/levels, daily streak tracking, and achievements (see `gamification.py`)
 
@@ -338,7 +338,10 @@ Edit `config.py` to customize:
 
 ### AI Configuration
 - `FACTDARI_TOGETHER_API_KEY` or `TOGETHER_API_KEY` or `TOGETHER_API_TOKEN`: Your Together AI API key (required for AI explanations and question generation)
-- The AI feature uses the DeepSeek-V3.1 model via Together AI
+- The AI feature uses the DeepSeek V4 Pro model (`deepseek-ai/DeepSeek-V4-Pro`) via Together AI
+- `FACTDARI_AI_MODEL`: override the model id (default: `deepseek-ai/DeepSeek-V4-Pro`)
+- `FACTDARI_AI_REASONING_ENABLED` (default: `false`): runs DeepSeek V4 Pro in Non-Think mode for fast, direct answers; set to `true` to enable thinking
+- `FACTDARI_AI_PROMPT_COST_PER_1K` (default: `0.0021`) and `FACTDARI_AI_COMPLETION_COST_PER_1K` (default: `0.0044`): per-1K-token prices used for cost tracking ($2.10 / $4.40 per 1M tokens)
 - Cost tracking is automatic based on token usage
 - All AI usage is logged to the `AIUsageLogs` table for analytics
 - Questions are cached in the `Questions` table and refresh based on `QuestionsRefreshCountdown`

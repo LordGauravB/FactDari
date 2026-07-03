@@ -350,6 +350,34 @@ def test_call_together_ai_connection_error_sets_failed(monkeypatch):
     assert usage["status"] == "FAILED"
 
 
+def test_call_together_ai_payload_uses_v4_pro_non_think(monkeypatch):
+    app = make_app()
+    app.ai_endpoint = "https://example.com"
+    app.ai_timeout_seconds = 5
+    app.ai_explanation_max_tokens = 100
+    app.ai_explanation_temperature = 0.5
+    app.ai_model = "deepseek-ai/DeepSeek-V4-Pro"
+    app.ai_provider = "together"
+    app.ai_reasoning_enabled = False
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "choices": [{"message": {"content": "An explanation."}}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+    }
+    mock_post = MagicMock(return_value=mock_resp)
+    monkeypatch.setattr(factdari.requests, "post", mock_post)
+
+    message, usage = app._call_together_ai("Fact text", "key")
+
+    assert message == "An explanation."
+    assert usage["status"] == "SUCCESS"
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["model"] == "deepseek-ai/DeepSeek-V4-Pro"
+    assert payload["reasoning"] == {"enabled": False}
+
+
 def test_speak_text_returns_early_on_home_page():
     app = make_app()
     app.is_home_page = True

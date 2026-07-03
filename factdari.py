@@ -114,7 +114,7 @@ class FactDariApp:
         self.STATS_FONT = config.get_font('stats')
 
         # AI model/pricing (used for logging and cost estimation)
-        self.ai_model = config.AI_PRICING.get('model', "deepseek-ai/DeepSeek-V3.1")
+        self.ai_model = config.AI_PRICING.get('model', "deepseek-ai/DeepSeek-V4-Pro")
         self.ai_provider = config.AI_PRICING.get('provider', "together")
         try:
             self.ai_prompt_cost_per_1k = float(config.AI_PRICING.get('prompt_cost_per_1k', 0) or 0)
@@ -134,6 +134,8 @@ class FactDariApp:
         self.ai_explanation_temperature = float(ai_req['explanation_temperature'])
         self.ai_question_max_tokens = int(ai_req['question_max_tokens'])
         self.ai_question_temperature = float(ai_req['question_temperature'])
+        # DeepSeek V4 Pro reasoning toggle (False = Non-Think mode)
+        self.ai_reasoning_enabled = bool(ai_req.get('reasoning_enabled', False))
 
         # UI timing/opacity settings
         ui_cfg = config.UI_CONFIG
@@ -1218,7 +1220,7 @@ class FactDariApp:
         started = time.perf_counter()
         usage_info = {
             "operation_type": "EXPLANATION",
-            "model": getattr(self, 'ai_model', "deepseek-ai/DeepSeek-V3.1"),
+            "model": getattr(self, 'ai_model', "deepseek-ai/DeepSeek-V4-Pro"),
             "provider": getattr(self, 'ai_provider', "together"),
             "status": "SUCCESS",
         }
@@ -1249,6 +1251,8 @@ class FactDariApp:
                 ],
                 "max_tokens": self.ai_explanation_max_tokens,
                 "temperature": self.ai_explanation_temperature,
+                # Non-Think mode unless reasoning is explicitly enabled (DeepSeek V4 Pro)
+                "reasoning": {"enabled": getattr(self, 'ai_reasoning_enabled', False)},
             }
             headers = {
                 "Authorization": f"Bearer {api_key}",
@@ -1321,7 +1325,7 @@ class FactDariApp:
         started = time.perf_counter()
         usage_info = {
             "operation_type": "QUESTION_GENERATION",
-            "model": getattr(self, 'ai_model', "deepseek-ai/DeepSeek-V3.1"),
+            "model": getattr(self, 'ai_model', "deepseek-ai/DeepSeek-V4-Pro"),
             "provider": getattr(self, 'ai_provider', "together"),
             "status": "SUCCESS",
         }
@@ -1356,6 +1360,8 @@ class FactDariApp:
                 ],
                 "max_tokens": self.ai_question_max_tokens,
                 "temperature": self.ai_question_temperature,
+                # Non-Think mode unless reasoning is explicitly enabled (DeepSeek V4 Pro)
+                "reasoning": {"enabled": getattr(self, 'ai_reasoning_enabled', False)},
             }
             headers = {
                 "Authorization": f"Bearer {api_key}",

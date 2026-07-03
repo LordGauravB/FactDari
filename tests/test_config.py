@@ -177,6 +177,16 @@ class TestAIPricingConfig:
         import config
         assert len(config.AI_PRICING['currency']) == 3  # ISO currency code
 
+    def test_ai_model_default_is_v4_pro(self):
+        """Test default AI model is DeepSeek V4 Pro."""
+        import config
+        assert config.AI_PRICING['model'] == 'deepseek-ai/DeepSeek-V4-Pro'
+
+    def test_ai_reasoning_default_disabled(self):
+        """Test reasoning defaults to Non-Think mode (disabled)."""
+        import config
+        assert config.AI_REQUEST_CONFIG['reasoning_enabled'] is False
+
 
 class TestHelperFunctions:
     """Tests for config helper functions."""
@@ -306,6 +316,31 @@ class TestFloatEnvHelper:
         import config
         result = config._get_float_env('TEST_FLOAT_INVALID', '3.0')
         assert result == 3.0
+
+
+class TestBoolEnvHelper:
+    """Tests for _get_bool_env helper function."""
+
+    def test_get_bool_env_truthy(self, monkeypatch):
+        """Test that 1/true/yes/on parse as True (case-insensitive)."""
+        import config
+        for val in ('1', 'true', 'TRUE', 'Yes', 'on'):
+            monkeypatch.setenv('TEST_BOOL', val)
+            assert config._get_bool_env('TEST_BOOL', 'false') is True
+
+    def test_get_bool_env_falsy(self, monkeypatch):
+        """Test that other values parse as False."""
+        import config
+        for val in ('0', 'false', 'no', 'off', ''):
+            monkeypatch.setenv('TEST_BOOL', val)
+            assert config._get_bool_env('TEST_BOOL', 'true') is False
+
+    def test_get_bool_env_default(self, monkeypatch):
+        """Test default is used when env var is missing."""
+        import config
+        monkeypatch.delenv('TEST_BOOL_MISSING', raising=False)
+        assert config._get_bool_env('TEST_BOOL_MISSING', 'true') is True
+        assert config._get_bool_env('TEST_BOOL_MISSING', 'false') is False
 
 
 class TestAnalyticsConfig:

@@ -57,4 +57,4 @@ Three Python modules at the repo root form the system. They share one SQL Server
 
 ## Platform notes
 
-Windows-only for the desktop widget (uses `pywin32`, `ctypes.wintypes`, `pyttsx3` SAPI). The shell for this environment is bash — use forward slashes and Unix shell syntax in scripts; the app itself still targets Windows at runtime. `analytics_factdari.py` runs Flask in debug for local use — do not expose publicly.
+Windows-only for the desktop widget (uses `pywin32`, `ctypes.wintypes`, `pyttsx3` SAPI). The dev shell is Windows **PowerShell** (win32) — use PowerShell syntax (`$env:VAR`, `$null`, backtick line-continuation) for shell scripting; a bash tool is also available for POSIX one-liners. The cross-platform `pip`/`python`/`pytest` commands above run unchanged in either. `analytics_factdari.py` runs Flask in debug for local use — do not expose publicly.

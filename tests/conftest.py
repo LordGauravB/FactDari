@@ -117,7 +117,7 @@ def sample_ai_usage():
         'ProfileID': 1,
         'OperationType': 'explain',
         'Status': 'SUCCESS',
-        'ModelName': 'deepseek-ai/DeepSeek-V3.1',
+        'ModelName': 'deepseek-ai/DeepSeek-V4-Pro',
         'Provider': 'together',
         'InputTokens': 150,
         'OutputTokens': 200,
